@@ -1,0 +1,8 @@
+node_modules
+.next
+runtime
+.env*
+.playwright-mcp
+.git
+*.tsbuildinfo
+AI Builder Cup 주제 기획.md
