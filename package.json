@@ -4,7 +4,7 @@
   "private": true,
   "description": "Scene: automatic audio description that fits the silence between the lines.",
   "scripts": {
-    "dev": "next dev -H 127.0.0.1 -p 21960",
+    "dev": "WATCHPACK_POLLING=true next dev --webpack -H 127.0.0.1 -p 21960",
     "build": "next build",
     "start": "next start -H ${HOSTNAME_BIND:-127.0.0.1} -p ${PORT:-21960}",
     "typecheck": "tsc --noEmit",

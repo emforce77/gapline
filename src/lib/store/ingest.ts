@@ -8,6 +8,8 @@ const MAX_THUMBNAILS = 60;
 const THUMB_HEIGHT = 72;
 /** Uploads are analysed as a short clip; longer films belong to the batch path, not the live demo. */
 export const MAX_UPLOAD_SECONDS = 90;
+/** Poster frame position as a share of the clip; past the opening titles in most films. */
+const POSTER_AT = 0.45;
 
 /** One row of thumbnails, evenly spaced; the timeline scales it to its own width. */
 async function writeStrip(clipFile: string, outFile: string, clipSeconds: number): Promise<number> {
@@ -78,6 +80,18 @@ export async function createProject(input: {
     throw new Error(`Clip is ${clipSeconds.toFixed(0)} s; the limit is ${MAX_UPLOAD_SECONDS} s`);
   }
   const stripStepSeconds = await writeStrip(clipFile, join(dir, "strip.jpg"), clipSeconds);
+  await runFfmpeg([
+    "-y",
+    "-ss",
+    (clipSeconds * POSTER_AT).toFixed(2),
+    "-i",
+    clipFile,
+    "-frames:v",
+    "1",
+    "-q:v",
+    "3",
+    join(dir, "poster.jpg"),
+  ]);
   const project: Project = {
     id: input.id,
     title: input.title,

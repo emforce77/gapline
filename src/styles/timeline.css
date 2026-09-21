@@ -1,0 +1,157 @@
+.timeline {
+  display: grid;
+  grid-template-columns: 96px minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px 14px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  user-select: none;
+}
+
+.tl-labels {
+  display: grid;
+  grid-template-rows: 20px 48px 22px 26px 34px;
+  row-gap: 8px;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+.tl-labels span {
+  display: flex;
+  align-items: center;
+}
+
+.tl-body {
+  position: relative;
+  display: grid;
+  grid-template-rows: 20px 48px 22px 26px 34px;
+  row-gap: 8px;
+  cursor: pointer;
+}
+
+.tl-ruler {
+  position: relative;
+  border-bottom: 1px solid var(--border);
+}
+
+.tl-tick {
+  position: absolute;
+  bottom: 2px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.tl-tick:first-child {
+  transform: none;
+}
+
+.tl-track {
+  position: relative;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+
+.tl-picture {
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+  opacity: 0.85;
+}
+
+.tl-dialogue {
+  position: absolute;
+  top: 3px;
+  bottom: 3px;
+  border-radius: 2px;
+  background: var(--dialogue);
+  animation: grow 300ms ease-out both;
+}
+
+.tl-room {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed var(--border-strong);
+  border-radius: 4px;
+  background: var(--room);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  animation: grow 300ms ease-out both;
+}
+
+.tl-narration .cue {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  display: flex;
+  align-items: center;
+  min-width: 18px;
+  padding: 0 6px;
+  border-radius: 4px;
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+  overflow: hidden;
+  animation: grow 300ms ease-out both;
+  transition:
+    background 200ms ease,
+    border-color 200ms ease;
+}
+
+.cue.approved {
+  background: rgba(241, 181, 75, 0.35);
+}
+
+.cue.fits {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+.cue.rejected {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.cue.rejected .cue-id::after {
+  content: " ✗";
+}
+
+.cue.dropped {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--muted);
+  text-decoration: line-through;
+}
+
+.cue.selected {
+  outline: 2px solid var(--text-strong);
+  outline-offset: 1px;
+}
+
+.tl-playhead {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text-strong);
+  pointer-events: none;
+}
+
+@keyframes grow {
+  from {
+    opacity: 0;
+    transform: scaleY(0.4);
+  }
+}
