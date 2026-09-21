@@ -3,27 +3,6 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { runFfmpeg } from "./ffmpeg";
 
-/** Mono 16 kHz MP3 for listening; Gemini resamples to 16 kHz anyway, so nothing is lost. */
-export async function encodeListeningAudio(file: string): Promise<Buffer> {
-  const { stdout } = await runFfmpeg([
-    "-i",
-    file,
-    "-vn",
-    "-ac",
-    "1",
-    "-ar",
-    "16000",
-    "-c:a",
-    "libmp3lame",
-    "-b:a",
-    "48k",
-    "-f",
-    "mp3",
-    "pipe:1",
-  ]);
-  return stdout;
-}
-
 /**
  * Small H.264 copy for watching. Gemini samples about one frame per second at reduced
  * resolution, so a 360-line proxy keeps the request small without changing what it sees.
