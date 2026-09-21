@@ -17,9 +17,10 @@ const STAGE_EFFORT: Record<string, Effort | undefined> = {
   // Measured on tos-opening (65 s). The writer at the default level spent 13–18k thinking tokens
   // (85–117 s) per draft; "medium" with the clip in view gave the cleanest drafts (no rejections in
   // Korean). "low" drafts faster but misplaced lines in time. A revision is a small edit: "low".
-  // The reviewer keeps the default level: it is the quality gate (at "low" it passed a "화면이" framing).
+  // The reviewer thinks hardest: it is the quality gate (at "low" it passed a "화면이" framing).
   write: "medium",
   revise: "low",
+  review: "high",
 };
 
 export function reasoningEffort(

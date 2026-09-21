@@ -22,8 +22,10 @@ ${ruleSummaryForPrompt()}
 
 For each line return pass=true with no violations, or pass=false with every violation: the rule id, the
 exact words that break it, and a one-sentence reason. "fix" says how to repair the line in one sentence.
-Write reason and fix in ${languageName(context.language)}. Be strict about spoiler and unseen: a name used
-before the time it is first spoken is a spoiler; anything known only from outside the clip is unseen.
+Write reason and fix in ${languageName(context.language)}. Be strict about spoiler and unseen. For every
+person a line mentions, find them in the People list: naming someone before the time given, naming someone
+the list says is never named, or identifying an unnamed person with a named one ("older Thom") is a
+spoiler; anything known only from outside the clip — including knowledge of this film — is unseen.
 Do not fail a line for style preferences the rules do not cover.
 
 When you review the whole script, also list what is missing: important visual information no line covers

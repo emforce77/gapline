@@ -172,8 +172,10 @@ export async function runDescription(
   });
 
   try {
-    const video = await encodeWatchingVideo(options.clipFile);
-    const videoDataUrl = `data:video/mp4;base64,${video.toString("base64")}`;
+    // The small watching copy is needed by watch, write and review; encode it once, in the background.
+    const videoDataUrlPromise = encodeWatchingVideo(options.clipFile).then(
+      (video) => `data:video/mp4;base64,${video.toString("base64")}`,
+    );
 
     // 1. Hear and watch are independent: run them together.
     const [speech, scene] = options.cached
@@ -187,9 +189,9 @@ export async function runDescription(
               ledgerFile,
             }),
           ),
-          stage("watch", () =>
+          stage("watch", async () =>
             watchClip({
-              videoDataUrl,
+              videoDataUrl: await videoDataUrlPromise,
               clipSeconds: options.clipSeconds,
               model: options.reviewerModel,
               ledgerFile,
@@ -205,6 +207,7 @@ export async function runDescription(
     );
     await emit({ type: "gaps", gaps });
 
+    const videoDataUrl = await videoDataUrlPromise;
     const context: ClipContext = {
       language: options.language,
       density: options.density,

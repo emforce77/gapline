@@ -9,12 +9,16 @@ service="${SERVICE:-scene-ad}"
 number="$(gcloud projects describe "$project" --format='value(projectNumber)')"
 bucket="${DATA_BUCKET:-scene-ad-data-$number}"
 account="scene-ad-run@$project.iam.gserviceaccount.com"
+# Builds run as their own account (roles/run.builder); the default compute account has no access
+# to the source bucket in this project.
+builder="projects/$project/serviceAccounts/scene-ad-build@$project.iam.gserviceaccount.com"
 
 # The project's organisation only allows its own domain in IAM policies, so the service is made
 # public by switching off the invoker check instead of granting allUsers.
 gcloud run deploy "$service" \
   --project "$project" --region "$region" --source . \
   --service-account "$account" \
+  --build-service-account "$builder" \
   --execution-environment gen2 \
   --add-volume "name=data,type=cloud-storage,bucket=$bucket" \
   --add-volume-mount "volume=data,mount-path=/data" \
