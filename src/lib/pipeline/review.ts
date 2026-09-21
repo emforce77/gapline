@@ -1,6 +1,7 @@
 import { callStructured } from "../llm/openrouter";
 import { reasoningEffort } from "../models";
 import {
+  DENSITY_STYLE,
   languageName,
   renderGaps,
   renderNames,
@@ -27,8 +28,9 @@ Do not fail a line for style preferences the rules do not cover.
 
 When you review the whole script, also list what is missing: important visual information no line covers
 (a new place or time, a main character's first appearance, essential on-screen text, a key action) that a
-gap could still hold — only where the gap has at least 1.2 s of free room outside existing lines. When you
-review only some lines, return missing as an empty list.`;
+gap could still hold — only where the gap has at least 1.2 s of free room outside existing lines. Judge it
+by the density the script was written for — ${DENSITY_STYLE[context.density]} When you review only some
+lines, return missing as an empty list.`;
 }
 
 export async function reviewLines(input: {

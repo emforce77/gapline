@@ -25,7 +25,7 @@ const LANGUAGE_STYLE: Record<Language, string> = {
     "appear.'",
 };
 
-const DENSITY_STYLE: Record<Density, string> = {
+export const DENSITY_STYLE: Record<Density, string> = {
   standard:
     "Standard density: describe the key visual information in every usable gap. A long gap may hold " +
     "several lines, each placed at the moment it describes.",
