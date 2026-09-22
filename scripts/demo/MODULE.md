@@ -38,9 +38,19 @@ Outputs (gitignored): `runtime/demo/media/*` (downloads), `runtime/demo/<lang>/{
   capture 57 fps during the replay animation, 30 fps during playback, 9–19 fps on static screens
   (the screencast sends frames only on change; ffconcat durations hold each one).
 
+- [2026-09-22] Parking the paused player on 57.5 s right after `.metrics` appeared did nothing: the
+  player swaps to the described film when the run loads and restores the previous position (0 s).
+  The recorder now waits until the video's `currentSrc` is the run's film and `readyState >= 2`.
+- [2026-09-22] KO presenter first came to 122.0 s (EN 113.0 s), which put the plan at ~177 s. Four
+  sentences were tightened to 116.2 s; the KO video ended at 169.6 s.
+
 ## Status
 
-- Works end to end with estimated presenter timing (EN). Real presenter voice needs a valid gcloud login
-  (Text-to-Speech); `voice` is the only step that calls a paid API.
-- A KO standard run on the service is required before `npm run demo -- ko` (the 2026-09-22 attempt failed
-  with an OpenRouter upstream rate limit during review).
+- [2026-09-22] Both videos built from revision scene-ad-00003-667:
+  - EN `runtime/demo/en/scene-demo-en.mp4` — 168.1 s, -16.2 LUFS, run 20260921t082401167 (7/7 lines,
+    $0.190, 4 min 11 s), featured line L5 (length loop).
+  - KO `runtime/demo/ko/scene-demo-ko.mp4` — 169.6 s, -16.1 LUFS, run 20260922t024410240 (4/4 lines,
+    1 dropped after review, $0.219, 5 min 14 s), featured line L3 (review loop, genuinely rewritten).
+  - Presenter TTS: EN 1,678 chars $0.050, KO 1,087 chars $0.033. Checks in `scene-demo-<lang>_check.md`.
+- Only `voice` calls a paid API (Google Text-to-Speech, gcloud login). Runs themselves are made on the
+  service; Gemini goes through OpenRouter there.

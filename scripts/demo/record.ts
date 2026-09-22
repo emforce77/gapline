@@ -171,7 +171,12 @@ export async function recordApp(input: {
       await clickLike(page, page.locator(".sample-card"));
       await page.waitForURL(`**/p/${PROJECT_ID}`);
       await page.locator(".metrics").waitFor();
-      // Park the paused film on a telling frame instead of the black first frame.
+      // Park the paused film on a telling frame instead of the black first frame. The player swaps to
+      // the described film once the run loads and restores the old position, so wait for that first.
+      await page.waitForFunction(() => {
+        const video = document.querySelector<HTMLVideoElement>(".player-frame video")!;
+        return video.currentSrc.includes("/runs/") && video.readyState >= 2;
+      });
       await page.evaluate((at) => {
         document.querySelector<HTMLVideoElement>(".player-frame video")!.currentTime = at;
       }, POSTER_SECONDS);

@@ -279,7 +279,7 @@ export function buildStoryboard(lang: Language, data: DemoData): Scene[] {
           "빈 구간은 코드가 계산하고, 제미나이가 구간마다 해설을 씁니다.",
         ),
         s(
-          "이어서 장애인방송 가이드라인과 넷플릭스 스타일 가이드에서 가져온 여덟 가지 규칙으로 모든 문장을 검수합니다.",
+          "그리고 장애인방송 가이드라인과 넷플릭스 기준에서 온 여덟 가지 규칙으로 모든 문장을 검수합니다.",
         ),
       ],
       hold: 0.4,
@@ -292,8 +292,8 @@ export function buildStoryboard(lang: Language, data: DemoData): Scene[] {
           ? [
               s(`이 문장의 초안은 ‘${rule!.title.ko}’ 규칙에 걸려 반려됐습니다.`),
               s(
-                "Gemini가 다시 쓴 문장은 검수를 통과했고, Chirp 3 HD가 읽었습니다. 막대는 이 문장이 빈 구간 안에 들어간다는 뜻입니다.",
-                "제미나이가 다시 쓴 문장은 검수를 통과했고, 처프 쓰리 에이치디가 읽었습니다. 막대는 이 문장이 빈 구간 안에 들어간다는 뜻입니다.",
+                "다시 쓴 문장은 검수를 통과했고, 읽은 길이도 빈 구간 안에 들어갑니다.",
+                "다시 쓴 문장은 검수를 통과했고, 읽은 길이도 빈 구간 안에 들어갑니다.",
               ),
             ]
           : [
@@ -332,7 +332,7 @@ export function buildStoryboard(lang: Language, data: DemoData): Scene[] {
           "단계마다 구글 모델이 따로 있습니다. 듣기는 처프 쓰리, 보기와 쓰기와 검수는 제미나이, 목소리는 처프 쓰리 에이치디입니다.",
         ),
         s(
-          "문장을 어디에 둘지와 실제 길이 확인은 코드가 합니다. 긴 문장은 조금 빠르게 읽고, 그래도 길면 줄입니다.",
+          "문장의 자리와 실제 길이는 코드가 확인합니다. 길면 조금 빠르게 읽고, 그래도 길면 줄여 씁니다.",
         ),
       ],
       hold: 0.5,
@@ -342,7 +342,7 @@ export function buildStoryboard(lang: Language, data: DemoData): Scene[] {
       show: { card: "numbers" },
       say: [
         s(
-          `이 ${summary.clipSeconds}초짜리 영상에서 해설 ${summary.cuesShipped}줄 중 ${allFit ? "모두가" : `${summary.cuesFitting}줄이`} 빈 구간 안에 들어갔고, ` +
+          `${summary.clipSeconds}초 영상에서 해설 ${summary.cuesShipped}줄이 ${allFit ? "모두" : `중 ${summary.cuesFitting}줄이`} 빈 구간에 들어갔고, ` +
             `대사와 겹친 시간은 ${summary.overlapWithSpeechSeconds}초입니다.`,
         ),
         s(
