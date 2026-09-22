@@ -1,20 +1,19 @@
 /**
- * Records the deployed app the way a person would use it: open the sample, replay the run, open the
- * rewritten line, listen with eyes closed, switch to Brief. Each beat lasts at least as long as the
- * presenter needs for it (voice.ts plan), so the builder never has to freeze or cut the picture.
+ * Records a real upload, the selected run's saved trace, review history, a paid human edit and
+ * playback/download. The builder labels time compression; listening remains at normal speed.
  *
  * Frames come from the Chrome DevTools screencast with their capture time; the page logs when the
  * film starts playing, so the builder can lay the film's own sound under the picture.
  *
- * Output: runtime/demo/<lang>/rec/{frames/*.jpg, frames.json, marks.json, media.json}
+ * Output: runtime/demo-v2/<lang>/rec/{frames/*.jpg, frames.json, marks.json, media.json}
  */
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { chromium, type Locator, type Page } from "playwright-core";
 import { dictionary } from "../../src/i18n";
 import type { Language } from "../../src/lib/pipeline/schemas";
 import { CHROME_PATH } from "./cards";
-import { PROJECT_ID, SERVICE_URL, type DemoData } from "./demo-data";
+import { PROJECT_ID, SERVICE_URL, loadRunById, saveEditedRun, type DemoData } from "./demo-data";
 import type { Beat, Scene } from "./storyboard";
 import { featuredLine, LISTEN_FROM, LISTEN_TO } from "./storyboard";
 import { planScene, type VoicedSentence } from "./voice";
@@ -23,8 +22,6 @@ import { planScene, type VoicedSentence } from "./voice";
 const VIEWPORT = { width: 1440, height: 720 };
 const SCALE = 4 / 3;
 const CURSOR_MOVE_MS = 650;
-/** A frame of the sample that shows what the film is about (the man inspecting a brain). */
-const POSTER_SECONDS = 57.5;
 
 export interface Frame {
   file: string;
@@ -36,6 +33,8 @@ export interface Mark {
   beat: Beat;
   start: number;
   end: number;
+  targetSeconds?: number;
+  processingSeconds?: number;
 }
 
 export interface MediaEvent {
@@ -93,21 +92,6 @@ async function clickLike(page: Page, target: Locator): Promise<void> {
   await page.mouse.click(x, y);
 }
 
-async function smoothScroll(page: Page, top: number): Promise<void> {
-  await page.evaluate((y) => window.scrollTo({ top: y, behavior: "smooth" }), top);
-  await page.waitForTimeout(700);
-}
-
-/** Scrolls so the element's bottom sits just above the bottom of the viewport. */
-async function scrollToBottomOf(page: Page, selector: string): Promise<void> {
-  const top = await page.evaluate((sel) => {
-    const el = document.querySelector(sel)!;
-    const rect = el.getBoundingClientRect();
-    return Math.max(0, window.scrollY + rect.bottom - window.innerHeight + 16);
-  }, selector);
-  await smoothScroll(page, top);
-}
-
 export async function recordApp(input: {
   lang: Language;
   data: DemoData;
@@ -118,136 +102,217 @@ export async function recordApp(input: {
   const { lang, data, scenes, voiced, outDir } = input;
   const t = dictionary(lang);
   const framesDir = join(outDir, "frames");
-  await rm(outDir, { recursive: true, force: true });
   await mkdir(framesDir, { recursive: true });
-
+  const resumeListen = process.env.DEMO_RECORD_LISTEN_ONLY === "1";
+  if (resumeListen && data.edited.runId === data.editBase.runId)
+    throw new Error("No completed edit to resume");
   const browser = await chromium.launch({
     executablePath: CHROME_PATH,
     args: ["--autoplay-policy=no-user-gesture-required", "--hide-scrollbars"],
   });
-  const frames: Frame[] = [];
+  const frames: Frame[] = resumeListen
+    ? JSON.parse(await readFile(join(outDir, "frames.json"), "utf8"))
+    : [];
   const writes: Promise<void>[] = [];
-  const marks: Mark[] = [];
+  const marks: Mark[] = resumeListen
+    ? JSON.parse(await readFile(join(outDir, "marks.json"), "utf8")).filter(
+        (m: Mark) => m.beat !== "listen",
+      )
+    : [];
+  const captureId = Date.now().toString(36);
   try {
-    const context = await browser.newContext({ viewport: VIEWPORT, deviceScaleFactor: SCALE });
+    const context = await browser.newContext({
+      viewport: VIEWPORT,
+      deviceScaleFactor: SCALE,
+      acceptDownloads: true,
+      storageState: resumeListen ? join(outDir, "session.json") : undefined,
+    });
     await context.addCookies([{ name: "scene_lang", value: lang, url: SERVICE_URL }]);
     await context.addInitScript(CURSOR_SCRIPT);
     const page = await context.newPage();
     await page.goto(SERVICE_URL, { waitUntil: "networkidle" });
     await page.evaluate(() => document.fonts.ready);
-
     const cdp = await context.newCDPSession(page);
     cdp.on("Page.screencastFrame", (frame) => {
-      const file = join(framesDir, `${String(frames.length).padStart(6, "0")}.jpg`);
+      const file = join(framesDir, `${captureId}-${String(frames.length).padStart(6, "0")}.jpg`);
       frames.push({ file, t: frame.metadata.timestamp ?? Date.now() / 1000 });
       writes.push(writeFile(file, Buffer.from(frame.data, "base64")));
       void cdp.send("Page.screencastFrameAck", { sessionId: frame.sessionId });
     });
     await cdp.send("Page.startScreencast", {
       format: "jpeg",
-      quality: 92,
-      maxWidth: VIEWPORT.width * SCALE,
-      maxHeight: VIEWPORT.height * SCALE,
+      quality: 90,
+      maxWidth: 1920,
+      maxHeight: 960,
       everyNthFrame: 1,
     });
-    await page.waitForTimeout(500);
-
-    const beat = async (name: Beat, act: (start: number) => Promise<void>) => {
+    const beat = async (name: Beat, act: () => Promise<void>) => {
       const scene = scenes.find((s) => "beat" in s.show && s.show.beat === name)!;
-      const minSeconds = planScene(scene, voiced).minSeconds;
+      const target = planScene(scene, voiced).minSeconds;
       const start = Date.now() / 1000;
-      await act(start);
-      const left = minSeconds - (Date.now() / 1000 - start);
-      if (left > 0) await page.waitForTimeout(left * 1000);
-      marks.push({ beat: name, start, end: Date.now() / 1000 });
-    };
-    const untilOffset = async (start: number, offset: number) => {
-      const wait = start + offset - Date.now() / 1000;
-      if (wait > 0) await page.waitForTimeout(wait * 1000);
-    };
-
-    await beat("open", async () => {
-      await page.waitForTimeout(1500);
-      await clickLike(page, page.locator(".sample-card"));
-      await page.waitForURL(`**/p/${PROJECT_ID}`);
-      await page.locator(".metrics").waitFor();
-      // Park the paused film on a telling frame instead of the black first frame. The player swaps to
-      // the described film once the run loads and restores the old position, so wait for that first.
-      await page.waitForFunction(() => {
-        const video = document.querySelector<HTMLVideoElement>(".player-frame video")!;
-        return video.currentSrc.includes("/runs/") && video.readyState >= 2;
-      });
-      await page.evaluate((at) => {
-        document.querySelector<HTMLVideoElement>(".player-frame video")!.currentTime = at;
-      }, POSTER_SECONDS);
-      await page.waitForTimeout(1200);
-      await scrollToBottomOf(page, ".metrics");
-      await glideTo(page, page.locator(".tl-dialogue").nth(4));
-      await page.waitForTimeout(1300);
-      await glideTo(page, page.locator(".tl-room").nth(1));
-      await page.waitForTimeout(1300);
-      await glideTo(page, page.locator(".tl-narration .cue").nth(1));
-    });
-
-    await beat("replay", async () => {
-      await clickLike(page, page.getByRole("button", { name: t.workspace.replay }));
-      await page.locator(".replay-badge").waitFor();
-      await glideTo(page, page.locator(".stages"));
-      await page.locator(".replay-badge").waitFor({ state: "detached", timeout: 60_000 });
-    });
-
-    const featured = featuredLine(data.standard);
-    await beat("detail", async () => {
-      await clickLike(page, page.locator(".tl-narration .cue", { hasText: featured.cue.id }));
-      await page.locator(".versions").waitFor();
-      await page.waitForTimeout(800);
-      if (featured.loop === "review") {
-        await glideTo(page, page.locator(".verdict.fail").first());
-      } else {
-        await glideTo(page, page.locator(".version").first());
-        await page.waitForTimeout(2500);
-        await glideTo(page, page.locator(".fit"));
+      try {
+        await act();
+        const left = target - (Date.now() / 1000 - start);
+        if (left > 0) await page.waitForTimeout(left * 1000);
+      } finally {
+        marks.push({
+          beat: name,
+          start,
+          end: Date.now() / 1000,
+          targetSeconds: target,
+          ...(name === "edit" ? { processingSeconds: data.edited.summary.wallSeconds } : {}),
+        });
+        await Promise.all(writes);
+        await writeFile(
+          join(outDir, "frames.json"),
+          JSON.stringify([...frames].sort((a, b) => a.t - b.t)),
+        );
+        await writeFile(join(outDir, "marks.json"), JSON.stringify(marks, null, 2));
+        await context.storageState({ path: join(outDir, "session.json") });
+        await writeFile(
+          join(outDir, "media.json"),
+          JSON.stringify(await page.evaluate(() => (window as any).__mediaLog), null, 2),
+        );
+        console.log(`record ${name}: ${(Date.now() / 1000 - start).toFixed(1)} s captured`);
       }
-    });
-
-    const listen = scenes.find((s) => s.id === "listen")!;
-    const listenPlan = planScene(listen, voiced);
-    await beat("listen", async (start) => {
-      await clickLike(page, page.locator(".button.back"));
-      await smoothScroll(page, 0);
-      await clickLike(page, page.getByRole("button", { name: t.workspace.eyesClosed }));
-      await page.evaluate((from) => {
-        const video = document.querySelector<HTMLVideoElement>(".player-frame video")!;
-        video.currentTime = from;
+    };
+    const openRun = async (id: string) => {
+      await page.goto(`${SERVICE_URL}/p/${PROJECT_ID}?run=${id}`, { waitUntil: "networkidle" });
+      await page.locator(".metrics").waitFor();
+      await page.waitForFunction((id) => {
+        const v = document.querySelector<HTMLVideoElement>("video");
+        return !!v && v.currentSrc.includes(id) && v.readyState >= 2;
+      }, id);
+      await page.locator("video").evaluate((v: HTMLVideoElement) => {
+        v.currentTime = 57.5;
+      });
+      await page.waitForTimeout(300);
+    };
+    if (!resumeListen) {
+      await beat("open", async () => {
+        const uploaded = page.waitForResponse(
+          (r) => r.url().endsWith("/api/projects") && r.request().method() === "POST",
+          { timeout: 120000 },
+        );
+        await page.locator('input[type="file"]').setInputFiles(data.clipFile);
+        const response = await uploaded;
+        if (!response.ok())
+          throw new Error(
+            `Recorded upload failed: HTTP ${response.status()} ${await response.text()}`,
+          );
+        await page.waitForURL("**/p/u-*", { timeout: 120000 });
+        await page.getByRole("button", { name: t.workspace.generate, exact: true }).waitFor();
+      });
+      await openRun(data.standard.runId);
+      await beat("replay", async () => {
+        await clickLike(page, page.getByRole("button", { name: t.workspace.replay, exact: false }));
+        await page.locator(".replay-badge").waitFor();
+        await page.locator(".replay-badge").waitFor({ state: "detached", timeout: 60000 });
+      });
+      await beat("detail", async () => {
+        const featured = featuredLine(data.standard);
+        await clickLike(
+          page,
+          page
+            .locator(".tl-narration .cue")
+            .filter({ hasText: new RegExp(`^${featured.cue.id}$`) }),
+        );
+        await page.locator(".versions").waitFor();
+        await glideTo(page, page.locator(".verdict.fail").first());
+        await page.waitForTimeout(6000);
+        await glideTo(page, page.locator(".versions .version").last());
+        await page.screenshot({ path: join(outDir, "review.png") });
+      });
+      if (process.env.DEMO_EDIT_CAPTURE) {
+        const saved = JSON.parse(await readFile(process.env.DEMO_EDIT_CAPTURE, "utf8"));
+        if (saved.runId !== data.edited.runId) throw new Error("Recovered edit run mismatch");
+        frames.push(...saved.frames);
+        marks.push(saved.mark);
+        await openRun(data.edited.runId);
+        await page
+          .locator(".tl-narration .cue")
+          .filter({ hasText: new RegExp(`^${data.edit.cueId}$`) })
+          .click();
+        await page.locator(".cue-editor").waitFor();
+        await page.locator(".cue-editor").scrollIntoViewIfNeeded();
+        await page.screenshot({ path: join(outDir, "editor.png") });
+        console.log(
+          "record edit: reusing the actual completed edit capture without another API call",
+        );
+      } else {
+        await openRun(data.editBase.runId);
+        await beat("edit", async () => {
+          await clickLike(
+            page,
+            page
+              .locator(".tl-narration .cue")
+              .filter({ hasText: new RegExp(`^${data.edit.cueId}$`) }),
+          );
+          await page.locator(".cue-editor").waitFor();
+          await glideTo(page, page.locator(".cue-editor textarea"));
+          await page.locator(".cue-editor textarea").fill(data.edit.text);
+          await page.locator('.cue-editor input[name="start"]').fill(String(data.edit.start));
+          await page.waitForTimeout(1500);
+          const responsePromise = page.waitForResponse(
+            (r) => r.url().endsWith("/edits") && r.request().method() === "POST",
+            { timeout: 900000 },
+          );
+          await clickLike(page, page.locator('.cue-editor button[type="submit"]'));
+          const response = await responsePromise;
+          const result = await response.json();
+          if (!response.ok()) throw Error(`Recorded edit failed: ${JSON.stringify(result)}`);
+          await writeFile(join(outDir, "edit-request.json"), response.request().postData()!);
+          await page.waitForFunction(
+            (id) =>
+              document.querySelector<HTMLSelectElement>(".result-picker select")?.value === id,
+            result.runId,
+          );
+          data.edited = await loadRunById(result.runId);
+          await saveEditedRun(lang, result.runId);
+          await page.waitForTimeout(1500);
+          await page.screenshot({ path: join(outDir, "editor.png") });
+        });
+      }
+    } else {
+      await openRun(data.edited.runId);
+    }
+    const back = page.locator(".button.back");
+    if (await back.count()) await back.click();
+    await beat("listen", async () => {
+      const scene = scenes.find((s) => s.id === "listen")!;
+      const plan = planScene(scene, voiced);
+      const start = Date.now() / 1000;
+      await page.evaluate(() => window.scrollTo(0, 0));
+      await clickLike(
+        page,
+        page.getByRole("button", { name: t.workspace.eyesClosed, exact: true }),
+      );
+      await page.locator("video").evaluate((v: HTMLVideoElement, from: number) => {
+        v.currentTime = from;
       }, LISTEN_FROM);
-      await glideTo(page, page.locator(".button.play"));
-      await untilOffset(start, listenPlan.film!.start);
+      const wait = start + plan.film!.start - Date.now() / 1000 - 0.75;
+      if (wait > 0) await page.waitForTimeout(wait * 1000);
       await clickLike(page, page.locator(".button.play"));
-      // Stop on the film's own clock, so a late start never cuts the end of the stretch.
       await page.waitForFunction(
-        (to) => document.querySelector<HTMLVideoElement>(".player-frame video")!.currentTime >= to,
+        (to) => document.querySelector<HTMLVideoElement>("video")!.currentTime >= to,
         LISTEN_TO,
-        { timeout: 60_000, polling: 50 },
+        { timeout: 30000, polling: 50 },
       );
-      await page.evaluate(() =>
-        document.querySelector<HTMLVideoElement>(".player-frame video")!.pause(),
-      );
+      await page.locator("video").evaluate((v: HTMLVideoElement) => v.pause());
+      const [download] = await Promise.all([
+        page.waitForEvent("download", { timeout: 10000 }),
+        clickLike(page, page.locator('.downloads a[href*="descriptions.vtt"]')),
+      ]);
+      await download.saveAs(join(outDir, "downloaded-descriptions.vtt"));
     });
-
-    await beat("brief", async () => {
-      await clickLike(page, page.getByRole("button", { name: t.workspace.eyesOpen }));
-      await scrollToBottomOf(page, ".timeline");
-      await clickLike(page, page.getByRole("button", { name: t.workspace.densityBrief }));
-      await page.locator(".tl-narration .cue").first().waitFor();
-      await page.waitForTimeout(600);
-    });
-
     await cdp.send("Page.stopScreencast");
     const media = (await page.evaluate(() => (window as any).__mediaLog)) as MediaEvent[];
     await Promise.all(writes);
+    frames.sort((a, b) => a.t - b.t);
     await writeFile(join(outDir, "frames.json"), JSON.stringify(frames));
     await writeFile(join(outDir, "marks.json"), JSON.stringify(marks, null, 2));
     await writeFile(join(outDir, "media.json"), JSON.stringify(media, null, 2));
+    await context.storageState({ path: join(outDir, "session.json") });
     return { frames, marks, media };
   } finally {
     await browser.close();

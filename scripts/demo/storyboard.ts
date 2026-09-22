@@ -1,362 +1,195 @@
-/**
- * The demo, scene by scene, in Korean and English. Every number the presenter says is read from the
- * runs the deployed service measured (demo-data.ts), never typed in.
- *
- * A scene shows one thing (a card, black, or a beat of the app recording), the presenter says its
- * sentences back to back, and some scenes then play a stretch of the film's sound.
- */
-import { GUIDELINE_RULES } from "../../src/lib/pipeline/guidelines";
 import type { Cue, Language } from "../../src/lib/pipeline/schemas";
 import type { DemoData, DemoRun } from "./demo-data";
-
-export type Beat = "open" | "replay" | "detail" | "listen" | "brief";
+export type Beat = "open" | "replay" | "detail" | "edit" | "listen";
 export type CardId = "problem" | "pipeline" | "numbers" | "close";
-
 export interface Sentence {
-  /** Shown as the caption. */
   text: string;
-  /** Sent to text-to-speech when the caption spelling would be read wrongly. */
   speak?: string;
 }
-
 export interface FilmSound {
   track: "original" | "described";
   from: number;
   to: number;
-  /** Caption while the film plays. */
   caption: string;
 }
-
 export interface Scene {
   id: string;
   show: { card: CardId } | { black: true } | { beat: Beat };
   say: Sentence[];
   film?: FilmSound;
-  /** Seconds kept after the last sound of the scene. */
   hold: number;
+  targetSeconds: number;
 }
-
-/** The stretch of the film heard twice: once bare, once described. */
-export const LISTEN_FROM = 43.8;
-export const LISTEN_TO = 62.6;
-
+export const LISTEN_FROM = 54;
+export const LISTEN_TO = 60.4;
 export const PRESENTER_VOICES: Record<Language, { languageCode: string; name: string }> = {
   ko: { languageCode: "ko-KR", name: "ko-KR-Chirp3-HD-Aoede" },
   en: { languageCode: "en-US", name: "en-US-Chirp3-HD-Aoede" },
 };
-
 export const SERVICE_HOST = "scene-ad-958994530029.asia-northeast3.run.app";
-export const REPO_URL = "github.com/emforce77/scene-ad";
-
-const s = (text: string, speak?: string): Sentence => (speak ? { text, speak } : { text });
-
-/** "4 minutes 11 seconds" / "4분 11초": written out so text-to-speech reads it naturally. */
-function spokenDuration(seconds: number, lang: Language): string {
-  const total = Math.round(seconds);
-  const m = Math.floor(total / 60);
-  const sec = total % 60;
-  if (lang === "ko") return m > 0 ? `${m}분 ${sec}초` : `${sec}초`;
-  const unit = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
-  return m > 0 ? `${unit(m, "minute")} ${unit(sec, "second")}` : unit(sec, "second");
-}
-
-/**
- * The line the demo opens in the inspector. A line the reviewer rejected and Gemini genuinely rewrote
- * shows the review loop; failing that, a line whose first voicing overran its pause shows the length
- * loop. Which one depends on what the run actually did.
- */
+const s = (text: string): Sentence => ({ text });
 export function featuredLine(run: DemoRun): { cue: Cue; loop: "review" | "length" } {
-  const fits = run.cues.filter((c) => c.status === "fits");
-  const rewritten = fits.find(
+  const cue = run.cues.find(
     (c) =>
+      c.status === "fits" &&
       c.versions.some((v) => v.review && !v.review.pass) &&
       c.versions.some((v) => v.by === "revise" && v.text !== c.versions[0].text),
   );
-  if (rewritten) return { cue: rewritten, loop: "review" };
-  const shortened = fits.filter((c) => c.versions.some((v) => v.by === "shorten"));
-  const cue = shortened.find((c) => c.start >= LISTEN_FROM && c.start < LISTEN_TO) ?? shortened[0];
-  if (!cue) throw new Error(`${run.runId} has neither a rewritten nor a shortened line to show`);
-  return { cue, loop: "length" };
+  if (cue) return { cue, loop: "review" };
+  const shortened = run.cues.find(
+    (c) => c.status === "fits" && c.versions.some((v) => v.by === "shorten"),
+  );
+  if (!shortened) throw Error("No real improved review or length example in pinned run");
+  return { cue: shortened, loop: "length" };
 }
-
 export function buildStoryboard(lang: Language, data: DemoData): Scene[] {
-  const run = data.standard;
-  const summary = run.summary;
-  const featured = featuredLine(run);
-  const first = featured.cue.versions[0];
-  const rule =
-    featured.loop === "review"
-      ? GUIDELINE_RULES.find(
-          (r) => r.id === featured.cue.versions.find((v) => v.review && !v.review.pass)!.review!.violations[0].rule,
-        )!
-      : null;
-  const firstSeconds = (first.voice?.seconds ?? 0).toFixed(1);
-  const roomSeconds = (featured.cue.windowEnd - featured.cue.start).toFixed(1);
-  const allFit = summary.cuesFitting === summary.cuesShipped;
-  const duration = spokenDuration(summary.wallSeconds, lang);
-
-  if (lang === "en") {
-    const cents = Math.round(summary.costUsd * 100);
-    return [
-      {
-        id: "cold",
-        show: { black: true },
-        say: [s("Close your eyes. This is a scene from a film, the way a blind viewer hears it.")],
-        film: {
-          track: "original",
-          from: LISTEN_FROM,
-          to: LISTEN_TO,
-          caption: "Sound only · no description",
-        },
-        hold: 0.6,
-      },
-      {
-        id: "problem",
-        show: { card: "problem" },
-        say: [
-          s(
-            "Audio description fixes that. A narrator says what is on screen, in the pauses between the lines.",
-          ),
-          s("In September 2026, Korea's Supreme Court widened the duty of cinemas to provide it."),
-          s(
-            "But it is still written, recorded and synced by hand: about fourteen million won for one Korean film.",
-          ),
-          s("Scene makes it automatically, with Gemini on Google Cloud."),
-        ],
-        hold: 0.5,
-      },
-      {
-        id: "open",
-        show: { beat: "open" },
-        say: [
-          s(
-            "Give Scene a short clip. Here, the opening of Tears of Steel, an open movie by the Blender Foundation.",
-          ),
-          s(
-            "The timeline shows the dialogue, the room between the words, and each narration line placed in that room.",
-          ),
-        ],
-        hold: 0.4,
-      },
-      {
-        id: "replay",
-        show: { beat: "replay" },
-        say: [
-          s("This is the job as it ran on Cloud Run, replayed at high speed."),
-          s("Chirp 3 times every spoken word, while Gemini watches the video."),
-          s("Plain code measures the room. Gemini writes one line for each pause,"),
-          s(
-            "then reviews every line against eight rules from Korea's accessible broadcasting guideline and Netflix's style guide.",
-          ),
-        ],
-        hold: 0.4,
-      },
-      {
-        id: "detail",
-        show: { beat: "detail" },
-        say:
-          featured.loop === "review"
-            ? [
-                s(`The reviewer rejected the first draft of this line: “${rule!.title.en}”.`),
-                s("Gemini rewrote it, the new line passed, and Chirp 3 HD voiced it. The meter shows it fits its pause."),
-              ]
-            : [
-                s(`The first draft of this line took ${firstSeconds} seconds to say, but its pause is only ${roomSeconds} seconds long.`),
-                s("Gemini shortened it, the shorter line passed review, and now it fits."),
-              ],
-        hold: 0.6,
-      },
-      {
-        id: "listen",
-        show: { beat: "listen" },
-        say: [s("Now the same scene again, eyes closed.")],
-        film: {
-          track: "described",
-          from: LISTEN_FROM,
-          to: LISTEN_TO,
-          caption: "With Scene's description",
-        },
-        hold: 0.4,
-      },
-      {
-        id: "brief",
-        show: { beat: "brief" },
-        say: [
-          s("Viewers who want less can switch to Brief: fewer lines, only what the story needs."),
-        ],
-        hold: 1.0,
-      },
-      {
-        id: "pipeline",
-        show: { card: "pipeline" },
-        say: [
-          s(
-            "Each step has its own Google model: Chirp 3 to hear, Gemini to watch, write and review, and Chirp 3 HD to speak.",
-          ),
-          s(
-            "Plain code decides where lines go and checks every measured length. A line that runs long is sped up a little, then shortened.",
-          ),
-        ],
-        hold: 0.5,
-      },
-      {
-        id: "numbers",
-        show: { card: "numbers" },
-        say: [
-          s(
-            `On this ${summary.clipSeconds}-second clip, ${allFit ? "all" : summary.cuesFitting} of ` +
-              `${summary.cuesShipped} lines fit their pauses, with ${summary.overlapWithSpeechSeconds === 0 ? "no" : summary.overlapWithSpeechSeconds} seconds over dialogue.`,
-          ),
-          s(`The whole job cost ${cents} cents and took ${duration} on Cloud Run.`),
-        ],
-        hold: 0.6,
-      },
-      {
-        id: "close",
-        show: { card: "close" },
-        say: [s("Scene narrates in Korean and English. Try it with your own clip.")],
-        hold: 2.0,
-      },
-    ];
-  }
-
+  const ko = lang === "ko";
+  const cost = data.standard.summary.costUsd.toFixed(3);
+  const elapsed = Math.round(data.standard.summary.wallSeconds);
   return [
     {
-      id: "cold",
+      id: "original",
       show: { black: true },
-      say: [s("눈을 감아 보세요. 시각장애인 관객에게 영화의 한 장면은 이렇게 들립니다.")],
+      targetSeconds: 10,
+      say: [s(ko ? "먼저 원음입니다." : "First, the original soundtrack.")],
       film: {
         track: "original",
         from: LISTEN_FROM,
         to: LISTEN_TO,
-        caption: "소리만 · 화면해설 없음",
+        caption: ko ? "원음 · 연구실의 소리" : "Original soundtrack · laboratory ambience",
       },
-      hold: 0.6,
+      hold: 0.2,
     },
     {
-      id: "problem",
-      show: { card: "problem" },
-      say: [
-        s("화면해설은 대사가 없는 틈에, 화면에서 벌어지는 일을 말로 들려줍니다."),
-        s("2026년 9월, 대법원은 극장의 화면해설 제공 의무를 넓혔습니다."),
-        s(
-          "하지만 해설은 지금도 사람이 쓰고 녹음하고 맞춥니다. 한국 영화 한 편에 약 1,400만 원이 듭니다.",
-          "하지만 해설은 지금도 사람이 쓰고 녹음하고 맞춥니다. 한국 영화 한 편에 약 천사백만 원이 듭니다.",
-        ),
-        s(
-          "씬은 이 일을 구글 클라우드의 Gemini로 자동화합니다.",
-          "씬은 이 일을 구글 클라우드의 제미나이로 자동화합니다.",
-        ),
-      ],
-      hold: 0.5,
-    },
-    {
-      id: "open",
-      show: { beat: "open" },
-      say: [
-        s(
-          "짧은 영상을 넣으면 됩니다. 블렌더 재단의 공개 영화, 〈티어스 오브 스틸〉의 도입부입니다.",
-          "짧은 영상을 넣으면 됩니다. 블렌더 재단의 공개 영화, 티어스 오브 스틸의 도입부입니다.",
-        ),
-        s("타임라인에는 대사와, 대사 사이의 빈 구간과, 그 안에 놓인 해설 문장이 보입니다."),
-      ],
-      hold: 0.4,
-    },
-    {
-      id: "replay",
-      show: { beat: "replay" },
-      say: [
-        s(
-          "Cloud Run에서 실제로 돌린 작업을 빠르게 다시 재생합니다.",
-          "클라우드 런에서 실제로 돌린 작업을 빠르게 다시 재생합니다.",
-        ),
-        s(
-          "Chirp 3가 대사를 단어 단위로 재고, Gemini가 영상을 봅니다.",
-          "처프 쓰리가 대사를 단어 단위로 재고, 제미나이가 영상을 봅니다.",
-        ),
-        s(
-          "빈 구간은 코드가 계산하고, Gemini가 구간마다 해설을 씁니다.",
-          "빈 구간은 코드가 계산하고, 제미나이가 구간마다 해설을 씁니다.",
-        ),
-        s(
-          "그리고 장애인방송 가이드라인과 넷플릭스 기준에서 온 여덟 가지 규칙으로 모든 문장을 검수합니다.",
-        ),
-      ],
-      hold: 0.4,
-    },
-    {
-      id: "detail",
-      show: { beat: "detail" },
-      say:
-        featured.loop === "review"
-          ? [
-              s(`이 문장의 초안은 ‘${rule!.title.ko}’ 규칙에 걸려 반려됐습니다.`),
-              s(
-                "다시 쓴 문장은 검수를 통과했고, 읽은 길이도 빈 구간 안에 들어갑니다.",
-                "다시 쓴 문장은 검수를 통과했고, 읽은 길이도 빈 구간 안에 들어갑니다.",
-              ),
-            ]
-          : [
-              s(`이 문장의 초안은 읽는 데 ${firstSeconds}초가 걸렸지만, 들어갈 빈 구간은 ${roomSeconds}초뿐이었습니다.`),
-              s(
-                "Gemini가 줄여 쓴 문장은 검수를 통과했고, 이제 구간 안에 들어갑니다.",
-                "제미나이가 줄여 쓴 문장은 검수를 통과했고, 이제 구간 안에 들어갑니다.",
-              ),
-            ],
-      hold: 0.6,
-    },
-    {
-      id: "listen",
-      show: { beat: "listen" },
-      say: [s("이제 같은 장면을 눈을 감고 다시 들어 보세요.")],
+      id: "described",
+      show: { black: true },
+      targetSeconds: 10,
+      say: [s(ko ? "이번엔 화면해설을 더합니다." : "Now, with Korean audio description.")],
       film: {
         track: "described",
         from: LISTEN_FROM,
         to: LISTEN_TO,
-        caption: "씬의 화면해설과 함께",
+        caption: "Korean AD: Simulation ready. A man examines a brain covered in electrodes.",
       },
-      hold: 0.4,
+      hold: 0.2,
     },
     {
-      id: "brief",
-      show: { beat: "brief" },
-      say: [s("해설이 적은 쪽을 원하면 간결 모드로 바꿉니다. 이야기에 꼭 필요한 것만 남습니다.")],
-      hold: 1.0,
-    },
-    {
-      id: "pipeline",
-      show: { card: "pipeline" },
+      id: "problem",
+      show: { card: "problem" },
+      targetSeconds: 15,
       say: [
         s(
-          "단계마다 구글 모델이 따로 있습니다. 듣기는 Chirp 3, 보기와 쓰기와 검수는 Gemini, 목소리는 Chirp 3 HD입니다.",
-          "단계마다 구글 모델이 따로 있습니다. 듣기는 처프 쓰리, 보기와 쓰기와 검수는 제미나이, 목소리는 처프 쓰리 에이치디입니다.",
-        ),
-        s(
-          "문장의 자리와 실제 길이는 코드가 확인합니다. 길면 조금 빠르게 읽고, 그래도 길면 줄여 씁니다.",
+          ko
+            ? "대사만으로는 장면의 변화나 인물의 행동을 알기 어렵습니다. 씬은 한국어 화면해설을 장면 근거와 실제 음성 길이로 검토하고, 편집자가 고쳐 완성하는 제작 도구입니다."
+            : "Dialogue alone can miss a change of setting, an action, or essential text. Scene helps editors make Korean audio description, grounded in the picture, checked against actual voice length, and finished by a person.",
         ),
       ],
-      hold: 0.5,
+      hold: 0.2,
+    },
+    { id: "open", show: { beat: "open" }, targetSeconds: 5, say: [], hold: 0 },
+    {
+      id: "replay",
+      show: { beat: "replay" },
+      targetSeconds: 25,
+      say: [
+        s(
+          ko
+            ? `실제 업로드 뒤, 같은 샘플의 저장된 생성 기록을 배속으로 봅니다. 원래 처리 시간은 ${elapsed}초입니다.`
+            : `After a real upload, this is the saved generation trace for the same sample, replayed at speed. Its original processing time was ${elapsed} seconds.`,
+        ),
+        s(
+          ko
+            ? "구글 음성 인식이 대사 시각을 찾고, 제미나이가 영상을 보며 문장을 씁니다. 검수와 낭독을 거친 뒤, 최종 출력에서 빠진 내용을 한 번 더 확인합니다."
+            : "Google speech recognition finds dialogue timings. Gemini watches and writes, then reviews the lines. Synthesized audio is measured before mixing, and a final audit checks what survived.",
+        ),
+      ],
+      hold: 0.2,
+    },
+    {
+      id: "detail",
+      show: { beat: "detail" },
+      targetSeconds: 30,
+      say: [
+        s(
+          ko
+            ? "이 문장은 실제로 반려된 뒤 문구가 바뀌어 통과했습니다. 장면 근거와 반려 이유, 수정 이력을 같은 패널에서 확인할 수 있습니다."
+            : "This line really was rejected, changed, and reviewed again. The same panel shows the scene evidence, the reason for rejection, and every version.",
+        ),
+        s(
+          ko
+            ? "지정 시각이 잘못된 공백에 속하면 다른 시점으로 옮기지 않고 반려합니다. 반려된 문장을 그대로 돌려주어도 새 개선으로 승인하지 않습니다. 자동 검수 뒤에도 누락이 남으면 검수 필요로 표시합니다."
+            : "A line assigned to the wrong gap is rejected without being moved to another scene. Returning the same rejected wording cannot count as an improvement. If the final output still misses information, Scene keeps a visible review-needed status.",
+        ),
+      ],
+      hold: 0.2,
+    },
+    {
+      id: "edit",
+      show: { beat: "edit" },
+      targetSeconds: 30,
+      say: [
+        s(
+          ko
+            ? "이제 반려된 한 문장을 사람이 고칩니다. 시작 시각은 같은 공백 안에서만 조정할 수 있습니다. 앞 문장의 실제 음성 끝과 다음 문장을 침범할 수 없습니다."
+            : "Now an editor corrects one rejected sentence. Its start can move only inside the same gap, after the previous voice ends and before the next line.",
+        ),
+        s(
+          ko
+            ? "수정 문장만 다시 읽고 검수합니다. 나머지 음성 파일은 그대로 재사용합니다. 원본은 보존되고 새 결과가 만들어집니다. 사람이 쓴 문장이 길면 자동으로 줄이지 않고 이유를 돌려줍니다."
+            : "Only that sentence is re-voiced and checked. Every unchanged voice file is reused. The original stays available as a new result is created. If the human wording is too long, Scene returns a reason instead of silently shortening it.",
+        ),
+      ],
+      hold: 0.2,
+    },
+    {
+      id: "listen",
+      show: { beat: "listen" },
+      targetSeconds: 20,
+      say: [
+        s(
+          ko
+            ? "수정한 장면을 다시 듣습니다. 완성 영상, 해설 음성, 텍스트 자막과 검수 기록을 각각 내려받을 수 있습니다."
+            : "Listen to the edited scene. The described film, narration stem, captions, and review history can each be downloaded.",
+        ),
+      ],
+      film: {
+        track: "described",
+        from: LISTEN_FROM,
+        to: LISTEN_TO,
+        caption: "Edited Korean AD · Simulation ready. A man examines the electrode-covered brain.",
+      },
+      hold: 0.2,
     },
     {
       id: "numbers",
       show: { card: "numbers" },
+      targetSeconds: 20,
       say: [
         s(
-          `${summary.clipSeconds}초 영상에서 해설 ${summary.cuesShipped}줄이 ${allFit ? "모두" : `중 ${summary.cuesFitting}줄이`} 빈 구간에 들어갔고, ` +
-            `대사와 겹친 시간은 ${summary.overlapWithSpeechSeconds}초입니다.`,
+          ko
+            ? `${data.evaluationRuns}회 중 ${data.evaluationDone}회 완료, ${data.evaluationFailed}회는 시각 오류로 중단됐습니다. 핵심 내용을 놓친 후보는 탈락했습니다.`
+            : `${data.evaluationRuns} screening runs produced ${data.evaluationDone} outputs and ${data.evaluationFailed} timing failures. We kept the stronger reviewer after the cheaper candidate missed a key time jump.`,
         ),
         s(
-          `Cloud Run에서 ${duration}, 비용은 ${summary.costUsd.toFixed(2)}달러였습니다.`,
-          `클라우드 런에서 ${duration}, 비용은 ${summary.costUsd.toFixed(2)}달러였습니다.`,
+          ko
+            ? `API 비용은 ${cost}달러입니다. 클라우드 런과 스토리지, 오픈라우터로 동작합니다.`
+            : `This generation cost ${cost} dollars. Cloud Run, Storage, and Secret Manager host Scene; Gemini runs through OpenRouter.`,
         ),
       ],
-      hold: 0.6,
+      hold: 0.2,
     },
     {
       id: "close",
       show: { card: "close" },
-      say: [s("씬은 한국어와 영어로 해설합니다. 직접 영상을 올려 보세요.")],
-      hold: 2.0,
+      targetSeconds: 10,
+      say: [
+        s(
+          ko
+            ? "씬. 장면을 근거로 쓰고, 사람이 고쳐 완성하는 한국어 화면해설. 표시된 주소에서 샘플을 체험할 수 있습니다."
+            : "Scene. Korean audio description grounded in the scene and finished by an editor. Try the sample at the address shown.",
+        ),
+      ],
+      hold: 0.2,
     },
   ];
 }

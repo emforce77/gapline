@@ -1,6 +1,7 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  distDir: process.env.NEXT_DIST_DIR || ".next",
   // Self-contained server bundle for the Cloud Run container.
   output: "standalone",
   devIndicators: false,

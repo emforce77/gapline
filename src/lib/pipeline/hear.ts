@@ -2,6 +2,7 @@ import { appendCallRecord } from "../llm/ledger";
 import { runFfmpeg } from "../media/ffmpeg";
 import { gcpProjectId, googleHeaders } from "../google/auth";
 import type { SpeechSegment } from "./schemas";
+import { reserveCall } from "../runs/budget";
 
 /** Chirp 3 synchronous recognition accepts up to one minute per request. */
 const CHUNK_SECONDS = 55;
@@ -85,8 +86,8 @@ async function recognizeChunk(
 
 /**
  * Word-timed speech from Google Speech-to-Text (Chirp 3), grouped into utterances.
- * Gemini's own timestamps drifted by up to 2.5 s on the sample clip, which is enough to make
- * narration talk over an actor; recognizer word offsets matched subtitle timing within 0.2 s.
+ * Word offsets are provider measurements, not independent proof of dialogue boundaries.
+ * Reject unusable offsets rather than inventing silence around untimed speech.
  */
 export async function hearSpeech(input: {
   clipFile: string;
@@ -100,7 +101,10 @@ export async function hearSpeech(input: {
     starts.push(t);
     if (t + CHUNK_SECONDS >= input.clipSeconds) break;
   }
-  const chunks = await Promise.all(
+  const settleCall = reserveCall(
+    ((input.clipSeconds + starts.length * OVERLAP_SECONDS) / 60) * STT_USD_PER_MINUTE,
+  );
+  const results = await Promise.allSettled(
     starts.map((from) =>
       recognizeChunk(
         input.clipFile,
@@ -109,6 +113,29 @@ export async function hearSpeech(input: {
         input.languageCode,
       ),
     ),
+  );
+  const failed = results.find((r) => r.status === "rejected");
+  if (failed?.status === "rejected") {
+    settleCall(null);
+    await appendCallRecord(input.ledgerFile, {
+      at: new Date(started).toISOString(),
+      label: "hear",
+      model: `speech-to-text:${STT_MODEL}`,
+      provider: "Google Cloud",
+      promptTokens: 0,
+      completionTokens: 0,
+      costUsd: 0,
+      costKnown: false,
+      latencyMs: Date.now() - started,
+      firstTokenMs: null,
+      finishReason: "",
+      ok: false,
+      error: String(failed.reason),
+    });
+    throw failed.reason;
+  }
+  const chunks = results.map(
+    (r) => (r as PromiseFulfilledResult<{ words: Word[]; billedSeconds: number }>).value,
   );
   // Each overlap belongs to the earlier chunk up to its midpoint, the later chunk after it.
   const words: Word[] = [];
@@ -120,6 +147,7 @@ export async function hearSpeech(input: {
   words.sort((a, b) => a.start - b.start);
 
   const billedSeconds = chunks.reduce((sum, c) => sum + c.billedSeconds, 0);
+  settleCall(billedSeconds > 0 ? (billedSeconds / 60) * STT_USD_PER_MINUTE : null);
   await appendCallRecord(input.ledgerFile, {
     at: new Date(started).toISOString(),
     label: "hear",
@@ -128,6 +156,7 @@ export async function hearSpeech(input: {
     promptTokens: 0,
     completionTokens: 0,
     costUsd: (billedSeconds / 60) * STT_USD_PER_MINUTE,
+    costKnown: billedSeconds > 0,
     latencyMs: Date.now() - started,
     firstTokenMs: null,
     finishReason: "",
@@ -136,9 +165,14 @@ export async function hearSpeech(input: {
 
   const segments: SpeechSegment[] = [];
   for (const w of words) {
+    if (!Number.isFinite(w.start) || !Number.isFinite(w.end) || w.start < 0 || w.end <= w.start) {
+      throw new Error(
+        "Speech recognition returned words without usable timing. This result was rejected; try a clip beginning before the spoken sentence.",
+      );
+    }
     const last = segments.at(-1);
     if (last && w.start - last.end <= SEGMENT_PAUSE_SECONDS) {
-      last.end = w.end;
+      last.end = Math.max(last.end, w.end);
       last.text += ` ${w.word}`;
     } else {
       segments.push({ start: w.start, end: w.end, speaker: "", text: w.word });

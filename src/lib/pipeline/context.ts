@@ -16,13 +16,14 @@ export interface ClipContext {
 const LANGUAGE_STYLE: Record<Language, string> = {
   ko:
     "Write in Korean, in the register of Korean broadcast audio description: complete present-tense " +
-    "declarative sentences (-ㄴ다/-는다), neutral third person, standard Korean — no bare noun phrases. " +
-    "Read on-screen text inside a sentence, quoting it: '“40년 후”라는 자막이 뜬다.' " +
+    "declarative sentences (-ㄴ다/-는다), neutral third person, standard Korean. " +
+    "Essential on-screen text may be read directly as a short phrase: '40년 후.' " +
+    "Do not add viewer framing such as '자막이 뜬다' or '화면에 보인다'. " +
     "Transliterate names consistently (Thom → 톰, Celia → 셀리아).",
   en:
     "Write in English: complete present-tense sentences, third person, plain and conversational — no " +
-    "bare fragments. Read on-screen text inside a sentence, quoting it: 'The words “Forty years later” " +
-    "appear.'",
+    "bare fragments except essential on-screen text, which may be read directly: 'Forty years later.' " +
+    "Do not add 'appears on screen' or other viewer framing.",
 };
 
 export const DENSITY_STYLE: Record<Density, string> = {
@@ -36,7 +37,7 @@ export const DENSITY_STYLE: Record<Density, string> = {
 };
 
 function seconds(value: number): string {
-  return value.toFixed(1);
+  return value.toFixed(2);
 }
 
 export function languageName(language: Language): string {

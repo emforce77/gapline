@@ -90,7 +90,17 @@ function FitMeter({ cue }: { cue: Cue }) {
 }
 
 /** One line: its final words, whether it fits, and every version with the reviewer's findings. */
-export function LineDetail({ cue, onPlay }: { cue: Cue; onPlay: () => void }) {
+export function LineDetail({
+  cue,
+  onPlay,
+  evidence,
+  editor,
+}: {
+  cue: Cue;
+  onPlay: () => void;
+  evidence?: string;
+  editor?: React.ReactNode;
+}) {
   const { t, lang } = useI18n();
   const latest = cue.versions[cue.versions.length - 1];
   const room = cue.windowEnd - cue.start;
@@ -105,11 +115,26 @@ export function LineDetail({ cue, onPlay }: { cue: Cue; onPlay: () => void }) {
         </button>
       </div>
       <p className={`line-text${cue.status === "dropped" ? " struck" : ""}`}>{latest.text}</p>
+      {evidence ? (
+        <div className="scene-evidence">
+          <h4>{t.editor.evidence}</h4>
+          <p>{evidence}</p>
+        </div>
+      ) : null}
       {cue.status === "dropped" && cue.droppedReason ? (
         <p className="line-dropped">⚠ {t.line.dropped[cue.droppedReason]}</p>
       ) : (
         <FitMeter cue={cue} />
       )}
+      {latest.review && !latest.review.pass ? (
+        <div className="verdict fail">
+          <p>{latest.review.violations.map((v) => v.reason).join(" ")}</p>
+          <p>
+            {t.line.fix}: {latest.review.fix}
+          </p>
+        </div>
+      ) : null}
+      {editor}
       <h4>{t.line.history}</h4>
       <ol className="versions">
         {cue.versions.map((version, i) => (

@@ -10,7 +10,8 @@ import type { SceneMap, SpeechSegment } from "../pipeline/schemas";
  *   projects/<id>/project.json   metadata
  *   projects/<id>/clip.mp4       the analysed clip (H.264/AAC)
  *   projects/<id>/strip.jpg      one thumbnail per second, for the timeline
- *   projects/<id>/analysis.json  speech + scene map, reused by later runs
+ *   projects/<id>/analysis-{speech,scene}.json  separately validated keyed components
+ *   projects/<id>/analysis.json  combined analysis for display and legacy results
  *   projects/<id>/runs/<runId>/  events, ledger, script and media of one run
  */
 export function dataDir(): string {
@@ -26,6 +27,7 @@ export const ProjectSchema = z.object({
   attribution: z.string(),
   license: z.string(),
   createdAt: z.string(),
+  ownerHash: z.string().optional(),
   /** Seconds covered by each thumbnail in strip.jpg. */
   stripStepSeconds: z.number(),
 });

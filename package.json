@@ -11,7 +11,8 @@
     "test": "node --import tsx --test tests/*.test.ts",
     "samples": "node --env-file=.env.local --import tsx scripts/prepare-samples.ts && node --env-file=.env.local --import tsx scripts/seed-samples.ts",
     "pipeline": "node --env-file=.env.local --import tsx scripts/run-pipeline.ts",
-    "demo": "node --env-file=.env.local --import tsx scripts/demo/make-demo.ts"
+    "demo": "node --env-file=.env.local --import tsx scripts/demo/make-demo.ts",
+    "test:media": "node --env-file-if-exists=.env.local --import tsx --test tests/*.media.ts"
   },
   "engines": {
     "node": ">=20.9"

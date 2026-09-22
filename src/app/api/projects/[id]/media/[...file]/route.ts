@@ -3,6 +3,7 @@ import { stat } from "node:fs/promises";
 import { join, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import { projectDir } from "@/lib/store/projects";
+import { accessibleProject } from "@/lib/store/access";
 
 export const runtime = "nodejs";
 
@@ -21,6 +22,14 @@ export async function GET(
   { params }: { params: Promise<{ id: string; file: string[] }> },
 ) {
   const { id, file } = await params;
+  if (!(await accessibleProject(id))) return new Response("Not found", { status: 404 });
+  const allowed =
+    (file.length === 1 && ["clip.mp4", "strip.jpg", "poster.jpg"].includes(file[0])) ||
+    (file.length === 3 &&
+      file[0] === "runs" &&
+      ["described.mp4", "narration.wav", "descriptions.vtt", "script.json"].includes(file[2])) ||
+    (file.length === 4 && file[0] === "runs" && file[2] === "voice" && /^L\d+\.wav$/.test(file[3]));
+  if (!allowed) return new Response("Not found", { status: 404 });
   if (file.length === 0 || !file.every((s) => SEGMENT.test(s) && s !== "..")) {
     return new Response("Not found", { status: 404 });
   }
@@ -39,7 +48,7 @@ export async function GET(
   const headers: Record<string, string> = {
     "Content-Type": type,
     "Accept-Ranges": "bytes",
-    "Cache-Control": "private, max-age=60",
+    "Cache-Control": "private, no-store",
   };
   const download = new URL(request.url).searchParams.get("download");
   if (download) headers["Content-Disposition"] = `attachment; filename="${file.at(-1)}"`;

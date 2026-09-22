@@ -1,0 +1,11 @@
+# Upgrade screening protocol
+
+Decision: retain the current high-effort reviewer unless a medium-effort reviewer has no additional factual, timing, essential-coverage or independently measured speech/sound intrusions. Cost and latency are secondary and only comparable when both runs reuse the same analysis. This is descriptive screening, not a causal or participant-impact study.
+
+One row is one run of one clip, output language and density. Four development clips and two held-out clips, at most two settings each (12 runs including the first upgrade smoke run). No automated parameter search. Stop after two consecutive provider/compatibility failures or two candidate iterations without meaningful quality improvement. OpenRouter remains the provider; Google Cloud STT/TTS are accounted separately. The experiment ledger reserves conservatively against $10/day and $20 total, including failures. No recharge.
+
+Sources: Tears of Steel (Blender Foundation, CC BY 3.0), Wikitongues: Hanbid speaking Korean (Wikitongues / Teddy Nee, CC BY-SA 4.0), and a clearly labeled synthetic signal clip. Raw sources are unchanged. Preparation writes clip hashes, source intervals and independent references before running the candidate. The opening smoke run uses the previously stored subtitle reference and is not a blinded sample.
+
+Primary outcomes: incorrect visual descriptions, wrong scene timing, essential omissions, narration intersecting independent speech/protected-sound intervals. Missing assessments stay unknown; never convert them to zero. Reference subtitles can omit speech or have approximate boundaries; optional independent Whisper timing is a cross-check, not human certification. The synthetic clip has exact authored event boundaries and no speech. Machine reviewer judgments remain separate from these reference checks.
+
+Risks checked: same-film clips are not independent films; subtitle windows are not exact vocal boundaries; reused analysis changes total run costs; omissions cannot be inferred from a valid JSON schema; a smaller number of lines can trivially reduce intrusions while making coverage worse. Do not claim blind/low-vision user comprehension, satisfaction, or population-wide quality from this small sample.

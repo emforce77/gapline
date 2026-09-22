@@ -10,6 +10,9 @@ export interface CallRecord {
   promptTokens: number;
   completionTokens: number;
   costUsd: number;
+  /** False when the provider did not return a charge; costUsd is only a known subtotal. */
+  costKnown?: boolean;
+  attempt?: number;
   latencyMs: number;
   firstTokenMs: number | null;
   finishReason: string;
@@ -17,6 +20,15 @@ export interface CallRecord {
   error?: string;
   /** TTS only: characters billed. */
   characters?: number;
+}
+
+export function summarizeCosts(calls: CallRecord[]) {
+  return {
+    costUsd: calls.reduce((s, c) => s + c.costUsd, 0),
+    costStatus: calls.some((c) => c.costKnown === false)
+      ? ("unresolved" as const)
+      : ("known" as const),
+  };
 }
 
 export async function appendCallRecord(file: string, record: CallRecord): Promise<void> {

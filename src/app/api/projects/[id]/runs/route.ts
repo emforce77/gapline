@@ -2,6 +2,7 @@ import { z } from "zod";
 import { BudgetExhaustedError } from "@/lib/runs/budget";
 import { startRun } from "@/lib/runs/start-run";
 import { listRuns } from "@/lib/store/projects";
+import { accessibleProject, sameOrigin } from "@/lib/store/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -16,6 +17,7 @@ const StartSchema = z.object({
 
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
+  if (!(await accessibleProject(id))) return new Response("Not found", { status: 404 });
   return Response.json({ runs: await listRuns(id) });
 }
 
@@ -25,7 +27,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
  */
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const parsed = StartSchema.safeParse(await request.json());
+  if (!sameOrigin(request)) return new Response("Forbidden", { status: 403 });
+  if (!(await accessibleProject(id))) return new Response("Not found", { status: 404 });
+  const parsed = StartSchema.safeParse(await request.json().catch(() => null));
   if (!parsed.success)
     return Response.json({ error: "language and density are required" }, { status: 400 });
 

@@ -3,8 +3,8 @@
  *
  *   npm run demo -- <ko|en> [cards|voice|record|build|all]
  *
- * cards and record need no credentials; voice calls Google Cloud Text-to-Speech with the gcloud
- * configuration in .env.local. record and build read the voice plan, so voice runs before them.
+ * voice calls Google Cloud TTS; record performs a real paid edit on the deployed service.
+ * Both are serial production steps. record/build read the measured voice plan.
  */
 import { join } from "node:path";
 import type { Language } from "../../src/lib/pipeline/schemas";

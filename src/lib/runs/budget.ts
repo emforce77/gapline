@@ -1,66 +1,102 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { AsyncLocalStorage } from "node:async_hooks";
+import { randomUUID } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { dataDir } from "../store/projects";
+import { updateJson } from "../store/atomic";
 
-/**
- * A public demo URL can be run by anyone, so live runs share a daily allowance.
- * Each run reserves the most a short clip has cost so far and settles to the measured cost when done.
- */
-export const RUN_RESERVE_USD = 0.3;
-
-function dailyCap(): number {
-  const cap = Number(process.env.DAILY_BUDGET_USD ?? "5");
-  if (!Number.isFinite(cap) || cap <= 0)
-    throw new Error("DAILY_BUDGET_USD must be a positive number");
-  return cap;
-}
-
-interface DayLedger {
+/** A conservative run ceiling; each paid call also checks its remaining allowance. */
+export const RUN_RESERVE_USD = 2.5;
+export type BudgetScope = "demo" | "experiment";
+export interface Reservation {
+  id: string;
   date: string;
-  settledUsd: number;
-  reservedUsd: number;
-  runs: number;
+  scope: BudgetScope;
+  amount: number;
 }
-
-function ledgerFile(date: string): string {
-  return join(dataDir(), "budget", `${date}.json`);
+interface Entry extends Reservation {
+  cost: number | null;
+  done: boolean;
 }
-
-async function readDay(date: string): Promise<DayLedger> {
-  try {
-    return JSON.parse(await readFile(ledgerFile(date), "utf8"));
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") {
-      return { date, settledUsd: 0, reservedUsd: 0, runs: 0 };
-    }
-    throw error;
-  }
+interface BudgetState {
+  entries: Entry[];
+  legacy: Record<string, number>;
 }
-
-async function writeDay(day: DayLedger): Promise<void> {
-  await mkdir(join(dataDir(), "budget"), { recursive: true });
-  await writeFile(ledgerFile(day.date), JSON.stringify(day, null, 2));
-}
-
 export class BudgetExhaustedError extends Error {}
 
-export async function reserveRun(): Promise<{ date: string }> {
-  const date = new Date().toISOString().slice(0, 10);
-  const day = await readDay(date);
-  if (day.settledUsd + day.reservedUsd + RUN_RESERVE_USD > dailyCap()) {
-    throw new BudgetExhaustedError(
-      `Today's live-run allowance ($${dailyCap().toFixed(2)}) is used up; the recorded runs remain viewable.`,
-    );
-  }
-  day.reservedUsd += RUN_RESERVE_USD;
-  await writeDay(day);
-  return { date };
+function dailyCap(scope: BudgetScope): number {
+  const cap = scope === "experiment" ? 10 : Number(process.env.DAILY_BUDGET_USD ?? "5");
+  if (!Number.isFinite(cap) || cap <= 0) throw new Error("Invalid DAILY_BUDGET_USD");
+  return cap;
 }
-
-export async function settleRun(reservation: { date: string }, costUsd: number): Promise<void> {
-  const day = await readDay(reservation.date);
-  day.reservedUsd = Math.max(0, day.reservedUsd - RUN_RESERVE_USD);
-  day.settledUsd += costUsd;
-  day.runs += 1;
-  await writeDay(day);
+export async function reserveRun(scope: BudgetScope = "demo"): Promise<Reservation> {
+  const date = new Date().toISOString().slice(0, 10);
+  let legacy = 0;
+  if (scope === "demo") {
+    try {
+      const old = JSON.parse(await readFile(join(dataDir(), "budget", `${date}.json`), "utf8"));
+      legacy = old.settledUsd + old.reservedUsd;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    }
+  }
+  const reservation: Reservation = { id: randomUUID(), date, scope, amount: RUN_RESERVE_USD };
+  return updateJson<BudgetState, Reservation>(
+    `budget/${scope}-v2.json`,
+    () => ({ entries: [], legacy: {} }),
+    (state) => {
+      state.legacy[date] ??= legacy;
+      const charge = (e: Entry) => e.cost ?? e.amount;
+      const today = state.entries
+        .filter((e) => e.date === date)
+        .reduce((s, e) => s + charge(e), state.legacy[date]);
+      const total = state.entries.reduce((s, e) => s + charge(e), 0);
+      if (
+        today + reservation.amount > dailyCap(scope) + 1e-9 ||
+        (scope === "experiment" &&
+          (total + reservation.amount > 20 || state.entries.some((e) => !e.done)))
+      )
+        throw new BudgetExhaustedError(
+          "Budget or concurrency allowance exhausted; recorded runs remain available.",
+        );
+      state.entries.push({ ...reservation, cost: null, done: false });
+      return reservation;
+    },
+  );
+}
+export async function settleRun(reservation: Reservation, costUsd: number | null): Promise<void> {
+  if (costUsd !== null && (!Number.isFinite(costUsd) || costUsd < 0))
+    throw new Error("Invalid cost");
+  await updateJson<BudgetState, void>(
+    `budget/${reservation.scope}-v2.json`,
+    () => ({ entries: [], legacy: {} }),
+    (state) => {
+      const entry = state.entries.find((e) => e.id === reservation.id);
+      if (!entry) throw new Error("Reservation not found");
+      if (entry.done) return;
+      entry.cost = costUsd;
+      entry.done = true;
+    },
+  );
+}
+const running = new AsyncLocalStorage<{ limit: number; spent: number; pending: number }>();
+export function withRunBudget<T>(reservation: Reservation, work: () => Promise<T>): Promise<T> {
+  return running.run({ limit: reservation.amount, spent: 0, pending: 0 }, work);
+}
+/** Unknown charges consume the full bound; failed and retried requests count too. */
+export function reserveCall(maxUsd: number): (costUsd: number | null) => void {
+  const state = running.getStore();
+  if (!state) return () => {};
+  if (state.spent + state.pending + maxUsd > state.limit + 1e-9)
+    throw new BudgetExhaustedError(
+      "This run reached its API allowance. Saved analysis can be reused.",
+    );
+  state.pending += maxUsd;
+  let done = false;
+  return (cost) => {
+    if (done) return;
+    done = true;
+    state.pending -= maxUsd;
+    state.spent += cost ?? maxUsd;
+  };
 }

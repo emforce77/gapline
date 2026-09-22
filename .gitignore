@@ -9,3 +9,5 @@ next-env.d.ts
 .playwright-mcp/
 # Internal planning notes (company context) never go to the public repo
 AI Builder Cup 주제 기획.md
+
+.next-verify/

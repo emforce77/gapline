@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { renderGaps } from "../src/lib/pipeline/context";
 import { findGaps, MIN_GAP_SECONDS, SPEECH_GUARD_SECONDS } from "../src/lib/pipeline/gaps";
 import { placeCues } from "../src/lib/pipeline/run";
 import { spokenUnits, unitBudget } from "../src/lib/pipeline/length";
@@ -62,6 +63,19 @@ describe("placeCues", () => {
     { id: "g2", start: 20, end: 22 },
   ];
 
+  it("keeps hundredth-second gap boundaries in the model prompt", () => {
+    const precise = [{ id: "g4", start: 45.41, end: 49.83 }];
+    assert.match(renderGaps(precise), /45\.41–49\.83/);
+    assert.equal(
+      placeCues([{ gapId: "g4", at: 45.41, text: "40 years later." }], precise).placed.length,
+      1,
+    );
+    assert.equal(
+      placeCues([{ gapId: "g4", at: 45.4, text: "40 years later." }], precise).dropped.length,
+      1,
+    );
+  });
+
   it("gives each line the room up to the next line in its gap", () => {
     const { placed } = placeCues(
       [
@@ -91,9 +105,17 @@ describe("placeCues", () => {
     assert.equal(dropped[0].droppedReason, "no_room");
   });
 
-  it("moves a line into the gap that contains its start when the gap id is wrong", () => {
-    const { placed } = placeCues([{ gapId: "g9", at: 20.2, text: "x" }], gaps);
-    assert.equal(placed[0].gapId, "g2");
+  it("rejects wrong gap ids and never relocates a line to a later gap", () => {
+    for (const draft of [
+      { gapId: "g9", at: 20.2, text: "x" },
+      { gapId: "g2", at: 1, text: "x" },
+      { gapId: "g1", at: 20.2, text: "x" },
+    ]) {
+      const { placed, dropped } = placeCues([draft], gaps);
+      assert.equal(placed.length, 0);
+      assert.equal(dropped[0].start, draft.at);
+      assert.equal(dropped[0].droppedReason, "invalid_placement");
+    }
   });
 });
 

@@ -1,5 +1,7 @@
 import { z } from "zod";
 import { appendCallRecord, type CallRecord } from "./ledger";
+import { setTimeout as delay } from "node:timers/promises";
+import { reserveCall } from "../runs/budget";
 
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 /** House default: never cap output below the model's own limit without a stated reason. */
@@ -42,20 +44,61 @@ interface StreamChunk {
   error?: { message?: string; code?: number };
 }
 
+export class ProviderError extends Error {
+  constructor(
+    message: string,
+    public status: number,
+    public retryable: boolean,
+    public retryAfterSeconds = 2,
+  ) {
+    super(message);
+  }
+}
+
+export function retryAfterSeconds(value: string | null, now = Date.now()): number {
+  if (!value) return 2;
+  const numeric = Number(value);
+  const seconds = Number.isFinite(numeric) ? numeric : (Date.parse(value) - now) / 1000;
+  return Number.isFinite(seconds) ? Math.max(0, seconds) : 2;
+}
+
+/** One retry, with a separate ledger entry for every attempt, including streamed errors. */
+export async function callStructured<T>(
+  call: StructuredCall<T>,
+): Promise<{ data: T; record: CallRecord }> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await callOnce(call, attempt);
+    } catch (error) {
+      if (
+        !(error instanceof ProviderError) ||
+        !error.retryable ||
+        attempt === 2 ||
+        error.retryAfterSeconds > 600
+      )
+        throw error;
+      await delay(error.retryAfterSeconds * 1000, undefined, { signal: call.signal });
+    }
+  }
+}
+
 /**
  * One Gemini/Gemma call through OpenRouter with a JSON-schema response.
  * Streams (first byte early, UI can watch), reads the exact charge from the final usage chunk,
  * validates the parsed JSON with zod and records every call — failed ones included — in the ledger.
  */
-export async function callStructured<T>(
+async function callOnce<T>(
   call: StructuredCall<T>,
+  attempt: number,
 ): Promise<{ data: T; record: CallRecord }> {
+  const settleCall = reserveCall(1.1);
   const started = Date.now();
   let firstTokenAt: number | null = null;
   let text = "";
   let usage: StreamChunk["usage"] = undefined;
   let provider = "";
   let finishReason = "";
+  let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
   const record = (ok: boolean, error?: string): CallRecord => ({
     at: new Date(started).toISOString(),
@@ -65,6 +108,8 @@ export async function callStructured<T>(
     promptTokens: usage?.prompt_tokens ?? 0,
     completionTokens: usage?.completion_tokens ?? 0,
     costUsd: usage?.cost ?? 0,
+    costKnown: typeof usage?.cost === "number",
+    attempt,
     latencyMs: Date.now() - started,
     firstTokenMs: firstTokenAt === null ? null : firstTokenAt - started,
     finishReason,
@@ -75,7 +120,7 @@ export async function callStructured<T>(
   try {
     const response = await fetch(OPENROUTER_URL, {
       method: "POST",
-      signal: call.signal,
+      signal: call.signal ?? AbortSignal.timeout(240_000),
       headers: {
         Authorization: `Bearer ${apiKey()}`,
         "Content-Type": "application/json",
@@ -84,6 +129,7 @@ export async function callStructured<T>(
       },
       body: JSON.stringify({
         model: call.model,
+        provider: { max_price: { prompt: 0.75, completion: 3.75 } },
         stream: true,
         max_tokens: MAX_OUTPUT_TOKENS,
         temperature: call.temperature ?? 0.4,
@@ -100,18 +146,25 @@ export async function callStructured<T>(
       }),
     });
     if (!response.ok || !response.body) {
-      throw new Error(
-        `OpenRouter HTTP ${response.status}: ${(await response.text()).slice(0, 600)}`,
+      const body = await response.text();
+      let message = body.slice(0, 600);
+      try {
+        message = JSON.parse(body).error?.message ?? message;
+      } catch {}
+      throw new ProviderError(
+        `OpenRouter HTTP ${response.status}: ${message}`,
+        response.status,
+        response.status === 429 || response.status === 503,
+        retryAfterSeconds(response.headers.get("retry-after")),
       );
     }
 
-    const reader = response.body.getReader();
+    reader = response.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
     for (;;) {
       const { done, value } = await reader.read();
-      if (done) break;
-      buffer += decoder.decode(value, { stream: true });
+      buffer += done ? decoder.decode() + "\n" : decoder.decode(value, { stream: true });
       let newline: number;
       while ((newline = buffer.indexOf("\n")) >= 0) {
         const line = buffer.slice(0, newline).trim();
@@ -121,11 +174,18 @@ export async function callStructured<T>(
         const payload = line.slice(5).trim();
         if (payload === "[DONE]") continue;
         const chunk = JSON.parse(payload) as StreamChunk;
-        if (chunk.error) throw new Error(`OpenRouter stream error: ${chunk.error.message}`);
         if (chunk.provider) provider = chunk.provider;
         if (chunk.usage) usage = chunk.usage;
+        if (chunk.error)
+          throw new ProviderError(
+            `OpenRouter stream error: ${chunk.error.message}`,
+            chunk.error.code ?? 500,
+            chunk.error.code === 429 || chunk.error.code === 503,
+          );
         const choice = chunk.choices?.[0];
         if (choice?.finish_reason) finishReason = choice.finish_reason;
+        if (finishReason === "error")
+          throw new ProviderError("OpenRouter stream terminated with an error", 500, false);
         const delta = choice?.delta?.content;
         if (delta) {
           if (firstTokenAt === null) firstTokenAt = Date.now();
@@ -133,16 +193,21 @@ export async function callStructured<T>(
           call.onDelta?.(delta);
         }
       }
+      if (done) break;
     }
 
     const data = call.schema.parse(JSON.parse(text));
     const ok = record(true);
     await appendCallRecord(call.ledgerFile, ok);
+    settleCall(ok.costKnown ? ok.costUsd : null);
     return { data, record: ok };
   } catch (error) {
     const failed = record(false, error instanceof Error ? error.message : String(error));
     await appendCallRecord(call.ledgerFile, failed);
+    settleCall(failed.costKnown ? failed.costUsd : null);
     console.error(`LLM call failed: label=${call.label} model=${call.model} ${failed.error}`);
     throw error;
+  } finally {
+    await reader?.cancel().catch(() => {});
   }
 }

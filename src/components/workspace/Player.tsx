@@ -116,7 +116,19 @@ export const Player = forwardRef<
           {formatClock(time)} / {formatClock(duration)}
         </span>
         <span className="player-spacer" />
-        <div className="segmented" role="group">
+        <input
+          className="player-seek"
+          aria-label={t.editor.seek}
+          type="range"
+          min={0}
+          max={duration || 0}
+          step={0.1}
+          value={Math.min(time, duration || 0)}
+          onChange={(e) => {
+            if (video.current) video.current.currentTime = Number(e.target.value);
+          }}
+        />
+        <div className="segmented" role="group" aria-label={t.editor.track}>
           <button
             type="button"
             aria-pressed={adOn}
@@ -129,7 +141,7 @@ export const Player = forwardRef<
             {t.workspace.adOff}
           </button>
         </div>
-        <div className="segmented" role="group">
+        <div className="segmented" role="group" aria-label={t.editor.picture}>
           <button type="button" aria-pressed={!eyesClosed} onClick={() => setEyesClosed(false)}>
             {t.workspace.eyesOpen}
           </button>

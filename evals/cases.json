@@ -1,0 +1,271 @@
+[
+  {
+    "id": "tos-opening",
+    "from": 0,
+    "seconds": 65,
+    "language": "ko",
+    "filmLanguage": "en-US",
+    "split": "development",
+    "facts": [
+      "Rocket engines ignite and rocket rises above a canal city.",
+      "A woman has a mechanical right hand; dialogue carries their argument.",
+      "40 YEARS LATER marks the change to a laboratory.",
+      "Technicians inspect a brain covered in electrodes."
+    ],
+    "license": "CC BY 3.0",
+    "url": "https://download.blender.org/demo/movies/ToS/",
+    "author": "Blender Foundation",
+    "synthetic": false,
+    "sha256": "b3f0259c1675e3a2a4daecee4f360ef327e17729d257635cff34eefcbea34f7c",
+    "speechReference": [
+      {
+        "start": 23,
+        "end": 24.5,
+        "text": "You're a jerk, Thom."
+      },
+      {
+        "start": 25,
+        "end": 27,
+        "text": "Look Celia, we have to follow our passions;"
+      },
+      {
+        "start": 27,
+        "end": 30.5,
+        "text": "...you have your robotics, and I just want to be awesome in space."
+      },
+      {
+        "start": 30.8,
+        "end": 34,
+        "text": "Why don't you just admit that you're freaked out by my robot hand?"
+      },
+      {
+        "start": 34.5,
+        "end": 36,
+        "text": "I'm not freaked out by- it's..."
+      },
+      {
+        "start": 37,
+        "end": 38,
+        "text": "...alright! Fine!"
+      },
+      {
+        "start": 38,
+        "end": 41,
+        "text": "I'm freaked out! I have nightmares that I'm being chased..."
+      },
+      {
+        "start": 41,
+        "end": 42,
+        "text": "...by these giant robotic claws of death..."
+      },
+      {
+        "start": 42.2,
+        "end": 45,
+        "text": "\"Fourty years later\" Whatever, Thom. We're done."
+      },
+      {
+        "start": 50,
+        "end": 53.5,
+        "text": "Robot's memory synced and locked!"
+      },
+      {
+        "start": 61,
+        "end": 63,
+        "text": "This is pretty freaky."
+      }
+    ],
+    "protectedSounds": null,
+    "referenceStatus": "subtitle-windows-not-vocal-certification",
+    "fixedAt": "2026-09-22T05:21:27.825Z"
+  },
+  {
+    "id": "eval-ko-intro",
+    "from": 0,
+    "seconds": 45,
+    "language": "ko",
+    "filmLanguage": "ko-KR",
+    "split": "development",
+    "facts": [
+      "A man with glasses and a checkered shirt sits behind a desk, speaking and gesturing.",
+      "Curtain to the left; SEAMi lettering and flower emblem on the wall."
+    ],
+    "license": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:WIKITONGUES-_Hanbid_speaking_Korean.webm",
+    "author": "Wikitongues / Teddy Nee",
+    "synthetic": false,
+    "sha256": "1138ecf3bd410fd64955cf7e245478f20647584447b77204673301a6e60fbff5",
+    "speechReference": null,
+    "protectedSounds": null,
+    "referenceStatus": "independent-transcription-pending",
+    "fixedAt": "2026-09-22T05:21:30.987Z"
+  },
+  {
+    "id": "eval-tos-city",
+    "from": 65,
+    "seconds": 45,
+    "language": "en",
+    "filmLanguage": "en-US",
+    "split": "development",
+    "facts": [
+      "TEARS OF STEEL title on black.",
+      "Ruined city and an elevated lookout.",
+      "A man aims a rifle with a scope.",
+      "Large machines approach through the city."
+    ],
+    "license": "CC BY 3.0",
+    "url": "https://download.blender.org/demo/movies/ToS/",
+    "author": "Blender Foundation",
+    "synthetic": false,
+    "sha256": "09b97a3c64b7580e5811b7ca1a5da7e55ea35b3dd7d5d6e21c17ade9d6a03b14",
+    "speechReference": [],
+    "protectedSounds": null,
+    "referenceStatus": "subtitle-windows-not-vocal-certification",
+    "fixedAt": "2026-09-22T05:21:36.614Z"
+  },
+  {
+    "id": "eval-signal",
+    "from": 0,
+    "seconds": 30,
+    "language": "ko",
+    "filmLanguage": "en-US",
+    "split": "development",
+    "facts": [
+      "A red square is visible from 0 to 10 seconds.",
+      "A blue square replaces it from 10 to 20 seconds.",
+      "A green square replaces it from 20 to 30 seconds.",
+      "A short authored beep sounds at each transition (10 and 20 seconds)."
+    ],
+    "license": "CC0",
+    "url": "scripts/prepare-upgrade-eval.ts",
+    "author": "Scene synthetic fixture",
+    "synthetic": true,
+    "sha256": "cf35c457a798192d32f69ca1b1d3b9d7bcec10143b8f3ebc39feafd265c139d6",
+    "speechReference": null,
+    "protectedSounds": [
+      {
+        "start": 10,
+        "end": 10.3
+      },
+      {
+        "start": 20,
+        "end": 20.3
+      }
+    ],
+    "referenceStatus": "authored-exact",
+    "fixedAt": "2026-09-22T05:21:37.475Z"
+  },
+  {
+    "id": "eval-ko-holdout",
+    "from": 90,
+    "seconds": 40,
+    "language": "ko",
+    "filmLanguage": "ko-KR",
+    "split": "confirmation",
+    "facts": ["Same desk interview setting; the speaker uses both hands while talking."],
+    "license": "CC BY-SA 4.0",
+    "url": "https://commons.wikimedia.org/wiki/File:WIKITONGUES-_Hanbid_speaking_Korean.webm",
+    "author": "Wikitongues / Teddy Nee",
+    "synthetic": false,
+    "sha256": "400e412b05bc737f25d849f66cc0e19a69b3e6025e3bceb34cef5bbfeda12b6a",
+    "speechReference": null,
+    "protectedSounds": null,
+    "referenceStatus": "independent-transcription-pending",
+    "fixedAt": "2026-09-22T05:21:41.008Z"
+  },
+  {
+    "id": "eval-tos-team",
+    "from": 190,
+    "seconds": 45,
+    "language": "en",
+    "filmLanguage": "en-US",
+    "split": "confirmation",
+    "facts": [
+      "A man in a red suit addresses an older gray-haired man; a woman stands beside them.",
+      "The red-suited man signals the laboratory team to start.",
+      "Technicians operate floating holographic controls.",
+      "The laboratory transforms into a simulated room with a woman in front of the group."
+    ],
+    "license": "CC BY 3.0",
+    "url": "https://download.blender.org/demo/movies/ToS/",
+    "author": "Blender Foundation",
+    "synthetic": false,
+    "sha256": "1a70c8e88d80857bfe8c4dbae6e979508365c5b04d915fae7b254d9e369d85df",
+    "speechReference": [
+      {
+        "start": 1,
+        "end": 2,
+        "text": "Are you ready?"
+      },
+      {
+        "start": 3,
+        "end": 5,
+        "text": "Of course you're ready, you're a rockstar."
+      },
+      {
+        "start": 7,
+        "end": 8,
+        "text": "How's it looking, Barley?"
+      },
+      {
+        "start": 9,
+        "end": 11,
+        "text": "We should have about ten minutes..."
+      },
+      {
+        "start": 11.5,
+        "end": 13,
+        "text": "Well that's perfect."
+      },
+      {
+        "start": 13.5,
+        "end": 16.5,
+        "text": "We're on in one! All systems go! Yeah you, go!"
+      },
+      {
+        "start": 18,
+        "end": 22,
+        "text": "Go! Move your asses! Go go go!"
+      },
+      {
+        "start": 23,
+        "end": 27,
+        "text": "I love it! Come on, go!"
+      },
+      {
+        "start": 33,
+        "end": 34,
+        "text": "That's nice."
+      },
+      {
+        "start": 34.5,
+        "end": 35.69999999999999,
+        "text": "Nothing to worry about."
+      },
+      {
+        "start": 36,
+        "end": 37,
+        "text": "Thom."
+      },
+      {
+        "start": 41,
+        "end": 43,
+        "text": "There she is."
+      },
+      {
+        "start": 43.5,
+        "end": 44.5,
+        "text": "Now."
+      }
+    ],
+    "protectedSounds": null,
+    "referenceStatus": "subtitle-windows-not-vocal-certification",
+    "fixedAt": "2026-09-22T05:21:45.798Z",
+    "visualReference": "Source contact sheet at 190,195,200,205,210,215,220,225,230 seconds, inspected before confirmation runs; sampled frames only.",
+    "referenceAmendment": {
+      "at": "2026-09-22T05:56:26.461Z",
+      "reason": "The last pre-run fact overinterpreted sampled frames. The visible exterior street, not the laboratory, becomes a simulated sunny canal town. Correction was informed by output inspection and is not a blinded reference.",
+      "originalFact": "The laboratory transforms into a simulated room with a woman in front of the group.",
+      "correctedFact": "A holographic grid transforms the ruined exterior street into a sunny canal town."
+    }
+  }
+]

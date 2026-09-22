@@ -1,56 +1,37 @@
-# scripts/demo — the submission video
+# Demo production, version 2
 
-## Direction
+Outputs are written under `runtime/demo-v2/`, preserving the earlier `runtime/demo/` films. English is the submission draft; Korean is the review copy. Both target 175 seconds. The builder throws before encoding or after probing if duration is **180 seconds or longer**.
 
-Makes the under-3-minute demo video, one per language (`npm run demo -- <ko|en> [cards|voice|record|build|all]`).
-Everything shown comes from the deployed service: the run list, each run's `script.json` and
-`described.mp4` (demo-data.ts). The presenter's numbers are read from those runs, never typed in.
+Pin `runtime/demo-v2/selection.json` to the project, generation run, edit parent, and recorded children. Nothing selects “the latest run” implicitly. The opening uses the edited Korean sample at 54–60.4 seconds, first as original sound, then with description. Both films contain English burned-in captions and an English SRT.
 
-- `storyboard.ts` — scenes and presenter sentences for KO and EN. `featuredLine` picks the line the
-  inspector opens: a genuinely rewritten line (review loop) if the run has one, otherwise a line whose
-  first voicing overran its pause (length loop). The narration follows whichever it is.
-- `cards.ts` — still frames drawn as HTML in the app's tokens, captured by Chrome at 1920×960.
-- `voice.ts` — presenter voice (Chirp 3 HD Aoede, distinct from the Charon narrator), one request per
-  sentence, cached by text+voice; `planScene` turns measured lengths into scene timing.
-- `record.ts` — drives the deployed app in headless Chrome (1440×720 at 4/3 → 1920×960) with a drawn
-  cursor; frames come from the DevTools screencast with capture times, and the page logs when the film
-  plays. Each beat lasts at least as long as its narration, so the build never freezes or cuts picture.
-- `build.ts` — one H.264 segment per scene with captions burned in (libass, Pretendard OTF), joined
-  without re-encoding; audio laid at planned/recorded times, each source at -16 LUFS; writes
-  `scene-demo-<lang>_check.md` (length ≤ 180 s, loudness, capture fps, film alignment).
+```json
+{
+  "projectId": "tos-opening",
+  "generationRunId": "completed-generation-id",
+  "editBaseRunId": "completed-parent-id",
+  "editedRuns": {},
+  "edit": { "cueId": "L4", "text": "시뮬레이션 준비 완료.", "start": 54.2 }
+}
+```
 
-Not its job: making runs. Runs are made on the service (scripts/cloud-run-sse.sh logs one over SSE).
+Run production steps serially:
 
-Outputs (gitignored): `runtime/demo/media/*` (downloads), `runtime/demo/<lang>/{cards,voice,rec,build}/`,
-`runtime/demo/<lang>/scene-demo-<lang>.mp4` and its `_check.md`.
+```sh
+npm run demo -- en voice
+npm run demo -- ko voice
+npm run demo -- en record
+npm run demo -- en build
+npm run demo -- ko record
+npm run demo -- ko build
+node --env-file=.env.local --import tsx scripts/demo/presentation.ts
+```
 
-## Debug log
+Voice requests use Google Cloud TTS and cache unchanged text/voice/rate. **Recording performs a paid sentence edit against the deployed service.** It records a real private upload, replays the pinned generation's saved trace, displays a genuinely changed rejected line, edits one dropped sentence, listens, and downloads VTT. The uploaded project and the replayed sample are distinct; narration explicitly says it is a saved trace for the same sample. No new full generation is claimed in the recording.
 
-- [2026-09-22] Featured line for EN run 20260921t082401167: L3 was rejected (spoiler) and "revised" to the
-  identical text, which then passed. Showing that as "rejected → rewritten" would be false, so
-  `featuredLine` requires the revised text to differ, and the video shows L5 (voiced 3.27 s in a 2.8 s
-  pause → shortened to 2.37 s). The app's metric was relabelled from "caught and fixed" to
-  "flagged in review" (it now shows `summary.cuesRejected`) for the same reason.
-- [2026-09-22] Stopping the eyes-closed playback on wall time cut the last line of dialogue ("This is
-  pretty freaky", 60.8–62.4 s), because play starts ~0.4 s after the planned offset. The recorder now
-  waits for the video's own `currentTime` to reach the end of the stretch.
-- [2026-09-22] Dry run with silent presenter lines of estimated length (words ÷ 2.7/s): 168.7 s total,
-  capture 57 fps during the replay animation, 30 fps during playback, 9–19 fps on static screens
-  (the screencast sends frames only on change; ffconcat durations hold each one).
+The edit writes a child run and records its exact ID. Do not rerun recording simply to repeat an already-successful paid mutation. The recorded cursor is an overlay on actual browser interaction. Time-compressed sections carry the speed and original run/edit processing time; listening remains at normal speed. Frame/media timestamps align the described soundtrack to recorded playback. Every source is loudness-adjusted, and an output limiter prevents digital over-levels.
 
-- [2026-09-22] Parking the paused player on 57.5 s right after `.metrics` appeared did nothing: the
-  player swaps to the described film when the run loads and restores the previous position (0 s).
-  The recorder now waits until the video's `currentSrc` is the run's film and `readyState >= 2`.
-- [2026-09-22] KO presenter first came to 122.0 s (EN 113.0 s), which put the plan at ~177 s. Four
-  sentences were tightened to 116.2 s; the KO video ended at 169.6 s.
+The September delivery uses one actual English-interface edit recording for both narration languages. Cards and presenter speech are localized; the listening beat starts film sound at ten seconds to keep both presenters clear of it. The first recording stopped while locating the download link after the paid edit had succeeded. Its edit frames were preserved and recovered using file write timestamps, then combined with a new CDP-timed upload/replay/listening/download recording. `DEMO_EDIT_CAPTURE` explicitly points to that preserved capture and checks the child run ID; it never simulates or repeats the edit. The recorder now checkpoints each beat so a later failure cannot discard completed paid evidence.
 
-## Status
+Each film has a technical check note. Full decode, video dimensions/codecs, duration, audio loudness/peaks, frame samples, caption placement and voice/film separation can be checked automatically. These checks do **not** substitute for a human listening to both complete films before submission. No claim of participant impact or certified zero real speech/sound intrusion is made.
 
-- [2026-09-22] Both videos built from revision scene-ad-00003-667:
-  - EN `runtime/demo/en/scene-demo-en.mp4` — 168.1 s, -16.2 LUFS, run 20260921t082401167 (7/7 lines,
-    $0.190, 4 min 11 s), featured line L5 (length loop).
-  - KO `runtime/demo/ko/scene-demo-ko.mp4` — 169.6 s, -16.1 LUFS, run 20260922t024410240 (4/4 lines,
-    1 dropped after review, $0.219, 5 min 14 s), featured line L3 (review loop, genuinely rewritten).
-  - Presenter TTS: EN 1,678 chars $0.050, KO 1,087 chars $0.033. Checks in `scene-demo-<lang>_check.md`.
-- Only `voice` calls a paid API (Google Text-to-Speech, gcloud login). Runs themselves are made on the
-  service; Gemini goes through OpenRouter there.
+Source: _Tears of Steel_, Blender Foundation, CC BY 3.0. The presentation also attributes the Korean Wikitongues evaluation source. Browser session files, owner tokens, raw recordings and media stay ignored. Neither this script nor deployment publishes GitHub or submits to the contest.

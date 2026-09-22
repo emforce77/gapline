@@ -69,6 +69,7 @@ export async function createProject(input: {
   filmLanguageCode: string;
   attribution: string;
   license: string;
+  ownerHash?: string;
 }): Promise<Project> {
   const dir = projectDir(input.id);
   await mkdir(dir, { recursive: true });
@@ -101,6 +102,7 @@ export async function createProject(input: {
     attribution: input.attribution,
     license: input.license,
     createdAt: new Date().toISOString(),
+    ...(input.ownerHash ? { ownerHash: input.ownerHash } : {}),
     stripStepSeconds,
   };
   await writeProject(project);

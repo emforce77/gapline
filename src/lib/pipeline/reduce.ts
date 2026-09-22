@@ -1,7 +1,16 @@
 import type { RunFiles, RunSummary, StageId, TimedRunEvent } from "./events";
 import type { Cue, Density, Gap, Language, MissingItem, SceneMap, SpeechSegment } from "./schemas";
 
-export const STAGES: StageId[] = ["hear", "watch", "gaps", "write", "review", "voice", "mix"];
+export const STAGES: StageId[] = [
+  "hear",
+  "watch",
+  "gaps",
+  "write",
+  "review",
+  "voice",
+  "verify",
+  "mix",
+];
 
 export interface StageView {
   state: "waiting" | "running" | "done" | "reused";

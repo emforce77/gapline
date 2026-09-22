@@ -15,6 +15,7 @@ import type { Project, RunListing } from "@/lib/store/projects";
 import { LineDetail, StageList } from "./Inspector";
 import { Player, type PlayerHandle } from "./Player";
 import { Timeline } from "./Timeline";
+import { CueEditor } from "./CueEditor";
 
 /** Replays squeeze a recorded run into about this many seconds, at one uniform speed. */
 const REPLAY_TARGET_SECONDS = 24;
@@ -49,15 +50,18 @@ export function Workspace({
   initialRuns,
   analysis,
   measured,
+  initialRunId,
 }: {
   project: Project;
   initialRuns: RunListing[];
   analysis: { speech: SpeechSegment[]; scene: SceneMap } | null;
   measured: RunSummary | null;
+  initialRunId?: string;
 }) {
   const { t, lang } = useI18n();
-  const [narration, setNarration] = useState<Language>(lang);
-  const [density, setDensity] = useState<Density>("standard");
+  const pinned = initialRuns.find((r) => r.runId === initialRunId);
+  const [narration, setNarration] = useState<Language>((pinned?.language as Language) ?? lang);
+  const [density, setDensity] = useState<Density>((pinned?.density as Density) ?? "standard");
   const [runs, setRuns] = useState(initialRuns);
   const [events, setEvents] = useState<TimedRunEvent[] | null>(null);
   const [view, setView] = useState<RunView | null>(null);
@@ -66,11 +70,17 @@ export function Workspace({
   const [selected, setSelected] = useState<string | null>(null);
   const [time, setTime] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false);
+  const [chosenRunId, setChosenRunId] = useState<string | null>(initialRunId ?? null);
   const player = useRef<PlayerHandle>(null);
   const timers = useRef<number[]>([]);
 
   const current =
-    runs.find((r) => r.language === narration && r.density === density && r.summary) ?? null;
+    runs.find(
+      (r) => r.runId === chosenRunId && r.language === narration && r.density === density,
+    ) ??
+    runs.find((r) => r.language === narration && r.density === density && r.summary) ??
+    null;
 
   const stopReplay = useCallback(() => {
     timers.current.forEach((id) => window.clearTimeout(id));
@@ -173,7 +183,11 @@ export function Workspace({
   const media = (file: string) => `/api/projects/${project.id}/media/${file}`;
   const describedUrl = final ? media(`runs/${final.runId}/${final.files!.described}`) : null;
   const selectedCue = shown?.cues.find((c) => c.id === selected) ?? null;
-  const busy = mode === "live";
+  const busy = mode === "live" || editing;
+  const sceneEvidence = shown?.scene?.shots
+    .filter((s) => selectedCue && selectedCue.start >= s.start && selectedCue.start < s.end)
+    .map((s) => [s.setting, s.action, s.onScreenText].filter(Boolean).join(" · "))
+    .join(" ");
   const languageName = narration === "ko" ? "한국어" : "English";
 
   return (
@@ -220,18 +234,100 @@ export function Workspace({
               currentTime={time}
               selectedCueId={selected}
               onSeek={(s) => player.current?.seek(s)}
-              onSelect={(id) => setSelected(id)}
+              onSelect={(id) => {
+                setSelected(id);
+                const cue = shown.cues.find((c) => c.id === id);
+                if (cue) player.current?.seek(cue.start);
+              }}
             />
           ) : null}
+          {final?.cues.length ? (
+            <label className="cue-picker">
+              {t.editor.chooseLine}
+              <select
+                aria-label={t.editor.chooseLine}
+                value={selected ?? ""}
+                disabled={busy}
+                onChange={(event) => {
+                  const id = event.target.value;
+                  setSelected(id);
+                  const cue = final.cues.find((c) => c.id === id);
+                  if (cue) player.current?.seek(cue.start);
+                }}
+              >
+                <option value="" disabled>
+                  —
+                </option>
+                {final.cues.map((cue) => (
+                  <option key={cue.id} value={cue.id}>
+                    {cue.id} · {cue.versions.at(-1)!.text}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
           {final?.summary ? <Metrics summary={final.summary} /> : null}
+          {final?.summary ? (
+            <div className="quality-note" role="status">
+              <strong>
+                {final.summary.qualityStatus === "model_checked"
+                  ? t.editor.checked
+                  : final.summary.qualityStatus === "review_needed"
+                    ? t.editor.reviewNeeded
+                    : t.editor.unchecked}
+              </strong>
+              {final.summary.costStatus === "unresolved" ? <p>{t.editor.uncertainty}</p> : null}
+              {final.summary.finalReview ? (
+                <ul>
+                  {final.summary.finalReview.missing.map((m, i) => (
+                    <li key={`m${i}`}>
+                      {m.at.toFixed(1)}s · {m.what}
+                    </li>
+                  ))}
+                  {final.summary.finalReview.verdicts
+                    .filter((v) => !v.pass)
+                    .map((v) => (
+                      <li key={v.cueId}>
+                        <button className="button ghost small" onClick={() => setSelected(v.cueId)}>
+                          {v.cueId}
+                        </button>{" "}
+                        {v.fix}
+                      </li>
+                    ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <aside className="ws-inspector">
           <div className="run-panel">
+            {runs.length ? (
+              <label className="result-picker">
+                {t.editor.history}
+                <select
+                  aria-label={t.editor.history}
+                  value={current?.runId ?? ""}
+                  disabled={busy || mode === "replay"}
+                  onChange={(e) => setChosenRunId(e.target.value)}
+                >
+                  <option value="" disabled>
+                    —
+                  </option>
+                  {runs
+                    .filter((r) => r.language === narration && r.density === density)
+                    .map((r) => (
+                      <option key={r.runId} value={r.runId}>
+                        {r.summary?.parentRunId ? t.editor.edited : t.editor.original} · {r.runId}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            ) : null}
             <div className="run-options">
               <div className="control">
                 <span className="label">{t.workspace.narration}</span>
-                <div className="segmented" role="group">
+                <div className="segmented" role="group" aria-label={t.workspace.narration}>
                   {(["ko", "en"] as Language[]).map((l) => (
                     <button
                       key={l}
@@ -247,7 +343,7 @@ export function Workspace({
               </div>
               <div className="control">
                 <span className="label">{t.workspace.density}</span>
-                <div className="segmented" role="group">
+                <div className="segmented" role="group" aria-label={t.workspace.density}>
                   {(["standard", "brief"] as Density[]).map((d) => (
                     <button
                       key={d}
@@ -316,12 +412,32 @@ export function Workspace({
               </button>
               <LineDetail
                 cue={selectedCue}
+                evidence={sceneEvidence}
+                editor={
+                  final && mode === "idle" ? (
+                    <CueEditor
+                      key={`${final.runId}-${selectedCue.id}`}
+                      projectId={project.id}
+                      runId={final.runId!}
+                      cue={selectedCue}
+                      cues={final.cues}
+                      gaps={final.gaps}
+                      onBusy={setEditing}
+                      onSaved={async (id) => {
+                        const response = await fetch(`/api/projects/${project.id}/runs`);
+                        if (!response.ok) throw new Error(t.editor.failed);
+                        setRuns((await response.json()).runs);
+                        setChosenRunId(id);
+                      }}
+                    />
+                  ) : null
+                }
                 onPlay={() => player.current?.seek(Math.max(0, selectedCue.start - 1), true)}
               />
             </>
           ) : (
             <>
-              {view ? (
+              {view && !final?.summary?.parentRunId ? (
                 <StageList
                   view={view}
                   clockRate={mode === "live" ? 1 : mode === "replay" ? replaySpeed : 0}

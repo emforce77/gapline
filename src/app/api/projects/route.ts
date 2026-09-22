@@ -4,6 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { createProject, MAX_UPLOAD_SECONDS } from "@/lib/store/ingest";
 import { listProjects } from "@/lib/store/projects";
+import { canAccess, ownerHash, publicProject, sameOrigin, sessionToken } from "@/lib/store/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -11,11 +12,16 @@ export const dynamic = "force-dynamic";
 const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
 
 export async function GET() {
-  return Response.json({ projects: await listProjects() });
+  const token = await sessionToken();
+  return Response.json(
+    { projects: (await listProjects()).filter((p) => canAccess(p, token)).map(publicProject) },
+    { headers: { "Cache-Control": "private, no-store" } },
+  );
 }
 
 /** Accepts one short video, normalises it into a new project and returns the project id. */
 export async function POST(request: Request) {
+  if (!sameOrigin(request)) return new Response("Forbidden", { status: 403 });
   const form = await request.formData();
   const file = form.get("video");
   if (!(file instanceof File))
@@ -39,6 +45,7 @@ export async function POST(request: Request) {
       filmLanguageCode: "auto",
       attribution: "",
       license: "",
+      ownerHash: ownerHash((await sessionToken(true))!),
     });
     return Response.json({ id: project.id });
   } catch (error) {

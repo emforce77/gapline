@@ -1,0 +1,11 @@
+projectId,setting,status,wallSeconds,modelQuality,observedEssentialOmissions,openRouterUsd,googleSpeechUsd,independentAsrOverlapCandidateCount
+tos-opening,high,done,349.29,review_needed,0,0.21921374999999999,0.02148666666666667,1
+tos-opening,medium,done,179.39,review_needed,1,0.1173765,0.0042,0
+eval-ko-intro,high,done,191.31,review_needed,2,0.11745675,0.012746666666666667,1
+eval-ko-intro,medium,done,47.56,model_checked,2,0.030813,0.00042,0
+eval-tos-city,high,done,219.03,review_needed,0,0.13538475000000003,0.035429999999999996,0
+eval-tos-city,medium,done,99.66,model_checked,0,0.0659895,0.017430000000000005,0
+eval-signal,high,failed,,,,0.00590475,0.008,
+eval-signal,medium,failed,,,,0,0.008,
+eval-ko-holdout,high,failed,,,,0.005226,0.010666666666666666,
+eval-tos-team,high,done,240.97,review_needed,,0.15021225,0.01614,1

@@ -17,7 +17,7 @@ import { PRESENTER_VOICES, type Scene } from "./storyboard";
 const LEAD_IN_SECONDS = 0.35;
 const BETWEEN_SECONDS = 0.3;
 const BEFORE_FILM_SECONDS = 0.5;
-const PRESENTER_RATE = 1.0;
+const PRESENTER_RATE = 1.06;
 
 export interface VoicedSentence {
   scene: string;
@@ -27,6 +27,7 @@ export interface VoicedSentence {
   voice: string;
   file: string;
   seconds: number;
+  rate?: number;
 }
 
 export interface ScenePlan {
@@ -54,7 +55,12 @@ export async function voiceStoryboard(
       const speak = sentence.speak ?? sentence.text;
       const file = join(outDir, `${scene.id}-${index}.wav`);
       const cached = previous.find(
-        (v) => v.file === file && v.speak === speak && v.voice === voice && existsSync(file),
+        (v) =>
+          v.file === file &&
+          v.speak === speak &&
+          v.voice === voice &&
+          v.rate === PRESENTER_RATE &&
+          existsSync(file),
       );
       if (cached) {
         voiced.push({ ...cached, text: sentence.text });
@@ -75,6 +81,7 @@ export async function voiceStoryboard(
         text: sentence.text,
         speak,
         voice,
+        rate: PRESENTER_RATE,
         file,
         seconds: line.seconds,
       });
@@ -100,8 +107,11 @@ export function planScene(scene: Scene, voiced: VoicedSentence[]): ScenePlan {
     return { start, seconds: v.seconds, file: v.file, text: v.text };
   });
   const film = scene.film
-    ? { start: t + BEFORE_FILM_SECONDS, seconds: scene.film.to - scene.film.from }
+    ? {
+        start: Math.max(scene.id === "listen" ? 10 : 0, t + BEFORE_FILM_SECONDS),
+        seconds: scene.film.to - scene.film.from,
+      }
     : null;
   const end = film ? film.start + film.seconds : t;
-  return { speech, film, minSeconds: end + scene.hold };
+  return { speech, film, minSeconds: Math.max(scene.targetSeconds, end + scene.hold) };
 }

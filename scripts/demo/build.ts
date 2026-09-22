@@ -2,12 +2,13 @@
  * Assembles the demo video from the cards, the app recording, the presenter's voice and the film.
  *
  * Picture: one H.264 segment per scene (1920×960 content over a 120 px caption bar, captions burned
- * in with libass and Pretendard), joined without re-encoding. App scenes use the recorded frames at
- * the times Chrome captured them; nothing is sped up, frozen or cut.
+ * in with libass and Pretendard), joined without re-encoding. Long recorded interactions are
+ * compressed to the storyboard duration with visible speed and original processing-time labels.
+ * Listening stays at normal speed so the film and its sound remain synchronized.
  * Sound: presenter sentences at their planned times, the bare film under the cold open, and the
  * described film exactly where the recording shows it playing. Each source is brought to -16 LUFS.
  *
- * Output: runtime/demo/<lang>/scene-demo-<lang>.mp4 and scene-demo-<lang>_check.md
+ * Output: runtime/demo-v2/<lang>/scene-demo-<lang>.mp4 and scene-demo-<lang>_check.md
  */
 import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -17,7 +18,7 @@ import { readCallRecords } from "../../src/lib/llm/ledger";
 import type { Language } from "../../src/lib/pipeline/schemas";
 import type { DemoData } from "./demo-data";
 import type { Frame, Mark, MediaEvent } from "./record";
-import type { CardId, Scene } from "./storyboard";
+import { buildStoryboard, type CardId, type Scene } from "./storyboard";
 import { planScene, type VoicedSentence } from "./voice";
 
 const FPS = 30;
@@ -47,7 +48,7 @@ function assTime(seconds: number): string {
 }
 
 function sceneAss(
-  captions: { start: number; end: number; style: "Say" | "Film"; text: string }[],
+  captions: { start: number; end: number; style: "Say" | "Film" | "Context"; text: string }[],
 ): string {
   const lines = captions.map(
     (c) =>
@@ -65,6 +66,7 @@ function sceneAss(
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
     "Style: Say,Pretendard,38,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,2,150,150,24,1",
     "Style: Film,Pretendard,34,&H0098908A,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,2,150,150,40,1",
+    "Style: Context,Pretendard,25,&H00FFFFFF,&H00FFFFFF,&H00171513,&H00171513,0,0,0,0,100,100,0,0,3,8,0,7,24,24,12,1",
     "",
     "[Events]",
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
@@ -74,15 +76,22 @@ function sceneAss(
 }
 
 /** The recorded frames that were on screen during [start, end), as ffconcat entries. */
-function beatConcat(frames: Frame[], mark: Mark): string {
+function beatConcat(frames: Frame[], mark: Mark, seconds: number): string {
   let first = frames.findLastIndex((f) => f.t <= mark.start);
-  if (first < 0) first = 0;
+  if (first < 0 || mark.start - frames[first].t > 2)
+    first = Math.max(
+      0,
+      frames.findIndex((f) => f.t >= mark.start),
+    );
   const entries: string[] = ["ffconcat version 1.0"];
   for (let i = first; i < frames.length && frames[i].t < mark.end; i++) {
     const from = Math.max(frames[i].t, mark.start);
     const to = Math.min(frames[i + 1]?.t ?? mark.end, mark.end);
     if (to <= from) continue;
-    entries.push(`file '${frames[i].file}'`, `duration ${(to - from).toFixed(4)}`);
+    entries.push(
+      `file '${frames[i].file}'`,
+      `duration ${(((to - from) * seconds) / (mark.end - mark.start)).toFixed(4)}`,
+    );
   }
   entries.push(entries[entries.length - 2]);
   return entries.join("\n") + "\n";
@@ -130,6 +139,8 @@ export async function buildDemo(input: {
 
   // Where each scene sits on the final timeline.
   const placed: Placed[] = [];
+  const english = buildStoryboard("en", data);
+  const subtitles: { start: number; end: number; text: string }[] = [];
   let cursor = 0;
   for (const scene of scenes) {
     const plan = planScene(scene, voiced);
@@ -138,33 +149,74 @@ export async function buildDemo(input: {
         ? marks.find((m) => m.beat === (scene.show as { beat: string }).beat)
         : null;
     if ("beat" in scene.show && !mark) throw new Error(`No recording for beat ${scene.show.beat}`);
-    const seconds = toFrames(mark ? mark.end - mark.start : plan.minSeconds);
+    const seconds = toFrames(mark?.beat === "listen" ? mark.end - mark.start : plan.minSeconds);
     placed.push({ scene, start: cursor, seconds });
     cursor += seconds;
   }
   const total = cursor;
+  if (total >= MAX_SECONDS)
+    throw new Error(`Demo exceeds strict duration limit: ${total.toFixed(2)} s`);
 
   // Picture: one segment per scene.
   const segments: string[] = [];
   const beatStats: string[] = [];
   for (const [i, p] of placed.entries()) {
     const plan = planScene(p.scene, voiced);
-    const captions = plan.speech.map((s, k) => ({
-      start: s.start,
-      end: Math.min(
+    const captions: {
+      start: number;
+      end: number;
+      style: "Say" | "Film" | "Context";
+      text: string;
+    }[] = [];
+    for (const [k, s] of plan.speech.entries()) {
+      const text = english.find((e) => e.id === p.scene.id)!.say[k].text;
+      const chunks: string[] = [];
+      for (const word of text.split(/\s+/)) {
+        if (chunks.length && chunks.at(-1)!.length + word.length < 94)
+          chunks[chunks.length - 1] += ` ${word}`;
+        else chunks.push(word);
+      }
+      let at = s.start;
+      const length = chunks.reduce((n, c) => n + c.length, 0);
+      const end = Math.min(
         s.start + s.seconds + CAPTION_TAIL_SECONDS,
         plan.speech[k + 1]?.start ?? p.seconds,
-      ),
-      style: "Say" as "Say" | "Film",
-      text: s.text,
-    }));
+      );
+      for (const chunk of chunks) {
+        const next = at + ((end - s.start) * chunk.length) / length;
+        captions.push({ start: at, end: next, style: "Say", text: chunk });
+        subtitles.push({ start: p.start + at, end: p.start + next, text: chunk });
+        at = next;
+      }
+    }
     if (plan.film && p.scene.film) {
       captions.push({
         start: plan.film.start,
         end: plan.film.start + plan.film.seconds,
         style: "Film",
-        text: p.scene.film.caption,
+        text: english.find((e) => e.id === p.scene.id)!.film!.caption,
       });
+      subtitles.push({
+        start: p.start + plan.film.start,
+        end: p.start + plan.film.start + plan.film.seconds,
+        text: english.find((e) => e.id === p.scene.id)!.film!.caption,
+      });
+    }
+    if ("beat" in p.scene.show) {
+      const beat = p.scene.show.beat;
+      const mark = marks.find((m) => m.beat === beat)!;
+      const speed = (mark.end - mark.start) / p.seconds;
+      const text =
+        beat === "replay"
+          ? `Saved run trace replay · original ${Math.round(data.standard.summary.wallSeconds)} s processing · recording ${speed.toFixed(1)}×`
+          : beat === "edit"
+            ? `Recorded edit ${speed.toFixed(1)}× · actual API processing ${Math.round(mark.processingSeconds ?? 0)} s`
+            : beat === "detail"
+              ? "Translation · Before: ‘The caption says forty years later.’ → After: ‘Forty years later.’"
+              : beat === "open"
+                ? `Recorded upload ${speed.toFixed(1)}×`
+                : "";
+      if (text) captions.push({ start: 0, end: p.seconds, style: "Context", text });
     }
     const assFile = join(workDir, `${p.scene.id}.ass`);
     await writeFile(assFile, sceneAss(captions));
@@ -176,7 +228,7 @@ export async function buildDemo(input: {
       beatStats.push(
         `${show.beat}: ${inBeat} frames in ${round(mark.end - mark.start, 1)} s (${round(inBeat / (mark.end - mark.start), 1)} fps captured)`,
       );
-      await writeFile(listFile, beatConcat(frames, mark));
+      await writeFile(listFile, beatConcat(frames, mark, p.seconds));
     } else {
       const image = "card" in show ? cards[show.card] : cards.black;
       await writeFile(
@@ -201,6 +253,8 @@ export async function buildDemo(input: {
       String(p.seconds),
       "-c:v",
       "libx264",
+      "-threads",
+      "4",
       "-preset",
       "medium",
       "-crf",
@@ -254,7 +308,7 @@ export async function buildDemo(input: {
     if (!plan.film || !p.scene.film) continue;
     const film = p.scene.film;
     if ("black" in p.scene.show) {
-      const source = film.track === "original" ? data.clipFile : data.standard.describedFile;
+      const source = film.track === "original" ? data.clipFile : data.edited.describedFile;
       const lufs = await extractLufs(
         source,
         film.from,
@@ -276,7 +330,7 @@ export async function buildDemo(input: {
       if (!playing) throw new Error(`The recording never shows the film playing in ${p.scene.id}`);
       const paused = media.find((e) => e.type === "pause" && e.wall > playing.wall);
       const seconds = Math.min(paused?.wall ?? mark.end, mark.end) - playing.wall;
-      const source = film.track === "described" ? data.standard.describedFile : data.clipFile;
+      const source = film.track === "described" ? data.edited.describedFile : data.clipFile;
       const lufs = await extractLufs(
         source,
         playing.media,
@@ -339,6 +393,7 @@ export async function buildDemo(input: {
 
   // Check note next to the video.
   const duration = await probeDurationSeconds(out);
+  if (duration >= MAX_SECONDS) throw new Error(`Encoded demo violates strict limit: ${duration} s`);
   const loudness = await integratedLufs(out);
   const size = (await stat(out)).size;
   const tts = await readCallRecords(join(outDir, "voice", "ledger.jsonl"));
@@ -348,12 +403,14 @@ export async function buildDemo(input: {
   const check = [
     `# scene-demo-${lang}.mp4 — check (${new Date().toISOString().slice(0, 10)})`,
     "",
-    `- [${duration <= MAX_SECONDS ? "x" : " "}] length: ${round(duration, 1)} s (limit ${MAX_SECONDS} s, planned ${round(total, 1)} s)`,
+    `- [${duration < MAX_SECONDS ? "x" : " "}] length: ${round(duration, 1)} s (strictly below ${MAX_SECONDS} s, planned ${round(total, 1)} s)`,
     `- [x] picture: ${WIDTH}×${HEIGHT} H.264 ${FPS} fps, ${round(size / 1e6, 1)} MB`,
     `- [${Math.abs(loudness - TARGET_LUFS) <= 1.5 ? "x" : " "}] loudness: ${loudness} LUFS integrated (target ${TARGET_LUFS})`,
     `- [x] presenter: ${voiced.length} sentences, ${ttsChars} characters synthesized this build set, $${ttsCost.toFixed(4)} (Chirp 3 HD ${voiced[0]?.voice})`,
-    `- [x] runs shown: ${run.runId} (standard), ${data.brief.runId} (brief), from ${"the deployed service"}`,
-    `- [x] numbers said: ${run.summary.cuesShipped} lines, ${run.summary.cuesFitting} fit, ${run.summary.overlapWithSpeechSeconds} s overlap, $${run.summary.costUsd.toFixed(4)}, ${run.summary.wallSeconds} s`,
+    `- [x] deployed runs: ${run.runId} (generation), ${data.editBase.runId} (edit parent), ${data.edited.runId} (recorded human edit)`,
+    `- [x] generation measurements: ${run.summary.cuesShipped} shipped lines; $${run.summary.costUsd.toFixed(4)} API cost; ${run.summary.wallSeconds} s. STT overlap is not a listening-quality certificate.`,
+    `- [x] English captions burned in for both narration languages; external English SRT also saved.`,
+    `- [ ] Human full-length listening acceptance remains required; automated media checks and sampled visual review cannot establish subjective listening quality.`,
     ...beatStats.map((b) => `- [x] recording ${b}`),
     ...filmNotes.map((f) => `- [x] film sound ${f}`),
     "",
@@ -368,5 +425,16 @@ export async function buildDemo(input: {
     "",
   ].join("\n");
   await writeFile(join(outDir, `scene-demo-${lang}_check.md`), check);
+  const srtTime = (v: number) => {
+    const ms = Math.round(v * 1000);
+    return `${String(Math.floor(ms / 3600000)).padStart(2, "0")}:${String(Math.floor(ms / 60000) % 60).padStart(2, "0")}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")},${String(ms % 1000).padStart(3, "0")}`;
+  };
+  await writeFile(
+    join(outDir, `scene-demo-${lang}.en.srt`),
+    subtitles
+      .sort((a, b) => a.start - b.start)
+      .map((s, i) => `${i + 1}\n${srtTime(s.start)} --> ${srtTime(s.end)}\n${s.text}\n`)
+      .join("\n"),
+  );
   return out;
 }

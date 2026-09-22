@@ -1,0 +1,288 @@
+{
+  "at": "2026-09-22T05:56:26.752Z",
+  "decision": "NO-GO medium reviewer; retain high. Final listening acceptance is open.",
+  "screeningRuns": 10,
+  "completed": 7,
+  "failed": 3,
+  "cost": {
+    "openRouterUsd": 0.8475772500000001,
+    "googleSpeechUsd": 0.13452,
+    "unknownCharges": 0
+  },
+  "notes": [
+    "Default high and candidate medium share all integrity fixes; this is not a pre-upgrade A/B comparison.",
+    "Only the retained setting was run on held-out cases after the candidate lost essential context.",
+    "Cold high versus cached medium total latency/cost are not comparable.",
+    "Opening reference is not blinded to the first smoke result.",
+    "Same-film clips are clustered; no population or participant-impact inference.",
+    "Whisper timings are independent ASR, not ground truth. Real sound intrusions and full listening acceptance remain unknown."
+  ],
+  "runs": [
+    {
+      "projectId": "tos-opening",
+      "setting": "high",
+      "split": "development",
+      "runId": "20260922t051536291-ko-standard-d88b71",
+      "status": "done",
+      "cost": {
+        "openRouterUsd": 0.21921374999999999,
+        "googleSpeechUsd": 0.02148666666666667,
+        "unknownCharges": 0
+      },
+      "wallSeconds": 349.29,
+      "analysisReused": {
+        "speech": false,
+        "scene": false
+      },
+      "shipped": 5,
+      "modelQuality": "review_needed",
+      "modelMissing": [
+        "주황색과 파란색의 홀로그램 인형들이 다투는 모습을 재현하고, 재생 제어창이 떠오른다.",
+        "콘솔 앞 연구원 위로 '시뮬레이션 준비 완료'라는 홀로그램 글자가 나타난다."
+      ],
+      "observedEssentialOmissions": 0,
+      "referenceScope": "Fixed facts and sampled-frame comparison; unknown is not zero.",
+      "independentAsrOverlapCandidates": [
+        {
+          "cueId": "L6",
+          "seconds": 1.89175
+        }
+      ],
+      "certifiedDialogueIntrusions": null,
+      "certifiedImportantSoundIntrusions": null,
+      "certifiedFactualAndTimingErrors": null
+    },
+    {
+      "projectId": "tos-opening",
+      "setting": "medium",
+      "split": "development",
+      "runId": "20260922t052256151-ko-standard-da3a89",
+      "status": "done",
+      "cost": {
+        "openRouterUsd": 0.1173765,
+        "googleSpeechUsd": 0.0042,
+        "unknownCharges": 0
+      },
+      "wallSeconds": 179.39,
+      "analysisReused": {
+        "speech": true,
+        "scene": true
+      },
+      "shipped": 5,
+      "modelQuality": "review_needed",
+      "modelMissing": ["'the Mango Open Movie project'라는 문구가 나타난다."],
+      "observedEssentialOmissions": 1,
+      "referenceScope": "Fixed facts and sampled-frame comparison; unknown is not zero.",
+      "independentAsrOverlapCandidates": [],
+      "certifiedDialogueIntrusions": null,
+      "certifiedImportantSoundIntrusions": null,
+      "certifiedFactualAndTimingErrors": null
+    },
+    {
+      "projectId": "eval-ko-intro",
+      "setting": "high",
+      "split": "development",
+      "runId": "20260922t052555638-ko-standard-cb49f5",
+      "status": "done",
+      "cost": {
+        "openRouterUsd": 0.11745675,
+        "googleSpeechUsd": 0.012746666666666667,
+        "unknownCharges": 0
+      },
+      "wallSeconds": 191.31,
+      "analysisReused": {
+        "speech": false,
+        "scene": false
+      },
+      "shipped": 1,
+      "modelQuality": "review_needed",
+      "modelMissing": [
+        "안경을 쓰고 체크무늬 셔츠를 입은 남자가 탁자에 앉아 있다.",
+        "배경 현수막에 'SEAMi SouthEastAsian Migrant inspired'라는 문구가 적혀 있다."
+      ],
+      "observedEssentialOmissions": 2,
+      "referenceScope": "Fixed facts and sampled-frame comparison; unknown is not zero.",
+      "independentAsrOverlapCandidates": [
+        {
+          "cueId": "L1",
+          "seconds": 0.4568333333333321
+        }
+      ],
+      "certifiedDialogueIntrusions": null,
+      "certifiedImportantSoundIntrusions": null,
+      "certifiedFactualAndTimingErrors": null
+    },
+    {
+      "projectId": "eval-ko-intro",
+      "setting": "medium",
+      "split": "development",
+      "runId": "20260922t052907003-ko-standard-1e10f8",
+      "status": "done",
+      "cost": {
+        "openRouterUsd": 0.030813,
+        "googleSpeechUsd": 0.00042,
+        "unknownCharges": 0
+      },
+      "wallSeconds": 47.56,
+      "analysisReused": {
+        "speech": true,
+        "scene": true
+      },
+      "shipped": 1,
+      "modelQuality": "model_checked",
+      "modelMissing": [],
+      "observedEssentialOmissions": 2,
+      "referenceScope": "Fixed facts and sampled-frame comparison; unknown is not zero.",
+      "independentAsrOverlapCandidates": [],
+      "certifiedDialogueIntrusions": null,
+      "certifiedImportantSoundIntrusions": null,
+      "certifiedFactualAndTimingErrors": null
+    },
+    {
+      "projectId": "eval-tos-city",
+      "setting": "high",
+      "split": "development",
+      "runId": "20260922t052954613-en-standard-d8685b",
+      "status": "done",
+      "cost": {
+        "openRouterUsd": 0.13538475000000003,
+        "googleSpeechUsd": 0.035429999999999996,
+        "unknownCharges": 0
+      },
+      "wallSeconds": 219.03,
+      "analysisReused": {
+        "speech": false,
+        "scene": false
+      },
+      "shipped": 9,
+      "modelQuality": "review_needed",
+      "modelMissing": [
+        "A newspaper covering the sleeping man's face bears the headline: Roboticist creates killer robots."
+      ],
+      "observedEssentialOmissions": 0,
+      "referenceScope": "Fixed facts and sampled-frame comparison; unknown is not zero.",
+      "independentAsrOverlapCandidates": [],
+      "certifiedDialogueIntrusions": null,
+      "certifiedImportantSoundIntrusions": null,
+      "certifiedFactualAndTimingErrors": null
+    },
+    {
+      "projectId": "eval-tos-city",
+      "setting": "medium",
+      "split": "development",
+      "runId": "20260922t053333711-en-standard-2e0548",
+      "status": "done",
+      "cost": {
+        "openRouterUsd": 0.0659895,
+        "googleSpeechUsd": 0.017430000000000005,
+        "unknownCharges": 0
+      },
+      "wallSeconds": 99.66,
+      "analysisReused": {
+        "speech": true,
+        "scene": true
+      },
+      "shipped": 9,
+      "modelQuality": "model_checked",
+      "modelMissing": [],
+      "observedEssentialOmissions": 0,
+      "referenceScope": "Fixed facts and sampled-frame comparison; unknown is not zero.",
+      "independentAsrOverlapCandidates": [],
+      "certifiedDialogueIntrusions": null,
+      "certifiedImportantSoundIntrusions": null,
+      "certifiedFactualAndTimingErrors": null
+    },
+    {
+      "projectId": "eval-signal",
+      "setting": "high",
+      "split": "development",
+      "runId": "20260922t053513443-ko-standard-0067c7",
+      "status": "failed",
+      "cost": {
+        "openRouterUsd": 0.00590475,
+        "googleSpeechUsd": 0.008,
+        "unknownCharges": 0
+      },
+      "error": "[\n  {\n    \"code\": \"custom\",\n    \"path\": [\n      0\n    ],\n    \"message\": \"end must follow start\"\n  }\n]",
+      "observedEssentialOmissions": null,
+      "referenceScope": "Fixed facts and sampled-frame comparison; unknown is not zero.",
+      "independentAsrOverlapCandidates": null,
+      "certifiedDialogueIntrusions": null,
+      "certifiedImportantSoundIntrusions": null,
+      "certifiedFactualAndTimingErrors": null
+    },
+    {
+      "projectId": "eval-signal",
+      "setting": "medium",
+      "split": "development",
+      "runId": "20260922t053522195-ko-standard-71f698",
+      "status": "failed",
+      "cost": {
+        "openRouterUsd": 0,
+        "googleSpeechUsd": 0.008,
+        "unknownCharges": 0
+      },
+      "error": "[\n  {\n    \"code\": \"custom\",\n    \"path\": [\n      0\n    ],\n    \"message\": \"end must follow start\"\n  }\n]",
+      "observedEssentialOmissions": null,
+      "referenceScope": "Fixed facts and sampled-frame comparison; unknown is not zero.",
+      "independentAsrOverlapCandidates": null,
+      "certifiedDialogueIntrusions": null,
+      "certifiedImportantSoundIntrusions": null,
+      "certifiedFactualAndTimingErrors": null
+    },
+    {
+      "projectId": "eval-ko-holdout",
+      "setting": "high",
+      "split": "confirmation",
+      "runId": "20260922t054704589-ko-standard-4c5e2c",
+      "status": "failed",
+      "cost": {
+        "openRouterUsd": 0.005226,
+        "googleSpeechUsd": 0.010666666666666666,
+        "unknownCharges": 0
+      },
+      "error": "[\n  {\n    \"code\": \"custom\",\n    \"path\": [\n      0\n    ],\n    \"message\": \"end must follow start\"\n  }\n]",
+      "observedEssentialOmissions": null,
+      "referenceScope": "Fixed facts and sampled-frame comparison; unknown is not zero.",
+      "independentAsrOverlapCandidates": null,
+      "certifiedDialogueIntrusions": null,
+      "certifiedImportantSoundIntrusions": null,
+      "certifiedFactualAndTimingErrors": null
+    },
+    {
+      "projectId": "eval-tos-team",
+      "setting": "high",
+      "split": "confirmation",
+      "runId": "20260922t054724430-en-standard-1c9aa1",
+      "status": "done",
+      "cost": {
+        "openRouterUsd": 0.15021225,
+        "googleSpeechUsd": 0.01614,
+        "unknownCharges": 0
+      },
+      "wallSeconds": 240.97,
+      "analysisReused": {
+        "speech": false,
+        "scene": false
+      },
+      "shipped": 3,
+      "modelQuality": "review_needed",
+      "modelMissing": [
+        "In a ruined city, a grey-haired man looks toward a massive mechanical walker standing on a canal bridge.",
+        "A sniper aims a scoped rifle through the balusters of a balcony.",
+        "Technicians work at glowing consoles as the mechanical walker begins to move."
+      ],
+      "observedEssentialOmissions": null,
+      "referenceScope": "Fixed facts and sampled-frame comparison; unknown is not zero.",
+      "independentAsrOverlapCandidates": [
+        {
+          "cueId": "L1",
+          "seconds": 0.027291666666666714
+        }
+      ],
+      "certifiedDialogueIntrusions": null,
+      "certifiedImportantSoundIntrusions": null,
+      "certifiedFactualAndTimingErrors": null
+    }
+  ]
+}

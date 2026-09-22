@@ -9,9 +9,14 @@ import type {
   Verdict,
 } from "./schemas";
 
-export type StageId = "hear" | "watch" | "gaps" | "write" | "review" | "voice" | "mix";
+export type StageId = "hear" | "watch" | "gaps" | "write" | "review" | "voice" | "verify" | "mix";
 
 export interface RunSummary {
+  qualityStatus?: "review_needed" | "model_checked";
+  finalReview?: { verdicts: Verdict[]; missing: MissingItem[] };
+  costStatus?: "known" | "unresolved";
+  analysisReused?: { speech: boolean; scene: boolean };
+  parentRunId?: string;
   clipSeconds: number;
   gapCount: number;
   gapSeconds: number;
@@ -70,6 +75,6 @@ export type RunEvent =
   | { type: "cue_dropped"; cueId: string; reason: NonNullable<Cue["droppedReason"]> }
   | { type: "writer_delta"; text: string }
   | { type: "run_done"; summary: RunSummary; files: RunFiles; cues: Cue[] }
-  | { type: "run_failed"; error: string };
+  | { type: "run_failed"; error: string; retryable?: boolean; retryAfterSeconds?: number };
 
 export type TimedRunEvent = RunEvent & { t: number };

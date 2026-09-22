@@ -12,7 +12,7 @@ import {
 import { ruleSummaryForPrompt } from "./guidelines";
 import { ReviewSchema, type MissingItem, type Verdict } from "./schemas";
 
-function reviewerSystem(context: ClipContext): string {
+function reviewerSystem(context: ClipContext, finalOutput = false): string {
   return `You review ${languageName(context.language)} audio description lines for blind and low-vision viewers
 against published guidelines. You did not write them. You see the clip itself; judge every line against
 the picture and the soundtrack at that moment.
@@ -29,8 +29,8 @@ spoiler; anything known only from outside the clip — including knowledge of th
 Do not fail a line for style preferences the rules do not cover.
 
 When you review the whole script, also list what is missing: important visual information no line covers
-(a new place or time, a main character's first appearance, essential on-screen text, a key action) that a
-gap could still hold — only where the gap has at least 1.2 s of free room outside existing lines. Judge it
+(a new place or time, a main character's first appearance, essential on-screen text, a key action)
+${finalOutput ? "even if there is no room left to add it. This is the final surviving-output audit." : "that a gap could still hold, only where the gap has at least 1.2 s of free room outside existing lines."} Judge it
 by the density the script was written for — ${DENSITY_STYLE[context.density]} When you review only some
 lines, return missing as an empty list.`;
 }
@@ -45,17 +45,19 @@ export async function reviewLines(input: {
   approved: { id: string; start: number; text: string }[];
   /** True when the lines are the whole script, so coverage can be judged. */
   wholeScript: boolean;
+  /** Final output audit: report essential omissions even if no room remains. */
+  finalOutput?: boolean;
 }): Promise<{ verdicts: Verdict[]; missing: MissingItem[] }> {
   const lines = input.lines
-    .map((l) => `- ${l.id} [${l.start.toFixed(1)}–${l.end.toFixed(1)} s]: ${l.text}`)
+    .map((l) => `- ${l.id} [${l.start.toFixed(3)}–${l.end.toFixed(3)} s]: ${l.text}`)
     .join("\n");
   const approved = input.approved
-    .map((l) => `- ${l.id} at ${l.start.toFixed(1)} s: ${l.text}`)
+    .map((l) => `- ${l.id} at ${l.start.toFixed(3)} s: ${l.text}`)
     .join("\n");
   const { data } = await callStructured({
     label: input.label,
     model: input.model,
-    system: reviewerSystem(input.context),
+    system: reviewerSystem(input.context, input.finalOutput),
     user: [
       { type: "video_url", video_url: { url: input.context.videoDataUrl } },
       {
@@ -65,7 +67,10 @@ export async function reviewLines(input: {
           `First-viewing notes:\n${renderScene(input.context.scene)}\n\n` +
           `Gaps where narration may speak:\n${renderGaps(input.context.gaps)}\n\n` +
           `Lines already approved:\n${approved || "(none)"}\n\n` +
-          `${input.wholeScript ? "Review the whole script" : "Review only these lines"}:\n${lines}`,
+          `${input.wholeScript ? "Review the whole script" : "Review only these lines"}:\n${lines}` +
+          (input.finalOutput
+            ? "\nFINAL OUTPUT AUDIT: these are the actual spoken lines after all deletions and shortening. List any essential missing action, person or on-screen text even when no free room remains. Use its scene time and the nearest gap id. Do not assume deleted draft lines are still present."
+            : ""),
       },
     ],
     schemaName: "line_review",
@@ -75,6 +80,15 @@ export async function reviewLines(input: {
     reasoningEffort: reasoningEffort("review"),
   });
   const byId = new Map(data.verdicts.map((v) => [v.cueId, v]));
+  if (data.verdicts.some((v) => !input.lines.some((l) => l.id === v.cueId)))
+    throw new Error("review returned an unknown cue id");
+  if (
+    !input.finalOutput &&
+    data.missing.some(
+      (m) => !input.context.gaps.some((g) => g.id === m.gapId && m.at >= g.start && m.at < g.end),
+    )
+  )
+    throw new Error("review returned a missing item outside its named gap");
   const missing = input.lines.filter((l) => !byId.has(l.id));
   if (missing.length > 0) {
     throw new Error(`review returned no verdict for ${missing.map((l) => l.id).join(", ")}`);

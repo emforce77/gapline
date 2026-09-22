@@ -1,6 +1,8 @@
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { readCallRecords } from "../llm/ledger";
+import { readCallRecords, summarizeCosts } from "../llm/ledger";
+import { ProviderError } from "../llm/openrouter";
+import { validateAnalysis, type AnalysisParts } from "../store/analysis";
 import { encodeWatchingVideo } from "../media/proxies";
 import {
   buildNarrationTrack,
@@ -53,7 +55,8 @@ export interface RunOptions {
   writerModel: string;
   reviewerModel: string;
   /** Hearing and watching do not depend on narration language or density; later runs reuse them. */
-  cached?: { speech: SpeechSegment[]; scene: SceneMap };
+  cached?: AnalysisParts;
+  onAnalysis?: (part: AnalysisParts) => Promise<void>;
   emit?: (event: TimedRunEvent) => void;
 }
 
@@ -70,7 +73,8 @@ async function mapLimit<T, R>(
       results[index] = await fn(items[index]);
     }
   });
-  await Promise.all(workers);
+  const completed = await Promise.allSettled(workers);
+  for (const result of completed) if (result.status === "rejected") throw result.reason;
   return results;
 }
 
@@ -79,25 +83,34 @@ export function placeCues(drafts: DraftCue[], gaps: Gap[]): { placed: Cue[]; dro
   const placed: Cue[] = [];
   const dropped: Cue[] = [];
   const byGap = new Map<string, DraftCue[]>();
+  let n = 0;
   for (const draft of drafts) {
-    const gap =
-      gaps.find((g) => g.id === draft.gapId && draft.at < g.end) ??
-      gaps.find((g) => draft.at >= g.start && draft.at < g.end);
-    if (!gap) continue;
+    const gap = gaps.find((g) => g.id === draft.gapId && draft.at >= g.start && draft.at < g.end);
+    if (!gap || !Number.isFinite(draft.at) || !draft.text.trim()) {
+      dropped.push({
+        id: `L${++n}`,
+        gapId: draft.gapId,
+        start: draft.at,
+        windowEnd: draft.at,
+        versions: [{ text: draft.text, by: "write", model: "" }],
+        status: "dropped",
+        droppedReason: "invalid_placement",
+      });
+      continue;
+    }
     byGap.set(gap.id, [...(byGap.get(gap.id) ?? []), { ...draft, gapId: gap.id }]);
   }
-  let n = 0;
   for (const gap of gaps) {
     const lines = (byGap.get(gap.id) ?? []).sort((a, b) => a.at - b.at);
     lines.forEach((line, i) => {
-      const start = Math.min(Math.max(line.at, gap.start), gap.end);
+      const start = line.at;
       const next = lines[i + 1];
       const windowEnd = next ? Math.min(Math.max(next.at, gap.start), gap.end) : gap.end;
       const cue: Cue = {
         id: `L${++n}`,
         gapId: gap.id,
-        start: round(start),
-        windowEnd: round(windowEnd),
+        start,
+        windowEnd,
         versions: [{ text: line.text.trim(), by: "write", model: "" }],
         status: "pending",
       };
@@ -117,6 +130,13 @@ function round(value: number): number {
 
 function latest(cue: Cue) {
   return cue.versions[cue.versions.length - 1];
+}
+
+export function sameWords(a: string, b: string): boolean {
+  return (
+    a.normalize("NFKC").replace(/\s+/g, " ").trim() ===
+    b.normalize("NFKC").replace(/\s+/g, " ").trim()
+  );
 }
 
 function overlapSeconds(spans: { start: number; end: number }[], speech: SpeechSegment[]): number {
@@ -156,7 +176,7 @@ export async function runDescription(
     return result;
   };
   const emitStage = (
-    name: "hear" | "watch" | "gaps" | "write" | "review" | "voice" | "mix",
+    name: "hear" | "watch" | "gaps" | "write" | "review" | "voice" | "verify" | "mix",
     state: "started" | "done",
     seconds?: number,
   ) => emit({ type: "stage", stage: name, state, seconds });
@@ -178,26 +198,37 @@ export async function runDescription(
     );
 
     // 1. Hear and watch are independent: run them together.
-    const [speech, scene] = options.cached
-      ? [options.cached.speech, options.cached.scene]
-      : await Promise.all([
-          stage("hear", () =>
-            hearSpeech({
+    const analysisResults = await Promise.allSettled([
+      options.cached?.speech
+        ? Promise.resolve(options.cached.speech)
+        : stage("hear", async () => {
+            const speech = await hearSpeech({
               clipFile: options.clipFile,
               clipSeconds: options.clipSeconds,
               languageCode: options.filmLanguageCode,
               ledgerFile,
-            }),
-          ),
-          stage("watch", async () =>
-            watchClip({
+            });
+            validateAnalysis({ speech }, options.clipSeconds);
+            await options.onAnalysis?.({ speech });
+            return speech;
+          }),
+      options.cached?.scene
+        ? Promise.resolve(options.cached.scene)
+        : stage("watch", async () => {
+            const scene = await watchClip({
               videoDataUrl: await videoDataUrlPromise,
               clipSeconds: options.clipSeconds,
               model: options.reviewerModel,
               ledgerFile,
-            }),
-          ),
-        ]);
+            });
+            validateAnalysis({ scene }, options.clipSeconds);
+            await options.onAnalysis?.({ scene });
+            return scene;
+          }),
+    ]);
+    for (const result of analysisResults) if (result.status === "rejected") throw result.reason;
+    const speech = (analysisResults[0] as PromiseFulfilledResult<SpeechSegment[]>).value;
+    const scene = (analysisResults[1] as PromiseFulfilledResult<SceneMap>).value;
     await emit({ type: "speech", segments: speech });
     await emit({ type: "scene", map: scene });
 
@@ -234,7 +265,7 @@ export async function runDescription(
       latest(cue).model = options.writerModel;
       await emit({ type: "cue_written", cue });
       if (cue.status === "dropped")
-        await emit({ type: "cue_dropped", cueId: cue.id, reason: "no_room" });
+        await emit({ type: "cue_dropped", cueId: cue.id, reason: cue.droppedReason! });
     }
     const active = () => cues.filter((c) => c.status !== "dropped");
 
@@ -246,7 +277,7 @@ export async function runDescription(
           .filter((c) => c.gapId === gap.id)
           .sort((a, b) => a.start - b.start);
         for (const [i, cue] of inGap.entries()) {
-          const windowEnd = round(inGap[i + 1]?.start ?? gap.end);
+          const windowEnd = inGap[i + 1]?.start ?? gap.end;
           if (windowEnd !== cue.windowEnd) {
             cue.windowEnd = windowEnd;
             await emit({ type: "cue_window", cueId: cue.id, windowEnd });
@@ -257,14 +288,21 @@ export async function runDescription(
     const addCues = async (additions: DraftCue[]): Promise<Cue[]> => {
       const added: Cue[] = [];
       for (const draft of additions) {
-        const gap =
-          gaps.find((g) => g.id === draft.gapId && draft.at < g.end) ??
-          gaps.find((g) => draft.at >= g.start && draft.at < g.end);
-        if (!gap) continue;
+        const gap = gaps.find(
+          (g) => g.id === draft.gapId && draft.at >= g.start && draft.at < g.end,
+        );
+        if (!gap) {
+          const cue = placeCues([draft], gaps).dropped[0];
+          cue.id = `L${++cueCount}`;
+          cues.push(cue);
+          await emit({ type: "cue_written", cue });
+          await emit({ type: "cue_dropped", cueId: cue.id, reason: "invalid_placement" });
+          continue;
+        }
         const cue: Cue = {
           id: `L${++cueCount}`,
           gapId: gap.id,
-          start: round(Math.min(Math.max(draft.at, gap.start), gap.end)),
+          start: draft.at,
           windowEnd: gap.end,
           versions: [{ text: draft.text.trim(), by: "add", model: options.writerModel }],
           status: "pending",
@@ -351,6 +389,12 @@ export async function runDescription(
         for (const { cue } of failed) {
           const text = revisions.get(cue.id);
           if (!text) throw new Error(`revise returned nothing for ${cue.id}`);
+          if (sameWords(text, latest(cue).text)) {
+            cue.status = "dropped";
+            cue.droppedReason = "unchanged";
+            await emit({ type: "cue_dropped", cueId: cue.id, reason: "unchanged" });
+            continue;
+          }
           cue.versions.push({ text: text.trim(), by: "revise", model: options.writerModel });
           await emit({
             type: "cue_revised",
@@ -403,7 +447,7 @@ export async function runDescription(
           });
           if (fits) {
             cue.status = "fits";
-            cue.seconds = round(line.seconds);
+            cue.seconds = line.seconds;
             cue.rate = rate;
             lines.set(cue.id, line);
           } else tooLong.push(cue);
@@ -444,6 +488,12 @@ export async function runDescription(
         for (const cue of tooLong) {
           const text = shortened.get(cue.id);
           if (!text) throw new Error(`shorten returned nothing for ${cue.id}`);
+          if (sameWords(text, latest(cue).text)) {
+            cue.status = "dropped";
+            cue.droppedReason = "unchanged";
+            await emit({ type: "cue_dropped", cueId: cue.id, reason: "unchanged" });
+            continue;
+          }
           cue.versions.push({ text: text.trim(), by: "shorten", model: options.writerModel });
           cue.status = "pending";
           await emit({
@@ -455,13 +505,35 @@ export async function runDescription(
           });
         }
         // A shortened line is a new line: it goes back through review before it is voiced.
-        await review(tooLong, MAX_REVIEW_ROUNDS, false);
+        await review(
+          tooLong.filter((c) => c.status !== "dropped"),
+          MAX_REVIEW_ROUNDS,
+          false,
+        );
         pending = tooLong.filter((c) => c.status === "approved");
       }
     });
 
     // 6. Mix.
     const shipped = cues.filter((c) => c.status === "fits");
+    // Audit exactly what will be heard, once. Findings remain visible; no regeneration loop.
+    const finalReview = await stage("verify", () =>
+      reviewLines({
+        context,
+        model: options.reviewerModel,
+        ledgerFile,
+        label: "review:final",
+        wholeScript: true,
+        finalOutput: true,
+        approved: [],
+        lines: shipped.map((c) => ({
+          id: c.id,
+          start: c.start,
+          end: c.start + c.seconds!,
+          text: latest(c).text,
+        })),
+      }),
+    );
     const files: RunFiles = {
       described: "described.mp4",
       narration: "narration.wav",
@@ -522,6 +594,13 @@ export async function runDescription(
     }
     const spans = shipped.map((c) => ({ start: c.start, end: c.start + (c.seconds ?? 0) }));
     const summary: RunSummary = {
+      qualityStatus:
+        finalReview.missing.length || finalReview.verdicts.some((v) => !v.pass)
+          ? "review_needed"
+          : "model_checked",
+      finalReview,
+      costStatus: summarizeCosts(calls).costStatus,
+      analysisReused: { speech: !!options.cached?.speech, scene: !!options.cached?.scene },
       clipSeconds: options.clipSeconds,
       gapCount: gaps.length,
       gapSeconds: round(gaps.reduce((s, g) => s + g.end - g.start, 0)),
@@ -548,7 +627,13 @@ export async function runDescription(
     return { summary, cues };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    await emit({ type: "run_failed", error: message });
+    await emit({
+      type: "run_failed",
+      error: message,
+      ...(error instanceof ProviderError
+        ? { retryable: error.retryable, retryAfterSeconds: error.retryAfterSeconds }
+        : {}),
+    });
     throw error;
   }
 }

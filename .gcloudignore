@@ -6,3 +6,5 @@ runtime
 .git
 *.tsbuildinfo
 AI Builder Cup 주제 기획.md
+
+.next-verify

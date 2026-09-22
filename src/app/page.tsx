@@ -68,7 +68,15 @@ export default async function LandingPage() {
                 />
               ) : null}
               <p className="label">
-                {formatSeconds(showcase.project.clipSeconds, lang)} · {t.landing.sampleReady}
+                {formatSeconds(showcase.project.clipSeconds, lang)} · {t.editor.ready}:{" "}
+                {Array.from(
+                  new Set(
+                    showcase.runs.map(
+                      (r) =>
+                        `${r.language === "ko" ? "한국어" : "English"} / ${r.density === "standard" ? t.workspace.densityStandard : t.workspace.densityBrief}`,
+                    ),
+                  ),
+                ).join(" · ") || "—"}
               </p>
             </div>
           </Link>
