@@ -42,15 +42,21 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
         }
       };
       const heartbeat = setInterval(() => send(": ping\n\n"), HEARTBEAT_MS);
+      // The pipeline reports its own failures; only errors raised before it starts need an event here.
+      let failureSent = false;
       startRun({
         projectId: id,
         language: parsed.data.language,
         density: parsed.data.density,
-        emit: (event) => send(`data: ${JSON.stringify(event)}\n\n`),
+        emit: (event) => {
+          if (event.type === "run_failed") failureSent = true;
+          send(`data: ${JSON.stringify(event)}\n\n`);
+        },
       })
         .catch((error: unknown) => {
           const budget = error instanceof BudgetExhaustedError;
           console.error(`run failed: project=${id}`, error);
+          if (failureSent) return;
           send(
             `data: ${JSON.stringify({
               type: "run_failed",

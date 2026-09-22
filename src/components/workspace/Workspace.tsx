@@ -22,16 +22,13 @@ const MIN_REPLAY_SPEED = 4;
 
 type Mode = "idle" | "live" | "replay";
 
-function Metrics({ summary, view }: { summary: RunSummary; view: RunView }) {
+function Metrics({ summary }: { summary: RunSummary }) {
   const { t, lang } = useI18n();
-  const fixed = view.cues.filter(
-    (c) => c.status === "fits" && c.versions.some((v) => v.review && !v.review.pass),
-  ).length;
   const items = [
     [String(summary.cuesShipped), t.metrics.lines],
     [`${summary.cuesFitting}/${summary.cuesShipped}`, t.metrics.fit],
     [formatSeconds(summary.overlapWithSpeechSeconds, lang), t.metrics.overlap],
-    [String(fixed), t.metrics.caught],
+    [String(summary.cuesRejected), t.metrics.caught],
     [formatUsd(summary.costUsd, lang), t.metrics.cost],
     [formatDuration(summary.wallSeconds, lang), t.metrics.time],
   ];
@@ -226,7 +223,7 @@ export function Workspace({
               onSelect={(id) => setSelected(id)}
             />
           ) : null}
-          {final?.summary ? <Metrics summary={final.summary} view={final} /> : null}
+          {final?.summary ? <Metrics summary={final.summary} /> : null}
         </div>
 
         <aside className="ws-inspector">

@@ -93,6 +93,7 @@ function FitMeter({ cue }: { cue: Cue }) {
 export function LineDetail({ cue, onPlay }: { cue: Cue; onPlay: () => void }) {
   const { t, lang } = useI18n();
   const latest = cue.versions[cue.versions.length - 1];
+  const room = cue.windowEnd - cue.start;
   return (
     <div className="line-detail">
       <div className="line-head">
@@ -117,6 +118,18 @@ export function LineDetail({ cue, onPlay }: { cue: Cue; onPlay: () => void }) {
               <span className="mono">v{i + 1}</span> {t.line.by[version.by]}
             </div>
             <p className="version-text">{version.text}</p>
+            {version.voice ? (
+              <p className={`voiced label${version.voice.seconds > room ? " over" : ""}`}>
+                {fill(t.line.voiced, {
+                  seconds: formatSeconds(version.voice.seconds, lang),
+                  rate: version.voice.rate.toFixed(2),
+                })}{" "}
+                ·{" "}
+                {version.voice.seconds > room
+                  ? fill(t.line.tooLong, { room: formatSeconds(room, lang) })
+                  : t.line.fits}
+              </p>
+            ) : null}
             {version.review ? (
               version.review.pass ? (
                 <p className="verdict pass">✓ {t.line.passed}</p>

@@ -381,6 +381,18 @@
   margin: 4px 0 8px;
 }
 
+.voiced {
+  margin: 0 0 8px;
+}
+
+.voiced.over {
+  color: var(--danger);
+}
+
+.voiced.over::before {
+  content: "⚠ ";
+}
+
 .verdict {
   margin: 0;
   font-size: var(--step--1);
