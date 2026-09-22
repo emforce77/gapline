@@ -10,7 +10,8 @@
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
     "samples": "node --env-file=.env.local --import tsx scripts/prepare-samples.ts && node --env-file=.env.local --import tsx scripts/seed-samples.ts",
-    "pipeline": "node --env-file=.env.local --import tsx scripts/run-pipeline.ts"
+    "pipeline": "node --env-file=.env.local --import tsx scripts/run-pipeline.ts",
+    "demo": "node --env-file=.env.local --import tsx scripts/demo/make-demo.ts"
   },
   "engines": {
     "node": ">=20.9"
