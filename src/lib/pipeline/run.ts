@@ -18,7 +18,7 @@ import { reviseLines, writeScript, type RevisionRequest } from "./write";
 
 /**
  * Review rounds: two rewrites, each from the reviewer's own fix, then a line that still breaks a rule
- * is dropped. On the sample, the line an editor once finished by hand was the reviewer's second fix.
+ * is dropped.
  */
 const MAX_REVIEW_ROUNDS = 3;
 

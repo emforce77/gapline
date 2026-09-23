@@ -9,7 +9,7 @@ import { featuredLine, RejectionStory } from "@/components/landing/RejectionStor
 import { SevenSeconds, type NarrationTrack } from "@/components/landing/SevenSeconds";
 import { asUiLang, dictionary, fill, UI_LANG_COOKIE, type UiLang } from "@/i18n";
 import { formatClock, formatDuration, formatSeconds, formatUsd } from "@/lib/format";
-import { findGaps } from "@/lib/pipeline/gaps";
+import { findGaps, mergeSpans } from "@/lib/pipeline/gaps";
 import { GUIDELINE_RULES } from "@/lib/pipeline/guidelines";
 import type { Language } from "@/lib/pipeline/schemas";
 import { readAnalysis } from "@/lib/store/projects";
@@ -55,7 +55,7 @@ export default async function LandingPage() {
   const t = dictionary(lang);
   const [english, korean] = await Promise.all([loadShowcase("en"), loadShowcase("ko")]);
   const showcase = lang === "ko" ? korean : english;
-  // The story follows the pinned Korean result: the line the reviewer rejected and an editor fixed.
+  // The story follows the pinned Korean result: the line the final check sent back and Scene rewrote.
   const featured = korean?.preview ?? showcase?.preview ?? null;
   const project = showcase?.project ?? null;
   const analysis = project ? await readAnalysis(project.id) : null;
@@ -72,11 +72,13 @@ export default async function LandingPage() {
         .map((p) => narrationTrack(project.id, p, lang))
     : [];
   const story = featured ? featuredLine(featured.cues) : null;
-  // The featured result may be an editor's fix; the measured run is the original it came from.
+  // An edited result measures only its edit; the run's figures come from the run it was made from.
   const runs = korean?.runs ?? [];
   const original = originalRun(runs, featured?.runId);
   const measured = original?.summary ?? null;
-  // The pinned result may carry later edits (a removal); the fix shown is the rewrite of this line.
+  // A run that reused hearing and watching did not pay for them; the figures say so next to them.
+  const reused = !!(measured?.analysisReused?.speech || measured?.analysisReused?.scene);
+  // Only a pinned result edited by hand has an edit of this line to measure.
   const fix = lineage(runs, featured?.runId).find(
     (r) => r.lastEdit?.cueId === story?.id && r.lastEdit?.action === "rewrite",
   );
@@ -86,6 +88,8 @@ export default async function LandingPage() {
   const after = sevenSpeech.find((s) => s.start >= SEVEN_END_SECONDS);
   const sum = (spans: { start: number; end: number }[]) =>
     spans.reduce((total, s) => total + s.end - s.start, 0);
+  // Dialogue as heard: the re-listen overlaps the first pass, so overlapping spans count once.
+  const dialogue = mergeSpans(analysis?.speech ?? []);
   const shortest = Math.min(...gaps.map((g) => g.end - g.start));
 
   return (
@@ -147,8 +151,8 @@ export default async function LandingPage() {
                 picture: t.landing.timelineRows.picture,
                 dialogue: t.landing.timelineRows.dialogue,
                 dialogueStat: fill(t.landing.timelineRows.dialogueStat, {
-                  n: analysis.speech.length,
-                  s: formatSeconds(sum(analysis.speech), lang),
+                  n: dialogue.length,
+                  s: formatSeconds(sum(dialogue), lang),
                 }),
                 room: t.landing.timelineRows.room,
                 roomStat: fill(t.landing.timelineRows.roomStat, {
@@ -227,7 +231,10 @@ export default async function LandingPage() {
                   })
                 : null}
             </p>
-            <p className="label">{t.landing.measuredNote}</p>
+            <p className="label">
+              {reused ? `${t.landing.measuredReused} ` : null}
+              {t.landing.measuredNote}
+            </p>
           </section>
         ) : null}
 

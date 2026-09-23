@@ -221,8 +221,14 @@
   color: var(--muted);
 }
 
-.scene-evidence p {
+/* The model's scene memo is folded by default; its summary keeps the heading's look. */
+.line-detail .scene-evidence > summary {
   margin: 0;
+  cursor: pointer;
+}
+
+.scene-evidence p {
+  margin: 8px 0 0;
 }
 
 /* Editing is folded under a button so the review history reads first. */

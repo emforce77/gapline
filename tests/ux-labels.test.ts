@@ -134,7 +134,7 @@ describe("line labels", () => {
         createdAt: "2026-09-22T04:00:00Z",
       },
     ];
-    assert.equal(runLabel(runs[0], runs, undefined, en, "en", false), "Original · Sep 21");
+    assert.equal(runLabel(runs[0], runs, undefined, en, "en", false), "Generated · Sep 21");
     assert.equal(runLabel(runs[1], runs, undefined, en, "en", false), "Edit 1");
     assert.equal(
       runLabel(runs[2], runs, { line: 5, kind: "restored" }, en, "en", false),
@@ -182,5 +182,52 @@ describe("sample run figures", () => {
         );
       }
     }
+  });
+});
+
+describe("interface copy", () => {
+  /** Every string in a catalog, however deeply nested. */
+  const strings = (value: unknown): string[] =>
+    typeof value === "string"
+      ? [value]
+      : typeof value === "object" && value !== null
+        ? Object.values(value).flatMap(strings)
+        : [];
+  /**
+   * Scene's copy states what the default run does; it does not insist nobody touched a result
+   * (owner decision, 23 Sep 2026). These phrasings kept coming back in drafts.
+   */
+  const DEFENSIVE =
+    /no one (edited|stepped|touched)|in the loop|without an editor|unattended|\b0 edits|no edits|편집자 없이|사람 개입 없이|손대지 않/i;
+
+  it("never insists that no person stepped in, in either language", () => {
+    for (const catalog of [en, ko]) {
+      for (const text of strings(catalog)) assert.doesNotMatch(text, DEFENSIVE, text);
+    }
+  });
+
+  /**
+   * What a run does, as the sample's records show it (verification panel, 23 Sep 2026): a silence
+   * can hold several lines, the final check sends lines back rather than fixing all it finds, and an
+   * edit re-voices one line but checks the whole track again.
+   */
+  const OVERCLAIM =
+    /a line for each|one line per silence|fixes what|re-checks and re-voices|침묵마다|침묵 하나에 한 문장|문제를 고쳐|문제를 고침|그 문장만 다시 검수/i;
+
+  it("describes a run as the sample's records show it, in either language", () => {
+    for (const catalog of [en, ko]) {
+      for (const text of strings(catalog)) assert.doesNotMatch(text, OVERCLAIM, text);
+    }
+  });
+
+  it("keeps one Korean word for voicing and calls Scene by its Korean name", () => {
+    for (const text of strings(ko)) assert.doesNotMatch(text, /녹음|재합성|재검수|Scene/, text);
+  });
+
+  it("names the final check the same way in the stage list and the editor", () => {
+    assert.equal(en.stages.verify, "Final check");
+    assert.equal(ko.stages.verify, "최종 점검");
+    assert.ok(ko.editor.checked.startsWith(ko.stages.verify), ko.editor.checked);
+    assert.ok(en.editor.checked.startsWith(en.stages.verify), en.editor.checked);
   });
 });

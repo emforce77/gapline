@@ -1,7 +1,12 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderGaps } from "../src/lib/pipeline/context";
-import { findGaps, MIN_GAP_SECONDS, SPEECH_GUARD_SECONDS } from "../src/lib/pipeline/gaps";
+import {
+  findGaps,
+  mergeSpans,
+  MIN_GAP_SECONDS,
+  SPEECH_GUARD_SECONDS,
+} from "../src/lib/pipeline/gaps";
 import { freeRoom, LINE_SPACING_SECONDS, placeCues } from "../src/lib/pipeline/cues";
 import { spokenUnits, unitBudget } from "../src/lib/pipeline/length";
 import { foldRun } from "../src/lib/pipeline/reduce";
@@ -54,6 +59,19 @@ describe("findGaps", () => {
       10,
     );
     assert.ok(gaps.every((g) => g.end - g.start >= MIN_GAP_SECONDS));
+  });
+
+  it("counts overlapping speech once, as the landing's dialogue row does", () => {
+    // The re-listen can return a span that overlaps the first pass (the sample: 12 spans, 11 heard).
+    const merged = mergeSpans([
+      { start: 5, end: 6 },
+      { start: 1, end: 3 },
+      { start: 2.5, end: 4 },
+    ]);
+    assert.deepEqual(merged, [
+      { start: 1, end: 4 },
+      { start: 5, end: 6 },
+    ]);
   });
 });
 

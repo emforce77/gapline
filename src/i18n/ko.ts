@@ -5,20 +5,20 @@ export const ko: Dictionary = {
   meta: {
     title: "씬 — 대사와 대사 사이에 맞춘 화면해설",
     description:
-      "씬은 영화의 화면해설을 한 번에 만듭니다. 문장마다 침묵 하나를 정해 쓰고, 한국의 공개 가이드라인으로 검수하고, 목소리로 읽어 길이를 잰 뒤 믹스까지 마칩니다. 필요하면 편집자가 어떤 문장이든 고칠 수 있습니다.",
+      "씬은 대사와 대사 사이에 꼭 맞는 영화 화면해설을 만듭니다. 생성하기를 한 번 누르면 침묵에 맞춰 문장을 쓰고, 한국의 공개 가이드라인으로 검수하고, 목소리로 읽어 길이를 잰 뒤, 최종 점검에서 돌아온 문장을 다시 써서 믹스까지 마칩니다. 어떤 문장이든 직접 고칠 수도 있습니다.",
     project: "{title} — 씬",
   },
   nav: { home: "씬", language: "English", skip: "본문으로 건너뛰기" },
   landing: {
     eyebrow: "시각장애인을 위한 화면해설",
     title: "대사와 대사 사이에 꼭 맞는 화면해설.",
-    lede: "씬은 영화의 화면해설을 한 번에 만듭니다. 문장마다 실제 침묵 하나를 정해 쓰고, 한국의 공개 가이드라인으로 검수하고, 목소리로 읽어 길이를 잰 뒤, 최종 점검에서 나온 문제까지 고쳐서 믹스합니다. 필요하면 편집자가 타임라인에서 어떤 문장이든 고칠 수 있습니다.",
+    lede: "생성하기를 한 번 누르면 모든 단계가 이어집니다. 씬은 실제 침묵에 맞춰 해설 문장을 쓰고, 한국의 공개 가이드라인으로 검수하고, 목소리로 읽어 길이를 잰 뒤, 최종 점검에서 돌아온 문장을 다시 써서 믹스합니다. 다른 표현을 원하면 어떤 문장이든 고칠 수 있고, 씬은 그 문장만 다시 낭독하고 트랙 전체를 다시 점검합니다.",
     ctaSample: "샘플 열어 보기",
     ctaUpload: "내 영상으로 해 보기",
     seven: {
-      label: "Tears of Steel, 54–60초",
+      label: "Tears of Steel, 54–61초",
       title: "대사가 없는 7초",
-      body: "“…locked.” 다음 7초 동안 아무도 말하지 않습니다. 시각장애인 관객에게는 말소리 없이 웅웅거리는 소리와 음악만 들리다가 “This is pretty freaky.”가 이어집니다. 두 버전을 들어 보세요.",
+      body: "“…locked.” 다음 7초 동안 아무도 말하지 않습니다. 시각장애인 관객에게는 말소리 없이 웅웅거리는 소리만 들리다가 “This is pretty freaky.”가 이어집니다. 두 버전을 들어 보세요.",
       original: "원래 소리",
       described: "해설 넣은 소리",
       narration: "해설 언어",
@@ -30,7 +30,7 @@ export const ko: Dictionary = {
     },
     timelineTitle: "해설은 아무도 말하지 않는 곳에서만 말합니다.",
     timelineLede:
-      "씬이 보는 샘플 65초입니다. 해설 문장은 침묵 하나를 정해 쓰고, 실제로 녹음된 목소리가 다음 대사 전에 끝나야 합니다.",
+      "씬이 보는 샘플 65초입니다. 해설 문장은 침묵 하나를 정해 쓰고, 실제 낭독이 다음 대사 전에 끝나야 합니다.",
     timelineRows: {
       picture: "화면",
       dialogue: "대사",
@@ -52,7 +52,11 @@ export const ko: Dictionary = {
         service: "Speech-to-Text · Chirp 3",
       },
       { name: "보기", detail: "장소·인물·화면 글자·중요한 소리", service: "Gemini 3.8 Flash" },
-      { name: "쓰기", detail: "침묵 하나에 한 문장, 그 길이에 맞춰", service: "Gemini 3.8 Flash" },
+      {
+        name: "쓰기",
+        detail: "문장마다 침묵 하나를 정해 그 길이에 맞춰",
+        service: "Gemini 3.8 Flash",
+      },
       {
         name: "검수",
         detail: "가이드라인 조항을 인용하는 8개 규칙",
@@ -61,14 +65,15 @@ export const ko: Dictionary = {
       },
       {
         name: "낭독",
-        detail: "실제 음성 길이를 침묵과 비교합니다",
+        detail: "실제 낭독 길이를 침묵과 비교합니다",
         loop: "길면 빠르게 읽거나 줄이거나 제외",
         service: "Text-to-Speech · Chirp 3 HD",
       },
       {
-        name: "믹스",
-        detail: "마지막 점검에서 빠진 내용을 채운 뒤, 해설 동안 원음을 낮춥니다",
-        service: "Cloud Run의 FFmpeg",
+        name: "최종 점검·믹스",
+        detail: "낭독된 트랙 전체를 최종 점검한 뒤, 해설 동안 원음을 낮춥니다",
+        loop: "반려된 문장은 다시 쓰고, 자리가 남은 침묵에는 문장을 더하기도 함",
+        service: "Gemini 3.8 Flash · Cloud Run의 FFmpeg",
       },
     ],
     rejectionTitle: "반려마다 근거 조항이 붙습니다",
@@ -84,20 +89,28 @@ export const ko: Dictionary = {
         remove: "편집자가 삭제",
       },
       rejected: "반려",
+      sentBack: "최종 점검에서 반려",
       passed: "검수 통과",
-      suggestion: "검수 제안",
-      dropped:
-        "두 번 다시 써도 규칙을 어겨서, 씬은 이 문장을 읽지 않고 제외했고, 최종 점검이 빠진 내용을 적어 두었습니다.",
+      suggestion: "수정 제안",
+      next: {
+        revise: "씬은 이 제안대로 문장을 다시 쓰고 다시 검수했습니다.",
+        final:
+          "이 초안은 검수를 통과해 낭독까지 됐지만, 낭독된 트랙 전체를 다시 보는 최종 점검이 반려했습니다. 씬은 제안대로 문장을 다시 썼습니다.",
+        human:
+          "다시 써도 규칙을 어겨서 씬은 이 문장을 읽지 않고 제외했습니다. 다음 버전은 사람이 직접 썼습니다.",
+      },
       fitted: "주어진 {room} 가운데 {spoken} 동안 읽음",
       human: "씬은 편집자의 문장을 검수하고 읽지만, 대신 고쳐 쓰지는 않습니다.",
     },
     rulesSummary: "검수 규칙 {n}개와 근거 조항 전체 보기",
     measuredTitle: "샘플에서 잰 값",
     measuredRun:
-      "65초 클립의 {language} 해설을 처음부터 만든 API 비용은 {cost}, 걸린 시간은 {time}입니다. {shipped}문장 중 {fit}문장이 침묵 안에 들어갔고, Chirp 3가 인식한 대사와 겹친 해설은 {overlap}입니다.",
-    measuredEdit: "이후 편집자가 한 문장을 고친 비용은 {cost}, 걸린 시간은 {time}입니다.",
+      "65초 클립의 {language} 해설을 한 번 만드는 데 든 API 비용은 {cost}, 걸린 시간은 {time}입니다. {shipped}문장 중 {fit}문장이 침묵 안에 들어갔고, Chirp 3가 인식한 대사와 겹친 해설은 {overlap}입니다.",
+    measuredEdit: "이후 이 문장을 직접 고치는 데 든 비용은 {cost}, 걸린 시간은 {time}입니다.",
+    measuredReused:
+      "듣기와 보기는 이 클립의 이전 실행 결과를 재사용했기 때문에, 그 비용과 시간은 포함하지 않았습니다.",
     measuredNote: "API 비용만 계산했습니다. Cloud Run과 저장소 비용은 포함하지 않았습니다.",
-    whyTitle: "법은 빨라지는데, 화면해설을 만드는 속도는 그대로입니다.",
+    whyTitle: "법은 화면해설을 요구하는데, 만드는 속도는 그대로입니다.",
     why: [
       {
         figure: "2026. 9. 3.",
@@ -116,7 +129,7 @@ export const ko: Dictionary = {
       },
     ],
     uploadIntro:
-      "90초, 30MB 이하 영상을 받습니다. 영상 준비는 1분 안에 끝나고, 해설 생성은 몇 분 더 걸리며 유료 Google Cloud와 Gemini API를 호출합니다. 생성 한도는 모든 방문자가 하루 단위로 함께 씁니다. 올린 영상은 올린 브라우저에서만 열 수 있습니다.",
+      "90초, 30MB 이하 영상을 받습니다. 영상 준비는 1분 안에 끝나고, 해설 생성은 10분 안팎 걸리며 유료 Google Cloud와 Gemini API를 호출합니다. 생성 한도는 모든 방문자가 하루 단위로 함께 씁니다. 올린 영상은 올린 브라우저에서만 열 수 있습니다.",
     uploadTitle: "내 영상",
     uploadHint:
       "MP4, MOV, WebM, 30MB와 90초 이하. 파일을 여기에 끌어 놓거나 골라 주세요. 65초 샘플의 {language} 해설은 생성에 {time} 걸렸고, 비용은 {cost}입니다.",
@@ -127,7 +140,7 @@ export const ko: Dictionary = {
     footerFilm:
       "샘플 영화: Tears of Steel, (CC) Blender Foundation | mango.blender.org, CC BY 3.0.",
     footerGuides:
-      "가이드라인: 방송통신위원회 『장애인방송 프로그램 제공 가이드라인』(2019), Netflix 화면해설 스타일 가이드 v2.5.",
+      "가이드라인: 방미통위(옛 방송통신위원회) 『장애인방송 프로그램 제공 가이드라인』(2019), Netflix 화면해설 스타일 가이드 v2.5.",
   },
   upload: {
     drop: "놓으면 바로 올라갑니다.",
@@ -141,14 +154,14 @@ export const ko: Dictionary = {
         "이 영상은 {length}입니다. {max}까지 받습니다. 한 장면으로 잘라서 다시 올려 주세요.",
       not_video: "영상 파일이 아닙니다. MP4, MOV, WebM 파일을 골라 주세요.",
       no_video_stream:
-        "소리만 있고 화면이 없는 파일입니다. Scene은 화면에 보이는 것을 설명하므로 영상이 필요합니다.",
+        "소리만 있고 화면이 없는 파일입니다. 씬은 화면에 보이는 것을 설명하므로 영상이 필요합니다.",
       missing_file: "파일이 전달되지 않았습니다. 영상을 다시 골라 주세요.",
       forbidden:
         "이 페이지에서 보낸 요청이 아니어서 거부되었습니다. 페이지를 새로 고친 뒤 다시 시도해 주세요.",
       internal:
         "영상을 준비하다가 서버에서 문제가 생겼습니다. 1분 뒤 다시 시도하거나 다른 파일을 올려 주세요.",
-      network: "업로드가 Scene에 닿지 않았습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.",
-      unexpected: "Scene이 오류로 응답했습니다(HTTP {status}). 1분 뒤 다시 시도해 주세요.",
+      network: "업로드가 씬에 닿지 않았습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.",
+      unexpected: "씬이 오류로 응답했습니다(HTTP {status}). 1분 뒤 다시 시도해 주세요.",
     },
     status: {
       budget_busy:
@@ -164,7 +177,7 @@ export const ko: Dictionary = {
     active: "{time}에 시작한 {language} 해설이 아직 만들어지고 있습니다.",
     follow: "이어서 보기",
     unreachable:
-      "Scene에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 이 페이지를 새로 고쳐 결과를 확인해 주세요.",
+      "씬에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 이 페이지를 새로 고쳐 결과를 확인해 주세요.",
     interrupted: "생성이 끝나지 못하고 멈춰 결과가 저장되지 않았습니다. 다시 생성할 수 있습니다.",
     notStarted: "생성이 시작되지 않았습니다. 다시 시도해 주세요.",
     notFound: "이 생성 기록을 찾을 수 없습니다. 다른 브라우저에서 시작한 것일 수 있습니다.",
@@ -192,7 +205,7 @@ export const ko: Dictionary = {
       speech_failed:
         "Google Speech-to-Text가 이 영상의 소리를 처리하지 못했습니다. 다시 시도하고, 두 번 실패하면 다른 영상을 써 보세요.",
       voice_failed:
-        "Google Text-to-Speech가 해설을 음성으로 만들다 실패했습니다. 1분 뒤 다시 시도해 주세요.",
+        "Google Text-to-Speech가 해설을 낭독하다 실패했습니다. 1분 뒤 다시 시도해 주세요.",
       media_failed:
         "해설 음성을 영상에 섞다가 실패했습니다. 다시 시도하고, 두 번 실패하면 다른 영상을 써 보세요.",
       internal: "서버에서 문제가 생겨 생성이 멈췄습니다. 다시 시도해 주세요.",
@@ -201,7 +214,7 @@ export const ko: Dictionary = {
       not_found: "이 영상을 더 이상 찾을 수 없습니다. 페이지를 새로 고쳐 주세요.",
       invalid_request: "요청을 이해하지 못했습니다. 페이지를 새로 고친 뒤 다시 시도해 주세요.",
       connection:
-        "Scene에 연결할 수 없어 생성이 시작되지 않았습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.",
+        "씬에 연결할 수 없어 생성이 시작되지 않았습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.",
       unknown: "생성이 끝나지 못하고 멈췄습니다. 다시 시도해 주세요.",
     },
   },
@@ -225,11 +238,12 @@ export const ko: Dictionary = {
     generate: "생성하기",
     regenerate: "다시 생성",
     generating: "생성하는 중…",
-    liveNote: "실시간 생성은 유료 API를 호출하고 몇 분 걸립니다. 기록된 결과는 그대로 남습니다.",
+    liveNote:
+      "실시간 생성은 유료 API를 호출하고 10분 안팎 걸립니다. 기록된 결과는 그대로 남습니다.",
     replay: "과정 다시 보기",
     replaying: "{speed}배속으로 다시 보는 중",
     stopReplay: "다시 보기 멈춤",
-    noRun: "이 밀도의 {language} 트랙이 아직 없습니다.",
+    noRun: "생성하기를 누르면 {language} 트랙을 만듭니다.",
     noRunHint: "65초 샘플의 {language} 해설 생성에 {time}, {cost}가 들었습니다.",
     adOn: "해설 켬",
     adOff: "해설 끔",
@@ -252,13 +266,13 @@ export const ko: Dictionary = {
     stageAnnounce: "{stage}: {state}",
   },
   versions: {
-    original: "원본",
+    original: "자동 생성",
     edit: "수정 {n}",
     restored: "{line} 복원",
     changed: "{line} 수정",
     removed: "{line} 삭제",
     basedOn:
-      "“{parent}”에서 이어진 결과입니다. 사람이 쓴 문장으로 {line} 한 줄만 다시 녹음했고, 나머지 문장은 그대로 재사용했습니다.",
+      "“{parent}”에서 이어진 결과입니다. 사람이 쓴 문장으로 {line} 한 줄만 다시 낭독했고, 나머지 문장은 그대로 재사용했습니다.",
     basedOnRemoved:
       "“{parent}”에서 이어진 결과입니다. 편집자가 삭제한 문장: {line}. 나머지 문장은 그대로 재사용했고, 남은 해설로 최종 점검을 다시 했습니다.",
   },
@@ -278,11 +292,11 @@ export const ko: Dictionary = {
     write: "쓰기",
     review: "검수",
     voice: "낭독",
-    verify: "최종 내용 확인",
-    fix: "점검 결과 보완",
+    verify: "최종 점검",
+    fix: "점검 결과 반영",
     mix: "믹스",
     waiting: "대기",
-    reused: "첫 실행 결과 재사용",
+    reused: "이 클립의 이전 실행 결과 재사용",
     running: "진행 중 · {elapsed}",
     done: "{seconds}초",
     doneState: "완료",
@@ -305,7 +319,7 @@ export const ko: Dictionary = {
     spoken: "낭독",
     rate: "속도 {rate}배",
     fits: "침묵 안에 맞음",
-    voiced: "음성: {rate}배속으로 {seconds}",
+    voiced: "낭독: {rate}배속으로 {seconds}",
     tooLong: "해설 자리 {room}보다 김",
     history: "이 문장이 만들어진 과정",
     by: {
@@ -352,5 +366,5 @@ export const ko: Dictionary = {
     time: "처리 시간",
   },
   editor: koEditor,
-  coverage: { title: "검수자가 찾은 누락" },
+  coverage: { title: "검수에서 찾은 누락" },
 };

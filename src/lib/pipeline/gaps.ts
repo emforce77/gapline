@@ -10,7 +10,8 @@ interface Span {
   end: number;
 }
 
-function mergeSpans(spans: Span[]): Span[] {
+/** Overlapping spans merged into one, sorted by start. */
+export function mergeSpans(spans: Span[]): Span[] {
   const sorted = [...spans].sort((a, b) => a.start - b.start);
   const merged: Span[] = [];
   for (const span of sorted) {

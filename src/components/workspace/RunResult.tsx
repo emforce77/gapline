@@ -34,10 +34,10 @@ export function Metrics({ summary }: { summary: RunSummary }) {
 }
 
 /**
- * The final check's outcome: what Scene fixed by itself after it, and what it still lists, for anyone
- * who wants to step in. A listed moment with no free silence left says so: Scene could not add a line
- * there without talking over dialogue. Older results have no final check; they get no badge rather
- * than a sentence that sounds like a failure.
+ * The final check's outcome: what Scene fixed on its own after it, and what it still notes, each list
+ * under its own lead so a note reads as a note. A listed moment with no free silence left says so:
+ * Scene could not add a line there without talking over dialogue. Older results have no final check;
+ * they get no badge rather than a sentence that sounds like a failure.
  */
 export function QualityNote({
   summary,
@@ -79,25 +79,35 @@ export function QualityNote({
         </p>
       ) : null}
       {summary.costStatus === "unresolved" ? <p>{t.editor.uncertainty}</p> : null}
-      {missing.length || failing.length ? (
-        <ul>
-          {missing.map((m, i) => (
-            <li key={`m${i}`}>
-              <span className="mono label">{formatClock(m.at)}</span>{" "}
-              <span lang={language ?? undefined}>{m.what}</span>
-              <Gloss text={m.what} pageLang={lang} textLang={language} />
-              {noRoom(m) ? <span className="label"> · {t.editor.noRoom}</span> : null}
-            </li>
-          ))}
-          {failing.map((v) => (
-            <li key={v.cueId}>
-              <button className="button ghost small" onClick={() => onSelect(v.cueId)}>
-                {fill(t.line.title, { n: lineNumbers.get(v.cueId) ?? v.cueId })}
-              </button>{" "}
-              <span lang={language ?? undefined}>{v.fix}</span>
-            </li>
-          ))}
-        </ul>
+      {missing.length ? (
+        <>
+          <p>{t.editor.missingLead}</p>
+          <ul>
+            {missing.map((m, i) => (
+              <li key={i}>
+                <span className="mono label">{formatClock(m.at)}</span>{" "}
+                <span lang={language ?? undefined}>{m.what}</span>
+                <Gloss text={m.what} pageLang={lang} textLang={language} />
+                {noRoom(m) ? <span className="label"> · {t.editor.noRoom}</span> : null}
+              </li>
+            ))}
+          </ul>
+        </>
+      ) : null}
+      {failing.length ? (
+        <>
+          <p>{t.editor.failingLead}</p>
+          <ul>
+            {failing.map((v) => (
+              <li key={v.cueId}>
+                <button className="button ghost small" onClick={() => onSelect(v.cueId)}>
+                  {fill(t.line.title, { n: lineNumbers.get(v.cueId) ?? v.cueId })}
+                </button>{" "}
+                <span lang={language ?? undefined}>{v.fix}</span>
+              </li>
+            ))}
+          </ul>
+        </>
       ) : null}
       <p className="label">{t.editor.optional}</p>
     </div>
@@ -157,7 +167,7 @@ export function Downloads({ base, files }: { base: string; files: RunFiles }) {
   );
 }
 
-/** An edited result: the result it came from, and what the editor did to which line. */
+/** An edited result: the result it came from, and what the edit did to which line. */
 export function EditSummary({ parent, note }: { parent: string; note: RunNote }) {
   const { t } = useI18n();
   const sentence = note.kind === "removed" ? t.versions.basedOnRemoved : t.versions.basedOn;

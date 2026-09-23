@@ -208,11 +208,12 @@ export function LineDetail({
       <h3 className="inspector-heading">{t.line.history}</h3>
       <VersionHistory cue={cue} language={language} />
       {editor}
+      {/* The model's own scene memo is in its working language, so it stays folded until asked for. */}
       {evidence ? (
-        <div className="scene-evidence">
-          <h3 className="inspector-heading">{t.line.evidence}</h3>
+        <details className="scene-evidence">
+          <summary className="inspector-heading">{t.line.evidence}</summary>
           <p>{evidence}</p>
-        </div>
+        </details>
       ) : null}
     </div>
   );

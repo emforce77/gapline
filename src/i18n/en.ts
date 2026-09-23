@@ -5,20 +5,20 @@ export const en = {
   meta: {
     title: "Scene — audio description that fits between the lines",
     description:
-      "Scene makes audio description for film in one pass: each line is written for one silence, checked against Korea's published guideline, voiced, measured and mixed. An editor can still change any line.",
+      "Scene makes audio description for film that fits between the lines. One press of Generate writes each line to fit a silence, checks it against Korea's published guideline, voices and measures it, rewrites what the final check sends back and mixes the track. You can still edit any line.",
     project: "{title} — Scene",
   },
   nav: { home: "Scene", language: "한국어", skip: "Skip to content" },
   landing: {
     eyebrow: "Audio description for blind and low-vision viewers",
     title: "Descriptions that fit between the lines.",
-    lede: "Scene makes audio description for film in one pass. Each line is written for one real silence, checked against Korea's published guideline, voiced and measured, and what the final check finds is fixed before the track is mixed. An editor can still change any line on the timeline.",
+    lede: "One press of Generate runs every step: Scene writes each line to fit a real silence, checks it against Korea's published guideline, voices and measures it, rewrites any line its final check sends back, and mixes the track. Want different words? You can still edit any line; Scene re-voices just that one and checks the track again.",
     ctaSample: "Open the sample",
     ctaUpload: "Try your own clip",
     seven: {
-      label: "Tears of Steel, 54–60 s",
+      label: "Tears of Steel, 54–61 s",
       title: "Seven seconds with no dialogue",
-      body: "After “…locked.”, nobody speaks for seven seconds. A blind viewer hears no words, only a hum and music, then “This is pretty freaky.” Listen to both versions.",
+      body: "After “…locked.”, nobody speaks for seven seconds. A blind viewer hears no words, only a hum, then “This is pretty freaky.” Listen to both versions.",
       original: "Original sound",
       described: "With description",
       narration: "Narration",
@@ -58,7 +58,7 @@ export const en = {
       },
       {
         name: "Write",
-        detail: "One line per silence, sized to fit it",
+        detail: "Each line written for one silence, sized to fit it",
         service: "Gemini 3.8 Flash",
       },
       {
@@ -74,10 +74,10 @@ export const en = {
         service: "Text-to-Speech · Chirp 3 HD",
       },
       {
-        name: "Mix",
-        detail:
-          "A final check finds what is missing, Scene fills it, then the film ducks under each line",
-        service: "FFmpeg on Cloud Run",
+        name: "Final check and mix",
+        detail: "A final check reviews the whole voiced track, then the film ducks under each line",
+        loop: "rewrites a line the final check sends back; may add one where a silence still has room",
+        service: "Gemini 3.8 Flash · FFmpeg on Cloud Run",
       },
     ],
     rejectionTitle: "Every rejection cites a clause",
@@ -93,18 +93,27 @@ export const en = {
         remove: "Removed by editor",
       },
       rejected: "Rejected",
+      sentBack: "Sent back by the final check",
       passed: "Passed review",
-      suggestion: "Reviewer's suggestion",
-      dropped:
-        "Still breaking a rule after two rewrites, so Scene dropped the line instead of voicing it, and the final check listed what it missed.",
+      suggestion: "Suggested fix",
+      /** What became of a rejected version, by who made the next one. */
+      next: {
+        revise: "Scene rewrote the line from this suggestion and reviewed it again.",
+        final:
+          "This draft had passed review and been voiced. The final check, which reviews the whole voiced track, sent it back, so Scene rewrote the line from the suggestion.",
+        human:
+          "Its rewrites still broke a rule, so Scene dropped the line instead of voicing it. The next version was written by hand.",
+      },
       fitted: "Voiced in {spoken} of the {room} available",
       human: "Scene reviews and voices an editor's words, but never rewrites them.",
     },
     rulesSummary: "All {n} review rules and where they come from",
     measuredTitle: "Measured on the sample",
     measuredRun:
-      "One full {language} run of the 65-second clip cost {cost} in API calls and took {time}. {fit} of {shipped} lines landed inside their silence, with {overlap} of narration over the speech Chirp 3 recognized.",
-    measuredEdit: "The editor's one-line fix afterwards cost {cost} and took {time}.",
+      "One {language} run of the 65-second clip cost {cost} in API calls and took {time}. {fit} of {shipped} lines landed inside their silence, with {overlap} of narration over the speech Chirp 3 recognized.",
+    measuredEdit: "Changing this line by hand afterwards cost {cost} and took {time}.",
+    measuredReused:
+      "Hearing and watching were reused from an earlier run of this clip, so their cost and time are not included.",
     measuredNote: "API cost only; Cloud Run and storage are not included.",
     whyTitle: "The law is moving faster than description can be made.",
     why: [
@@ -125,7 +134,7 @@ export const en = {
       },
     ],
     uploadIntro:
-      "Clips up to 90 seconds and 30 MB. Preparing a clip takes under a minute; generating its description takes a few minutes more and calls paid Google Cloud and Gemini APIs, within a daily allowance shared by every visitor. Only the browser that uploaded a clip can open it.",
+      "Clips up to 90 seconds and 30 MB. Preparing a clip takes under a minute; generating its description takes about 10 minutes and calls paid Google Cloud and Gemini APIs, within a daily allowance shared by every visitor. Only the browser that uploaded a clip can open it.",
     uploadTitle: "Your clip",
     uploadHint:
       "MP4, MOV or WebM, up to 30 MB and 90 seconds. Drop the file here or choose it. Generating {language} narration for the 65-second sample took {time} and cost {cost}.",
@@ -234,11 +243,11 @@ export const en = {
     generate: "Generate",
     regenerate: "Generate again",
     generating: "Generating…",
-    liveNote: "A live run calls paid APIs and takes a few minutes. The recorded result stays.",
+    liveNote: "A live run calls paid APIs and takes about 10 minutes. The recorded result stays.",
     replay: "Replay the run",
     replaying: "Replaying at {speed}× speed",
     stopReplay: "Stop replay",
-    noRun: "No {language} track at this density yet.",
+    noRun: "Press Generate to make a track in {language}.",
     noRunHint:
       "Generating {language} narration for the 65-second sample took {time} and cost {cost}.",
     adOn: "Description on",
@@ -262,7 +271,7 @@ export const en = {
     stageAnnounce: "{stage}: {state}",
   },
   versions: {
-    original: "Original",
+    original: "Generated",
     edit: "Edit {n}",
     restored: "{line} restored",
     changed: "{line} changed",
@@ -282,17 +291,17 @@ export const en = {
   },
   stages: {
     hear: "Hear",
-    relisten: "Re-listen to each silence",
+    relisten: "Re-listen",
     watch: "Watch",
     gaps: "Find room",
     write: "Write",
     review: "Review",
     voice: "Voice",
-    verify: "Check final output",
+    verify: "Final check",
     fix: "Fix what the check found",
     mix: "Mix",
     waiting: "Waiting",
-    reused: "reused from the first run",
+    reused: "reused from an earlier run of this clip",
     running: "Working · {elapsed}",
     done: "{seconds} s",
     doneState: "done",
