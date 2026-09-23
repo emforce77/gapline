@@ -11,6 +11,15 @@ import { esc, note, pageHtml, pick, STAGE, type PageTiming } from "./shell";
 
 const M = STAGE.margin;
 const EV = { head: 52, col: 206 };
+/**
+ * The sample's figures come in one after another this far apart, from just after the caption that
+ * names the sample starts: all of them are in within about a second, so the last is read as long as
+ * the first (spread over the whole caption, the fourth was up for only 1.3 s).
+ */
+const FACT_STEP_S = 0.25;
+const FACT_FADE_S = 0.4;
+/** The page is read for seconds once every figure is in: it drifts this much closer meanwhile. */
+const EV_DRIFT = 0.02;
 
 export function evidencePage(timing: PageTiming): string {
   const lang = timing.lang;
@@ -88,13 +97,16 @@ export function evidencePage(timing: PageTiming): string {
 ${reuse}`;
   const render = `
 const S = D.S, L = D.L;
+const stage = $('.stage');
+stage.style.transformOrigin = '50% 45%';
+stage.style.transform = 'scale(' + (1 + ${EV_DRIFT} * ease(t / D.T)) + ')';
 reveal($('#ev-head'), prog(t, 0, 0.7));
 reveal($('#ev-a'), prog(t, S[0], 0.6));
 const n = Math.floor(lin(t, S[0] + 0.6, Math.max(1.5, L[0] - 1.2)) * ${l.written} + 0.001);
 $$('#ev-bars-a i').forEach((el, i) => el.classList.toggle('lit', i < n));
 reveal($('#ev-b'), prog(t, S[1] - 0.2, 0.5), 0);
 const facts = $$('.ev-facts li');
-facts.forEach((el, i) => reveal(el, prog(t, S[1] + 0.2 + i * ((L[1] - 0.4) / facts.length), 0.4), 8));
+facts.forEach((el, i) => reveal(el, prog(t, S[1] + i * ${FACT_STEP_S}, ${FACT_FADE_S}), 8));
 if ($('.src')) $('.src').style.opacity = prog(t, S[1] + 0.6, 0.6);`;
   return pageHtml({ lang, css, body, render, data: timing });
 }

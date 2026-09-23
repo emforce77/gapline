@@ -53,20 +53,32 @@ evidence, close.
   (`recorder-kit.ts`); `camera.ts` turns them into eased scale+crop filters; overlays (spotlight,
   service chips, labels) are ASS drawings, because this FFmpeg has no drawtext. Every box is read
   after the page settles, and each spotlight is read again as it lights up: below 90% overlap the
-  recording fails.
+  recording fails. The replay's stage list is read again as its stages run: if it has moved under
+  its chips, the recording fails.
 - Waits (upload preparation, the saved run's replay) are squeezed, and every squeezed stretch carries
   a label with its real length. `clock.pace()` lands each stage of the replay on the sentence that
   names it (a stretch is slowed at most 5×). The upload's shortened stretch ends when the upload is
   answered; the page change, the new workspace's first paint and the switch to Korean narration (a
   new workspace opens in the page's language) all fall inside it. Replay is pressed before its scene
-  starts, so the scene opens on the reset stage list with the app's speed badge out of shot.
-- Camera (`camera.ts`, `beats.ts`): moves take 1.2 s; close-ups are placed so their edges fall
-  between lines of text; wherever a scene holds still, a slow push-in ("drift", at most 8% closer)
-  runs, which spotlights and chips follow frame by frame and which stops before it would cut a line
-  the shot showed whole. The recording's CSS (`recorder-kit.ts`) hides the model's scene memo
-  (`.scene-evidence`) and turns off scroll anchoring, which had jumped the page 645 px at the end of
-  the replay. The reveal's amber lines appear at each line's voice onset (`onset` in
-  `scripts/deck/data/sample.ts`: the first 10 ms window within 30 dB of the file's peak).
+  starts, and the scene starts on the first screencast frame stamped after that (`frameAfter` in
+  `record.ts`), so it opens on the reset stage list with the app's speed badge out of shot. Before
+  that, the page is scrolled up by the few pixels that put the sticky inspector at its place, so the
+  timeline growing during the replay moves nothing in it; the page goes back down once the replay
+  is done.
+- Camera (`camera.ts`, `beats.ts`): moves take 1.2 s. Close-ups are placed so that no line of text
+  is cut at any edge of the picture, the column beside the element included
+  (`frameAround` in `recorder-kit.ts`: moved up or down, or up to 15% more page; failing that, only
+  the element's own column is kept whole at top and foot). Wherever a scene holds still, a slow
+  push-in ("drift", at most 8% closer) runs about the point that lets it go furthest (the element's
+  centre, or an edge or corner of the view), which spotlights and chips follow frame by frame and
+  which keeps whole every line the shot showed whole. The upload section is framed for the page
+  before and after the card's status line pushes the next section down. The edit scene opens on the
+  whole workspace and types in a close-up of the line's box: a close-up of the whole editor is as
+  tall as the player's caption strip and controls beside it, and cuts their labels. The recording's
+  CSS (`recorder-kit.ts`) hides the model's scene memo (`.scene-evidence`) and turns off scroll
+  anchoring, which had jumped the page 645 px at the end of the replay. The reveal's amber lines
+  appear at each line's voice onset (`onset` in `scripts/deck/data/sample.ts`: the first 10 ms
+  window within 30 dB of the file's peak).
 - Result playback: the scene starts on a freshly loaded run page. `segments.playbackExcerpt()` is
   the one source of the excerpt's start, trim and length for both the sound (`mix.ts`) and the
   picture: `playbackOverlay()` lays `described.mp4` over the player's measured video box (rounded
@@ -209,18 +221,60 @@ OpenRouter) on the cloud page. It never ticks the human watch-through.
   over the stage list; longest still stretch now 2.43 s EN and 2.17 s KO, in review), and every app
   scene ran within 0.01 s of its plan. One dry run crashed on a screencast frame acknowledged after
   the screencast stopped; `record.ts` now ignores frames that arrive after the stop.
+- [2026-09-23] The re-verification of the 13:03Z/13:10Z films found polish items only. Root causes,
+  measured on the recordings and on dry runs against the dev server:
+  - The replay opened on the finished run for 6 frames (EN 79.47–79.63 s). The recording's frame
+    stamped 7 ms before the replay's setup returned (two animation frames after the reset list was
+    committed) still showed the finished run; the next, stamped 63 ms after, showed the reset list,
+    and the first replay stretch is slowed about 3×. The scene now starts on the first frame stamped
+    after its setup (`fromNextFrame`, `frameAfter`).
+  - Chips and spotlight half a row off from Write's end (KO 83.5–91 s, EN too): the inspector is
+    `position: sticky` (16 px) but the shortened page's grid foot held it at 0; when the first lines
+    made the timeline 22 px taller, the whole inspector dropped 16 CSS px into place (logged in the
+    page each animation frame, 1.37 s into the replay, in both languages). The replay's setup now
+    scrolls the page up by that much first, and scrolls it back once the replay is done.
+  - The upload shot cut the next section's heading at its foot (EN 72.1–74.2 s): the card's status
+    line ("Converting and measuring…") appears after the shot was framed and pushes the page under
+    it down 33 px. The shot is now framed once the status is up, against both layouts. Under the
+    dry run's request interception the card never reaches its "preparing" status (the upload body is
+    not reported sent before the answer); the harness reports it sent in the page.
+  - Close-ups cut the player's labels at their left edge ("ption on", "ith a mechanical eye"): the
+    framing only kept the element's own column whole, and drifts against the page's right edge swept
+    their left edge into the neighbouring column. The framing now checks the sides against every
+    line in the picture's rows, and a drift may push in about an edge or corner. The edit scene's
+    two tall shots had no clean view within 15% (the strip and control labels fill x 98–626 CSS in
+    their rows): it now opens wide and types in a close-up of the line's box.
+  - The result scene pushed from zoom 1 to 2 in 0.83 s: its first shot was cut short by the meter's.
+    It is now one 1.2 s push to the meter.
+  - The edit's note above its button was found as the one `p.label` without `.mono`; the app's
+    start range became a plain `p.label` this round ("Can start: 56.22–60.63 s"), and the note is
+    now found by the app's own hint text.
 
 ## Status
 
-2026-09-23: the films in `runtime/demo-v3/` (recorded 19:43 EN and 19:50 KO, built 19:47 and 19:54)
-are in sync. Raw-sample cross-correlation against the source clips puts every excerpt +1.6 to
-+8.9 ms from its place (EN dark/reveal/result +5.0/+5.0/+1.6 ms, KO +5.0/+5.0/+8.9 ms, match at
-least 0.995); the build's own check reads +5 ms on each. Lengths: EN 172.2 s, KO 168.6 s. The
-English check note fails its still-picture box (5.2 s at 89.1–94.3 s against 4 s; KO 4.0 s, passes).
-Both films show the spent-allowance notice under Generate (debug log), and the verification round
-asked for caption, page and app-text changes, so both must be recorded and built again
-(`npm run demo -- en all`, then `ko`) from a `DATA_DIR` without `budget/`. With those changes in,
-`planScene` plans EN 164.8 s and KO 165.6 s (frame-rounded). Each record step leaves a
+2026-09-23: the films in `runtime/demo-v3/` were recorded at 13:03Z (EN) and 13:10Z (KO) and built
+right after: EN 165.3 s, KO 166.1 s, as planned. Their check notes read every film excerpt +5 ms
+from its place (dark, reveal and result, match at least 0.989), the sound as long as the picture,
+the longest still stretch 2.8 s (EN) and 2.9 s (KO) against 4 s, loudness -16.4 LUFS, and
+`/api/live-status` canStart true when recorded, so no spent-allowance notice is in the picture.
+The re-verification round (1 fps and 5 fps frame reads, its own cross-correlation) found no P0 or
+P1 left, only polish.
+
+This round's polish is in the scripts, not yet in the films: the replay's first frame and the
+inspector lift, the upload framing, the result push, the edit's framing and resting cursor, the edge
+and drift rules (debug log); captions (a separate Gemini review; the finished tracks; the Korean
+review and evidence sentences); the evidence page's figures, all in within 1.2 s of their caption,
+with a slow push-in; the cloud page's Korean wording; the constraint page's tag "6.7 s / of 7.2 s
+usable" ("7.2초 중 해설 가능"). Both films must be recorded and built again (`npm run demo -- en
+all`, then `ko`) from a `DATA_DIR` without `budget/`; `planScene` now plans EN 166.8 s and KO
+167.3 s (frame-rounded; 165.3 and 166.1 before). Dry runs of every app scene against the dev
+server (GET only, live status answered canStart true in the browser, the upload answered there
+after 5.6 s), both languages, rendered through `segments.ts`: every scene within 0.01 s of its
+plan, every spotlight on 100% of its element, no line of text cut at any shot's or drift's end,
+the replay's first frames all on the reset list, the chips on their rows before and after Write
+ends, the timeline whole at the replay's end, the result push 1.2 s, the edit's cursor resting past
+the button. The changed pages were rendered with their captions (constraint, cloud, evidence in
+both languages; the evidence page's longest still stretch is 1.6 s). Each record step leaves a
 private `u-*` upload project in `runtime/projects/`.
 Open: the development Gemini label (until the switch to Google AI Studio), the human watch-through,
 and the Cloud Run URL on the close page, which answers again only after a redeploy under the same

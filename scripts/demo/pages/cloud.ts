@@ -91,7 +91,7 @@ const LOOPS: [StageId, StageId, Record<Language, string>, "over" | "under"][] = 
     "review",
     {
       en: "too long: faster, or shortened and checked again",
-      ko: "너무 김: 빠르게, 또는 줄여서 다시 검수",
+      ko: "너무 길면: 빠르게 읽거나 줄여서 다시 검수",
     },
     "under",
   ],
@@ -185,7 +185,7 @@ svg { position:absolute; left:0; top:0; overflow:visible; }
   )}</p>
 <p class="a cz-sub">${pick(lang, {
     en: "One container: the Next.js app and FFmpeg. A run is one request.",
-    ko: "컨테이너 하나에 Next.js 앱과 FFmpeg. 실행 한 번이 요청 하나입니다.",
+    ko: "Next.js 앱과 FFmpeg을 컨테이너 하나에 담았고, 실행 한 번은 요청 하나로 처리됩니다.",
   })}</p>
 ${names}
 <div class="a cz-models">

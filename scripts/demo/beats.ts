@@ -35,6 +35,7 @@ import {
   scrollInspectorTo,
   settledRect,
   sharedArea,
+  textLines,
   toOutput,
   unionRect,
   videoPicture,
@@ -90,6 +91,8 @@ const SCROLL_LEAD_S = 0.7;
 const SPOTLIGHT_CLEAR_S = 0.1;
 /** A spotlight lights up this long after its sentence starts, once the camera is on its way. */
 const LIGHT_S = 0.5;
+/** A spotlight on a shot the scene opens with lights up this long after the camera has arrived. */
+const LIGHT_GAP_S = 0.1;
 /** The check's fix is lit alone at least until this far into its sentence, before the rewrite joins it. */
 const FIX_ALONE_S = 2.2;
 /** A drift starts this long after the camera has arrived, and ends this long before the next move. */
@@ -125,6 +128,16 @@ const CARET_MS = 25;
 const TYPING_MS = 110;
 /** The cursor's glide (recorder-kit moveCursor) with its settle, so it can arrive on time. */
 const GLIDE_S = 0.75;
+/**
+ * Once it has pointed at the edit's button, the cursor rests this far (CSS px) past the button's
+ * end, this long into the button's sentence, so the button's label reads whole under the caption.
+ */
+const BESIDE_CSS = 10;
+const REST_BESIDE_S = 0.4;
+/** How long the upload card may take to show its status line once the clip is chosen. */
+const STATUS_TIMEOUT_MS = 15_000;
+/** A box read again later counts as unmoved within this many CSS px. */
+const UNMOVED_PX = 1;
 
 /** Seconds into the listened line's voice before its first spoken sound (from its voice file). */
 const lineOnset = film.opening.lines.find((l) => l.id === film.line.cueId)?.onset;
@@ -295,10 +308,14 @@ const upload: BeatScript = async (page, clock, plan, lang) => {
     card.getByRole("button"),
   ]);
   const cardRect = await settledRect(page, cardParts);
-  // The card with the column beside it, so no line of either is cut at the frame's edge.
+  // The card with the column beside it, so no line of either is cut at the frame's edge. Once the
+  // clip is chosen, the card's status line pushes everything under it down: the shot is framed for
+  // the page before and after (the next section's heading was cut at the frame's foot, 2026-09-23),
+  // so it is logged now and its box found once the status is up.
   const intro = page.locator(".upload-section > div:not(.upload-card)");
   const section = await settledRect(page, boxesOf([intro, card]));
-  clock.shot(await frameWhole(page, section, SECTION_ZOOM), SECTION_ZOOM);
+  const sectionAt = clock.now();
+  const sectionLines = await textLines(page);
   // The card lights up as the cursor heads for its button, and stays lit while the clip uploads.
   const lit = clock.now() + CARD_LIGHT_S;
   clock.spotlight("the upload card", lit, back - SPOTLIGHT_CLEAR_S, cardRect, cardParts);
@@ -316,6 +333,19 @@ const upload: BeatScript = async (page, clock, plan, lang) => {
   );
   await chooser.setFiles(await uploadCopy(lang));
   const chosen = Date.now() / 1000;
+  // Framed as soon as the status line is up (the clip has been sent), alongside the wait below.
+  const sectionFrame = Promise.race([
+    card
+      .locator("#upload-status")
+      .filter({ hasText: /\S/ })
+      .waitFor({ timeout: STATUS_TIMEOUT_MS })
+      .then(() => frameWhole(page, section, SECTION_ZOOM, sectionLines)),
+    answered.then(() => {
+      throw new Error("upload: the clip was answered before the card showed its status line");
+    }),
+  ]);
+  // Read after the wait; a failure is reported there, not as an unhandled rejection meanwhile.
+  sectionFrame.catch(() => undefined);
   let left = 0;
   const korean = page.locator('.run-options .segmented button[lang="ko"]');
   // No label tail: it would sit over the new page's header.
@@ -353,6 +383,7 @@ const upload: BeatScript = async (page, clock, plan, lang) => {
     () => words.upload(left - chosen),
     0,
   );
+  clock.shot(await sectionFrame, SECTION_ZOOM, sectionAt);
   if (toOutput(clock.rec, left) < changed - PAGE_CHANGE_TOLERANCE_S)
     throw new Error(
       `upload: the clip was ready ${(left - chosen).toFixed(1)} s after it was chosen, before the camera had pulled back; show less of the preparation`,
@@ -380,11 +411,17 @@ const stageRow = (page: Page, lang: Language, stage: ServiceStage, state?: strin
     .locator(`.stages li${state ? `.${state}` : ""}`)
     .filter({ has: page.getByText(dictionary(lang).stages[stage], { exact: true }) });
 
+/**
+ * How far the replay's page was scrolled up before its scene (SCRIPTS.replay.before), to be
+ * scrolled back down once the replay is done.
+ */
+let replayLift = 0;
+
 const replay: BeatScript = async (page, clock, plan, lang) => {
   const words = labels(lang);
   const t = dictionary(lang);
-  // s1: Gemini writes each line; s2: a second Gemini checks every line; s3: voiced and measured, and
-  // the final check sends back what fails.
+  // s1: Gemini writes each line; s2: a separate Gemini review checks every line; s3: voiced and
+  // measured, and the final check sends back what fails.
   const [s1, s2, s3] = sentences(plan, "replay", 3);
   const last = plan.seconds - s3;
   const doneAt = s3 + last * DONE_AT;
@@ -394,11 +431,12 @@ const replay: BeatScript = async (page, clock, plan, lang) => {
   // label says what is sped up).
   const list = page.locator(".stages");
   const stages = await settledRect(page, boxesOf([list]));
+  const framed = await frameWhole(page, stages, LIST_ZOOM);
   const badge = await rectOf(page.locator(".replay-badge"));
   for (const push of [1, DRIFT_PUSH])
-    if (sharedArea(badge, shotView(stages, LIST_ZOOM, push)) > 0)
+    if (sharedArea(badge, shotView(framed, LIST_ZOOM, push)) > 0)
       throw new Error("replay: the replay badge would be in the stage list's shot");
-  clock.shot(stages, LIST_ZOOM, 0, 0);
+  clock.shot(framed, LIST_ZOOM, 0, 0);
   clock.spotlight("the stage list", s1 + LIST_LIGHT_S, listEnd, stages, boxesOf([list]));
   // Each stage's service beside it; the stages the sample reused get one chip saying where from.
   const reused = page.locator(".stages li").filter({ hasText: t.stages.reused });
@@ -423,14 +461,24 @@ const replay: BeatScript = async (page, clock, plan, lang) => {
       rect: unionRect(await Promise.all((await reused.all()).map(rectOf))),
     });
   // A slow push-in on the list while its stages run, so it is never a still picture.
-  await clock.drift(stages, LIST_ZOOM, s1 + CHIPS_LIGHT_S + DRIFT_LEAD_S, doneAt - DRIFT_TAIL_S);
-  const running = (stage: ServiceStage) => () =>
-    stageRow(page, lang, stage, "running").first().waitFor({ timeout: REPLAY_TIMEOUT_MS });
+  await clock.drift(framed, LIST_ZOOM, s1 + CHIPS_LIGHT_S + DRIFT_LEAD_S, doneAt - DRIFT_TAIL_S);
+  // The chips sit on rows measured once: the list must not have moved under them (before()).
+  const unmoved = async () => {
+    const now = await rectOf(list);
+    if (Math.abs(now.x - stages.x) > UNMOVED_PX || Math.abs(now.y - stages.y) > UNMOVED_PX)
+      throw new Error(
+        `replay: the stage list moved ${(now.y - stages.y).toFixed(1)} px under its chips`,
+      );
+  };
+  const running = (stage: ServiceStage, check?: () => Promise<void>) => async () => {
+    await stageRow(page, lang, stage, "running").first().waitFor({ timeout: REPLAY_TIMEOUT_MS });
+    await check?.();
+  };
   await clock.pace(
     [
-      { by: s2, wait: running("review") },
+      { by: s2, wait: running("review", unmoved) },
       { by: s3 + CHECK_LEAD_S, wait: running("verify") },
-      { by: s3 + last * FIX_AT, wait: running("fix") },
+      { by: s3 + last * FIX_AT, wait: running("fix", unmoved) },
       {
         by: doneAt,
         wait: () =>
@@ -440,8 +488,10 @@ const replay: BeatScript = async (page, clock, plan, lang) => {
     words.replay,
     clock.rec.wallStart,
   );
-  // Every row done: the timeline, with every line in place, whole in the picture, and the line
+  // Every row done, the page goes back down to where the replay began (smoothly, as the camera
+  // leaves the list): the timeline, with every line in place, whole in the picture, and the line
   // picker under it either whole or out of it.
+  await page.evaluate((lift) => window.scrollBy({ top: lift, behavior: "smooth" }), replayLift);
   const timeline = await settledRect(page, boxesOf([page.locator(".timeline")]));
   const view = shotView(timeline, TIMELINE_ZOOM);
   for (const part of [".timeline", ".cue-picker"]) {
@@ -523,13 +573,19 @@ const result: BeatScript = async (page, clock, plan, lang) => {
   const title = words.resultLine.split(" · ")[0];
   if (!(await head.innerText()).startsWith(title))
     throw new Error(`result: the line picked is not "${title}"`);
+  // One push from the whole page to the meter, from the scene's first frame, in a whole camera move
+  // (it went in two, the first cut short to 0.83 s); the meter lights once the camera is there.
   const fit = page.locator(".fit");
-  const lined = await settledRect(page, boxesOf([head, fit]));
-  clock.shot(await frameWhole(page, lined, TEXT_ZOOM), TEXT_ZOOM);
-  await clock.at(0.9, "fit meter");
   const meterEnd = s1 - SPOTLIGHT_CLEAR_S;
-  const meter = await spotlight(page, clock, "the fit meter", [fit], 1.3, meterEnd);
-  await frameAndHold(page, clock, meter, FIT_ZOOM, meterEnd);
+  const meter = await spotlight(
+    page,
+    clock,
+    "the fit meter",
+    [fit],
+    MOVE_SECONDS + LIGHT_GAP_S,
+    meterEnd,
+  );
+  await frameAndHold(page, clock, meter, FIT_ZOOM, meterEnd, 0);
   // The player with the strip and the controls under it, framed across the whole workspace: the
   // zoom's spare width lands in the page's margins, never inside the inspector beside it.
   const main = await rectOf(page.locator(".ws-main"));
@@ -577,16 +633,20 @@ const edit: BeatScript = async (page, clock, plan, lang) => {
   const words = labels(lang);
   const [s0, s1] = sentences(plan, "edit", 2);
   const summary = page.locator(".edit-line > summary");
-  const opener = await settledRect(page, boxesOf([page.locator(".line-head"), summary]));
-  clock.shot(await frameWhole(page, opener, LIST_ZOOM), LIST_ZOOM);
+  // The whole workspace, Line 7 picked, as its editor is opened. A close-up on the line's head and
+  // the editor's summary, or on the whole editor, is as tall as the player's caption strip and
+  // controls beside it, and would cut their labels at the frame's left edge (2026-09-23); the
+  // line's own box sits beside the film's picture, where no words are.
+  clock.shot(null);
   await clock.at(s0 + EDITOR_OPEN_S, "open the editor");
   await clickLike(page, summary);
   const form = page.locator(".cue-editor");
   await form.waitFor();
   await scrollInspectorTo(page, form, 40);
   const typedEnd = s1 - SPOTLIGHT_CLEAR_S;
-  await frameAndHold(page, clock, await settledRect(page, boxesOf([form])), TEXT_ZOOM, typedEnd);
   const box = form.locator("textarea");
+  const field = form.locator("label").filter({ has: page.locator("textarea") });
+  await frameAndHold(page, clock, await settledRect(page, boxesOf([field])), TEXT_ZOOM, typedEnd);
   await clickLike(page, box);
   const before = await box.inputValue();
   if (!before.endsWith(EDIT_BEFORE))
@@ -602,11 +662,12 @@ const edit: BeatScript = async (page, clock, plan, lang) => {
   if ((await box.inputValue()) !== typed)
     throw new Error(`typed "${await box.inputValue()}", expected "${typed}"`);
   // 2. The button that would review and re-voice this line, and the note above it: the cursor is on
-  // the button as its sentence starts. Never submitted: it would start a paid re-voice.
+  // the button as its sentence starts, then rests just past its end, so the label reads whole.
+  // Never submitted: it would start a paid re-voice.
   const submit = form.locator('button[type="submit"]');
   await clock.at(s1 - GLIDE_S, "point at the submit button");
   await glideTo(page, submit, HOVER_ACROSS);
-  const note = form.locator("p.label:not(.mono)");
+  const note = form.locator("p.label").filter({ hasText: dictionary(lang).editor.hint });
   const button = await spotlight(
     page,
     clock,
@@ -616,12 +677,23 @@ const edit: BeatScript = async (page, clock, plan, lang) => {
     plan.seconds - 0.2,
   );
   await frameAndHold(page, clock, button, TEXT_ZOOM, plan.seconds - 0.2, s1);
+  await clock.at(s1 + REST_BESIDE_S, "rest beside the button");
+  const end = await rectOf(submit);
+  await moveCursor(page, end.x + end.w + BESIDE_CSS, end.y + end.h / 2);
   await clock.at(plan.seconds, "end of edit");
 };
 
 export const SCRIPTS: Record<
   Beat,
-  { before: (page: Page, lang: Language) => Promise<void>; run: BeatScript }
+  {
+    before: (page: Page, lang: Language) => Promise<void>;
+    run: BeatScript;
+    /**
+     * The page is still changing when `before` returns, so the scene starts on the first screencast
+     * frame stamped after that (record.ts frameAfter) rather than on the last one before it.
+     */
+    fromNextFrame?: boolean;
+  }
 > = {
   upload: {
     before: async (page) => {
@@ -649,7 +721,18 @@ export const SCRIPTS: Record<
         .evaluate((b: HTMLButtonElement) => b.focus({ preventScroll: true }));
       await page.keyboard.press("Enter");
       await page.locator(".replay-badge").waitFor();
-      // Two animation frames: the reset list is on screen before the scene's first frame.
+      // The inspector sticks 16 px under the window's top, but on the page the replay shortens, the
+      // foot of the page's grid holds it higher. When the run's first lines lengthen the timeline,
+      // the page grows and the whole inspector dropped into its sticky place, 16 CSS px, in the
+      // middle of the scene and off the spotlight and service chips measured on it (2026-09-23).
+      // Scrolled up by that much now, it is in its place from the first frame and stays there.
+      replayLift = await page.evaluate(() => {
+        const panel = document.querySelector<HTMLElement>(".ws-inspector")!;
+        const lift = parseFloat(getComputedStyle(panel).top) - panel.getBoundingClientRect().top;
+        if (lift > 0) window.scrollBy({ top: -lift, behavior: "instant" });
+        return Math.max(0, lift);
+      });
+      // Two animation frames: the reset list is drawn before the scene's first frame.
       await page.evaluate(
         () =>
           new Promise<void>((done) =>
@@ -658,6 +741,9 @@ export const SCRIPTS: Record<
       );
     },
     run: replay,
+    // The replay runs on as the scene starts: its first frame is the first stamped after this
+    // setup.
+    fromNextFrame: true,
   },
   review: {
     // The line's frame is decoded before the scene picks the line, so the pick does not flash black.

@@ -169,9 +169,10 @@ describe("the film's storyboard", () => {
 
   it("claims no more than the sample shows (2026-09-23 verification)", () => {
     // The sample has 2 or 3 lines in some silences, its final check added no line, an edit reviews
-    // the whole track, and the screen shows the title in English, not the line's gloss.
+    // the whole track, the screen shows the title in English, not the line's gloss, and the writer
+    // and the reviewer are one model with separate instructions (2026-09-23 re-verification).
     const overclaims =
-      /one line for each silence|fixes what it finds|re-checks just that line|words on screen|침묵마다 한 문장|스스로 고칩니다/i;
+      /one line for each silence|fixes what it finds|re-checks just that line|words on screen|second Gemini|침묵마다 한 문장|스스로 고칩니다|두 번째 제미나이/i;
     assert.deepEqual(
       [...sentences("en"), ...sentences("ko")].filter((s) => overclaims.test(s)),
       [],

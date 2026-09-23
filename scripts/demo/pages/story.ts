@@ -170,11 +170,14 @@ export async function constraintPage(timing: PageTiming): Promise<string> {
     .join("");
   const shortestWord = pick(lang, { en: "shortest", ko: "가장 짧음" });
   // The hook's silence: 7.2 s between the words on the seven page, less the guard kept clear of them
-  // here. Its box says it is the usable part.
+  // here. Its tag says so under its length, on one line: "6.7 s / of 7.2 s usable".
   const h = film.hook;
   const hookGap = o.gaps.find((g) => g.start >= h.locked.end && g.end <= h.freaky.start);
   if (!hookGap) throw new Error("no usable silence between the hook's two lines of dialogue");
-  const usableWord = pick(lang, { en: "usable", ko: "해설 가능" });
+  const usableWord = pick(lang, {
+    en: `of ${secs(h.silence, lang)} usable`,
+    ko: `${secs(h.silence, lang)} 중 해설 가능`,
+  });
   const gapWord = (id: string) =>
     id === o.shortestId ? shortestWord : id === hookGap.id ? usableWord : null;
   const gaps = o.gaps

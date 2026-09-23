@@ -251,22 +251,23 @@ export function buildStoryboard(): Scene[] {
             ko: [["제미나이가 화면을 보고,", "침묵 길이에 맞춰 문장을 씁니다."]],
           },
         ),
+        // The writer and the reviewer are the same model with separate instructions: a separate
+        // review, not a second model.
         cap(
-          `A second Gemini checks every line against ${film.rules} rules from Korea's and Netflix's guides.`,
-          `두 번째 제미나이가 모든 문장을 한국·넷플릭스 해설 규칙 ${film.rules}가지로 검수합니다.`,
+          `A separate Gemini review checks every line against ${film.rules} rules from Korea's and Netflix's guides.`,
+          `제미나이가 별도 검수로 모든 문장을 한국·넷플릭스 해설 규칙 ${film.rules}가지로 검토합니다.`,
           {
             // "화면해설 규칙" would take the second line one character past the Korean limit.
             ko: [
               [
-                "두 번째 제미나이가 모든 문장을",
-                `한국·넷플릭스 해설 규칙 ${film.rules}가지로 검수합니다.`,
+                "제미나이가 별도 검수로 모든 문장을",
+                `한국·넷플릭스 해설 규칙 ${film.rules}가지로 검토합니다.`,
               ],
             ],
+            // Too long for one caption: the rules and whose they are stay together in the second.
             en: [
-              [
-                "A second Gemini checks every line against",
-                `${film.rules} rules from Korea's and Netflix's guides.`,
-              ],
+              ["A separate Gemini review checks every line"],
+              [`against ${film.rules} rules from Korea's`, "and Netflix's guides."],
             ],
           },
         ),
@@ -298,11 +299,12 @@ export function buildStoryboard(): Scene[] {
         ),
         cap(
           "Scene rewrote it as the check suggested: it now reads the title on screen.",
-          `씬은 점검 의견대로, 화면 속 영문 글자를 우리말로 옮긴 ‘${rewriteWords}’${euro(rewrite)} 다시 썼습니다.`,
+          `씬은 점검 의견대로 화면 속 영어 문구를 우리말로 옮겨 ‘${rewriteWords}’${euro(rewrite)} 다시 썼습니다.`,
           {
             en: [["Scene rewrote it as the check suggested:", "it now reads the title on screen."]],
+            // The first caption ends on a verb (옮겨), not on a modifier waiting for its noun.
             ko: [
-              ["씬은 점검 의견대로,", "화면 속 영문 글자를 우리말로 옮긴"],
+              ["씬은 점검 의견대로", "화면 속 영어 문구를 우리말로 옮겨"],
               [`‘${rewriteWords}’${euro(rewrite)} 다시 썼습니다.`],
             ],
           },
@@ -383,7 +385,7 @@ export function buildStoryboard(): Scene[] {
       show: { page: "evidence" },
       parts: [
         cap(
-          `In ${l.runs} finished test runs, ${l.voiced} of ${l.written} lines made it into the track.`,
+          `In ${l.runs} finished test runs, ${l.voiced} of ${l.written} lines made it into the finished tracks.`,
           `끝까지 마친 시험 실행 ${l.runs}회에서 ${l.written}문장 중 ${l.voiced}문장이 완성 트랙에 들어갔습니다.`,
           {
             ko: [
@@ -396,7 +398,15 @@ export function buildStoryboard(): Scene[] {
         ),
         cap(
           `The sample: ${sample.lines} lines in ${minutesSeconds(sample.seconds, "en")}, for $${sample.costUsd.toFixed(2)} in API fees.`,
-          `샘플은 ${sample.lines}문장, ${minutesSeconds(sample.seconds, "ko")}, API 비용 ${sample.costUsd.toFixed(2)}달러였습니다.`,
+          `샘플은 ${sample.lines}문장이고, 만드는 데 ${minutesSeconds(sample.seconds, "ko")}, API 비용 ${sample.costUsd.toFixed(2)}달러가 들었습니다.`,
+          {
+            ko: [
+              [
+                `샘플은 ${sample.lines}문장이고, 만드는 데 ${minutesSeconds(sample.seconds, "ko")},`,
+                `API 비용 ${sample.costUsd.toFixed(2)}달러가 들었습니다.`,
+              ],
+            ],
+          },
         ),
       ],
       hold: 0.5,

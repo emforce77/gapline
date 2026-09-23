@@ -9,7 +9,7 @@
  */
 import type { Locator, Page } from "playwright-core";
 import type { Rect } from "./ass";
-import { DRIFT_PUSH, rectShowing, shotView } from "./camera";
+import { DRIFT_PAD_CSS, DRIFT_PUSH, rectShowing, shotView, type Point } from "./camera";
 import type { Beat } from "./storyboard";
 
 export interface Frame {
@@ -36,6 +36,8 @@ export interface Shot {
   move?: number;
   /** A drift: a slow push-in on `rect`, this much closer than its shot, that lit overlays follow. */
   drift?: number;
+  /** The page point a drift pushes in about (camera.ts); the camera's own centre when unset. */
+  anchor?: Point;
 }
 
 export type Overlay =
@@ -123,11 +125,16 @@ const MIN_PUSH = 1.01;
 const PUSH_STEP = 0.005;
 /** A line of text may reach this far (CSS px) past a frame's edge and still count as inside it. */
 const LINE_EPS = 0.5;
-/** Framing a shot may show up to this much more page than the element alone asks for... */
+/**
+ * Framing a shot may show up to this much more page than the element alone asks for, tried in steps
+ * of a quarter per cent (at zoom 2 an edge then moves about 2 CSS px, less than a word space)...
+ */
 const FRAME_GROW = 1.15;
-const FRAME_GROW_STEP = 0.01;
+const FRAME_GROW_STEP = 0.0025;
 /** ...and keeps at least this much room (CSS px) above and below the element. */
 const FRAME_ROOM = 6;
+/** A framed shot's edges pass at least this far (CSS px) from any line of text they do not cut. */
+const EDGE_CLEAR = 2;
 /** A box has settled when two readings this far apart agree within SETTLE_PX. */
 const SETTLE_STEP_MS = 100;
 const SETTLE_PX = 0.5;
@@ -145,14 +152,16 @@ export class BeatClock {
   /** Set by a scene that plays the film: where the film's picture is (videoPicture). */
   player?: PlayerPicture;
   private pending: PendingSpot[] = [];
+  /** `wallStart`: the wall time of the scene's first frame (now, unless the recorder waits). */
   constructor(
     private page: Page,
     beat: Beat,
     seconds: number,
+    wallStart = Date.now() / 1000,
   ) {
     this.rec = {
       beat,
-      wallStart: Date.now() / 1000,
+      wallStart,
       wallEnd: 0,
       seconds,
       warps: [],
@@ -273,23 +282,16 @@ export class BeatClock {
   }
 
   /**
-   * A slow push-in on the shot's `rect` from `from` to `until`, so a held picture keeps moving while
-   * its caption is read; lit overlays follow it. It stops short of cutting any line of text in the
-   * shot's column that the shot shows whole, and is skipped when the hold is too short to need one
-   * or there is no room to push in.
+   * A slow push-in on the shot's `rect` from `from` to `until`, so a held picture keeps moving
+   * while its caption is read; lit overlays follow it. It keeps whole every line of text the shot
+   * shows whole (driftFor), and is skipped when the hold is too short to need one or there is no
+   * room to push in.
    */
   async drift(rect: Rect, maxZoom: number | undefined, from: number, until: number): Promise<void> {
     if (until - from < MIN_DRIFT_S) return;
-    const still = shotView(rect, maxZoom);
-    const whole = (await textLines(this.page)).filter((l) => inColumn(l, rect) && holds(still, l));
-    let push = DRIFT_PUSH;
-    const keeps = (p: number) => {
-      const view = shotView(rect, maxZoom, p);
-      return whole.every((l) => holds(view, l));
-    };
-    while (push >= MIN_PUSH && !keeps(push)) push -= PUSH_STEP;
-    if (push < MIN_PUSH) return;
-    this.rec.shots.push({ at: from, rect, maxZoom, move: until - from, drift: push });
+    const found = driftFor(rect, maxZoom, await textLines(this.page));
+    if (!found) return;
+    this.rec.shots.push({ at: from, rect, maxZoom, move: until - from, ...found });
   }
 
   overlay(o: Overlay): void {
@@ -457,34 +459,103 @@ const holds = (view: Rect, line: Rect) =>
 
 /** A line in the column of `rect`: they share some of their width. */
 const inColumn = (line: Rect, rect: Rect) => line.x < rect.x + rect.w && line.x + line.w > rect.x;
+/** Whether an edge at `edge` runs through the span from `from`, `length` long, or grazes it. */
+const crosses = (from: number, length: number, edge: number) =>
+  from - EDGE_CLEAR < edge && edge < from + length + EDGE_CLEAR;
+/** Whether `line` shares some of the height of `view`: it is in the view's rows. */
+const inRows = (line: Rect, view: Rect) => line.y < view.y + view.h && line.y + line.h > view.y;
 
 /**
- * The box to frame for a shot of `rect` whose top and bottom edges cut no line of text in the
- * column of `rect` (lines beside the column, as in a dimmed panel next to it, fall as they may): the
- * view is moved up or down, least first, and failing that shown a little taller, with the element
- * always whole. `rect` itself when no such view exists.
+ * The box to frame for a shot of `rect`, so that no line of text shows cut at the picture's edges,
+ * with the element whole and FRAME_ROOM above and below it: the view is moved up or down, least
+ * first, and failing that shown a little wider and taller (up to FRAME_GROW). It asks, in turn:
+ *   1. no line cut at any edge;
+ *   2. no line cut at the sides (the column beside the element, whose labels a close-up at the
+ *      page's edge would otherwise cut mid-word), and none of the element's column at top or foot;
+ *   3. none of the element's column cut at top or foot (the rule before 2026-09-23).
+ * `rect` itself when its own view passes, or when no view passes even 3. `lines` are the page's
+ * lines of text (textLines), with the lines of any other layout the shot must also suit (the upload
+ * section before and after its status line pushes the page under it down).
  */
-export async function frameWhole(page: Page, rect: Rect, maxZoom: number): Promise<Rect> {
-  const lines = (await textLines(page)).filter((l) => inColumn(l, rect));
-  const inside = (l: Rect, edge: number) => l.y + LINE_EPS < edge && edge < l.y + l.h - LINE_EPS;
-  const clean = (v: Rect) =>
-    rect.y - v.y >= FRAME_ROOM - LINE_EPS &&
-    v.y + v.h - (rect.y + rect.h) >= FRAME_ROOM - LINE_EPS &&
-    !lines.some((l) => inside(l, v.y) || inside(l, v.y + v.h));
+export function frameAround(rect: Rect, maxZoom: number, lines: Rect[]): Rect {
   const view = shotView(rect, maxZoom);
-  if (clean(view)) return rect;
-  for (let grow = 1; grow <= FRAME_GROW + 1e-9; grow += FRAME_GROW_STEP) {
-    const height = view.h * grow;
-    const centred = view.y - (height - view.h) / 2;
-    for (let shift = 0; shift <= height; shift++)
-      for (const top of shift ? [centred - shift, centred + shift] : [centred]) {
-        const box = rectShowing(rect, top, height);
-        const shown = shotView(box, maxZoom);
-        if (Math.abs(shown.y - top) < 1 && Math.abs(shown.h - height) < 1 && clean(shown))
-          return box;
-      }
+  const column = lines.filter((l) => inColumn(l, rect));
+  const topOrBottom = (v: Rect, set: Rect[]) =>
+    set.some((l) => inColumn(l, v) && (crosses(l.y, l.h, v.y) || crosses(l.y, l.h, v.y + v.h)));
+  const sides = (v: Rect) =>
+    lines.some((l) => inRows(l, v) && (crosses(l.x, l.w, v.x) || crosses(l.x, l.w, v.x + v.w)));
+  const tests = [
+    (v: Rect) => !topOrBottom(v, lines) && !sides(v),
+    (v: Rect) => !topOrBottom(v, column) && !sides(v),
+    (v: Rect) => !topOrBottom(v, column),
+  ];
+  // Views that keep the element whole with its room: tops from the highest to the lowest allowed.
+  const lowest = rect.y - FRAME_ROOM + LINE_EPS;
+  const roomy = (v: Rect) => v.y <= lowest && v.y + v.h >= rect.y + rect.h + FRAME_ROOM - LINE_EPS;
+  for (const clean of tests) {
+    if (roomy(view) && clean(view)) return rect;
+    for (let grow = 1; grow <= FRAME_GROW + 1e-9; grow += FRAME_GROW_STEP) {
+      const height = view.h * grow;
+      const highest = rect.y + rect.h + FRAME_ROOM - LINE_EPS - height;
+      const centred = view.y - (height - view.h) / 2;
+      for (let shift = 0; centred - shift >= highest || centred + shift <= lowest; shift++)
+        for (const top of shift ? [centred - shift, centred + shift] : [centred]) {
+          if (top < highest || top > lowest) continue;
+          const box = rectShowing(rect, top, height);
+          const shown = shotView(box, maxZoom);
+          if (Math.abs(shown.y - top) < 1 && Math.abs(shown.h - height) < 1 && clean(shown))
+            return box;
+        }
+    }
   }
   return rect;
+}
+
+/** frameAround with the page's lines of text as they are now, and `also` (lines read earlier). */
+export async function frameWhole(
+  page: Page,
+  rect: Rect,
+  maxZoom: number,
+  also: Rect[] = [],
+): Promise<Rect> {
+  return frameAround(rect, maxZoom, [...(await textLines(page)), ...also]);
+}
+
+/**
+ * The furthest push-in on the shot of `rect` (at most DRIFT_PUSH, at least MIN_PUSH) that keeps
+ * whole every line of text the shot shows whole, in any column, and the element at least
+ * DRIFT_PAD_CSS inside the picture; with the page point it pushes in about. That is the camera's
+ * own centre, or an edge or corner of the view when that goes further: a close-up held against the
+ * page's right edge pushes its left edge into the column beside it, and anchored on that edge it
+ * pushes in from the right and the foot instead. Null when no push is possible.
+ */
+export function driftFor(
+  rect: Rect,
+  maxZoom: number | undefined,
+  lines: Rect[],
+): { drift: number; anchor?: Point } | null {
+  const still = shotView(rect, maxZoom);
+  const whole = lines.filter((l) => holds(still, l));
+  const padded = {
+    x: rect.x - DRIFT_PAD_CSS,
+    y: rect.y - DRIFT_PAD_CSS,
+    w: rect.w + 2 * DRIFT_PAD_CSS,
+    h: rect.h + 2 * DRIFT_PAD_CSS,
+  };
+  const anchors: (Point | undefined)[] = [undefined];
+  for (const fx of [0, 0.5, 1])
+    for (const fy of [0, 0.5, 1])
+      anchors.push({ x: still.x + still.w * fx, y: still.y + still.h * fy });
+  let best: { drift: number; anchor?: Point } | null = null;
+  for (const anchor of anchors)
+    for (let push = DRIFT_PUSH; push >= MIN_PUSH; push -= PUSH_STEP) {
+      const view = shotView(rect, maxZoom, push, anchor);
+      if (!holds(view, padded) || !whole.every((l) => holds(view, l))) continue;
+      if (!best || push > best.drift + 1e-9)
+        best = anchor ? { drift: push, anchor } : { drift: push };
+      break;
+    }
+  return best;
 }
 
 /** Reads the union of the targets' boxes. */

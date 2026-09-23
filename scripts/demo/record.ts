@@ -31,6 +31,9 @@ import { planScene } from "./timing";
 
 const PAID = /\/(runs|edits)(\/|$|\?)/;
 const JPEG_QUALITY = 88;
+/** How long a scene that starts on its next frame waits for one. */
+const NEXT_FRAME_TIMEOUT_MS = 3000;
+const FRAME_POLL_MS = 10;
 /** Presented frames further apart than this during playback are a stall (the film runs at 24 fps). */
 export const MAX_FRAME_GAP_S = 0.15;
 
@@ -66,6 +69,22 @@ async function checkLiveAllowance(): Promise<LiveAllowance> {
 export interface LiveAllowance {
   canStart: boolean;
   reason: string | null;
+}
+
+/**
+ * The stamp of the first screencast frame stamped after wall time `after`. A frame stamped just
+ * before can still show the page as it was: in the 2026-09-23 recording, the frame stamped 7 ms
+ * before the replay's setup returned (two animation frames after the reset stage list was
+ * committed) still showed the finished run, and the next one, stamped 63 ms after, the reset list.
+ */
+export async function frameAfter(frames: Frame[], after: number): Promise<number> {
+  const until = Date.now() + NEXT_FRAME_TIMEOUT_MS;
+  for (;;) {
+    const next = frames.find((f) => f.t > after);
+    if (next) return next.t;
+    if (Date.now() > until) throw new Error(`no screencast frame came after ${after.toFixed(3)}`);
+    await new Promise((r) => setTimeout(r, FRAME_POLL_MS));
+  }
 }
 
 /** Stretches between presented frames longer than MAX_FRAME_GAP_S, in wall seconds. */
@@ -182,7 +201,12 @@ export async function recordApp(input: {
       const beat = scene.show.beat;
       const plan = planScene(scene, input.lang);
       await SCRIPTS[beat].before(page, input.lang);
-      const clock = new BeatClock(page, beat, plan.seconds);
+      const clock = new BeatClock(
+        page,
+        beat,
+        plan.seconds,
+        SCRIPTS[beat].fromNextFrame ? await frameAfter(frames, Date.now() / 1000) : undefined,
+      );
       await SCRIPTS[beat].run(page, clock, plan, input.lang);
       const rec = clock.end();
       const media = (

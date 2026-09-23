@@ -4,8 +4,9 @@
  * of it. Crop bounds are written as explicit 1920·Z / 880·Z expressions because crop keeps the first
  * frame's input size.
  * A shot is reached in MOVE_SECONDS, or cut to at once; a drift is a slow push-in on the element in
- * shot, so the picture never stands still for long. The same state function places overlays in
- * picture pixels: a spotlight lands on its element, and follows it through a drift.
+ * shot, so the picture never stands still for long, about the page point it keeps in place (its
+ * anchor: the element's centre unless the recorder chose an edge). The same state function places
+ * overlays in picture pixels: a spotlight lands on its element, and follows it through a drift.
  */
 import type { Rect } from "./ass";
 import { CONTENT_HEIGHT, CSS_TO_OUT, FPS, WIDTH } from "./config";
@@ -20,7 +21,7 @@ export const MOVE_SECONDS = 1.2;
  * DRIFT_PAD_CSS is left around its element (more than a spotlight's frame, 10 picture px).
  */
 export const DRIFT_PUSH = 1.08;
-const DRIFT_PAD_CSS = 12;
+export const DRIFT_PAD_CSS = 12;
 
 /** Zoom, and the view centre in unzoomed picture pixels. */
 export interface CamState {
@@ -36,11 +37,35 @@ const clamp = (v: number, a: number, b: number) => Math.min(b, Math.max(a, v));
 const fitZoom = (r: Rect, pad: number) =>
   Math.min(WIDTH / ((r.w + 2 * pad) * CSS_TO_OUT), CONTENT_HEIGHT / ((r.h + 2 * pad) * CSS_TO_OUT));
 
-function stateFor(shot: Pick<Shot, "rect" | "maxZoom" | "drift">): CamState {
+/** A point of the page (CSS px). */
+export interface Point {
+  x: number;
+  y: number;
+}
+
+/**
+ * `c` pushed `push` closer about the page point `p`, which stays where it is in the picture. A
+ * point inside the view keeps the pushed view inside it, so inside the frame.
+ */
+function pushAbout(c: CamState, p: Point, push: number): CamState {
+  const z = c.z * push;
+  const px = p.x * CSS_TO_OUT;
+  const py = p.y * CSS_TO_OUT;
+  // The picture position of p stays: p·z − (centre·z − half) is the same at both zooms.
+  const x0 = px * z - (px * c.z - (c.cx * c.z - WIDTH / 2));
+  const y0 = py * z - (py * c.z - (c.cy * c.z - CONTENT_HEIGHT / 2));
+  const x = clamp(x0, 0, WIDTH * z - WIDTH);
+  const y = clamp(y0, 0, CONTENT_HEIGHT * z - CONTENT_HEIGHT);
+  return { z, cx: (x + WIDTH / 2) / z, cy: (y + CONTENT_HEIGHT / 2) / z };
+}
+
+function stateFor(shot: Pick<Shot, "rect" | "maxZoom" | "drift" | "anchor">): CamState {
   if (!shot.rect) return WIDE;
   const r = shot.rect;
   const framed = clamp(fitZoom(r, PAD_CSS), 1, shot.maxZoom ?? DEFAULT_MAX_ZOOM);
   const push = Math.min(shot.drift ?? 1, DRIFT_PUSH);
+  if (shot.anchor && push > 1)
+    return pushAbout(stateFor({ rect: r, maxZoom: shot.maxZoom }), shot.anchor, push);
   const z = Math.max(framed, Math.min(framed * push, fitZoom(r, DRIFT_PAD_CSS)));
   // Clamp the crop inside the zoomed frame, then express it as a centre again.
   const x = clamp((r.x + r.w / 2) * CSS_TO_OUT * z - WIDTH / 2, 0, WIDTH * z - WIDTH);
@@ -97,9 +122,12 @@ export function cameraAt(keys: Key[], t: number): CamState {
   return state;
 }
 
-/** The part of the page (CSS px) a shot shows once the camera has arrived (or drifted `push` in). */
-export function shotView(rect: Rect | null, maxZoom?: number, push?: number): Rect {
-  const c = stateFor({ rect, maxZoom, drift: push });
+/**
+ * The part of the page (CSS px) a shot shows once the camera has arrived (or drifted `push` in,
+ * about `anchor` when one is given).
+ */
+export function shotView(rect: Rect | null, maxZoom?: number, push?: number, anchor?: Point): Rect {
+  const c = stateFor({ rect, maxZoom, drift: push, anchor });
   const w = WIDTH / c.z / CSS_TO_OUT;
   const h = CONTENT_HEIGHT / c.z / CSS_TO_OUT;
   return { x: c.cx / CSS_TO_OUT - w / 2, y: c.cy / CSS_TO_OUT - h / 2, w, h };

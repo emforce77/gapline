@@ -1,7 +1,15 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import type { Page } from "playwright-core";
-import { cameraAt, cameraKeys, MOVE_SECONDS, pieces, settledAt } from "../scripts/demo/camera";
+import {
+  cameraAt,
+  cameraKeys,
+  MOVE_SECONDS,
+  pieces,
+  settledAt,
+  shotView,
+  toPicture,
+} from "../scripts/demo/camera";
 import { locateExcerpt } from "../scripts/demo/check";
 import { minutesSeconds, film } from "../scripts/demo/facts";
 import { labels } from "../scripts/demo/labels";
@@ -9,6 +17,8 @@ import { mixGraph, type FilmSound } from "../scripts/demo/mix";
 import { frameGaps } from "../scripts/demo/record";
 import {
   BeatClock,
+  driftFor,
+  frameAround,
   MAX_STRETCH,
   overlapShare,
   toOutput,
@@ -230,6 +240,73 @@ describe("the camera", () => {
         ),
       /the camera moves at 2\.00 s while a spotlight is lit/,
     );
+  });
+});
+
+describe("framing a close-up against the page's right edge", () => {
+  // The edit scene's button and note in the inspector, and a label of the player's controls in the
+  // column beside it (2026-09-23 dry run: the zoom-2 view began at x 720, inside "Description
+  // off").
+  const rect = { x: 1072, y: 506.9, w: 308, h: 117.3 };
+  const label = { x: 711, y: 586, w: 89, h: 16 };
+  const cuts = (view: typeof rect, line: typeof rect) =>
+    line.y < view.y + view.h &&
+    line.y + line.h > view.y &&
+    [view.x, view.x + view.w].some((edge) => line.x < edge && edge < line.x + line.w);
+  const holds = (view: typeof rect, r: typeof rect) =>
+    view.x <= r.x + 0.5 &&
+    view.y <= r.y + 0.5 &&
+    view.x + view.w >= r.x + r.w - 0.5 &&
+    view.y + view.h >= r.y + r.h - 0.5;
+
+  it("widens the view a little so its left edge cuts no word of the column beside it", () => {
+    assert.ok(cuts(shotView(rect, 2), label), "the plain view cuts the label");
+    const view = shotView(frameAround(rect, 2, [label]), 2);
+    assert.ok(!cuts(view, label), `view from x ${view.x.toFixed(1)}`);
+    assert.ok(holds(view, rect), "the element stays whole");
+    assert.ok(view.w < shotView(rect, 2).w * 1.15, "by no more than the framing allows");
+  });
+
+  it("frames for two layouts at once: a line where it is now and where it will be pushed", () => {
+    const section = { x: 162, y: 73.1, w: 1116, h: 219.8 };
+    const now = [
+      { x: 162, y: 438.9, w: 396, h: 35.5 },
+      { x: 162, y: 476.4, w: 341, h: 35.5 },
+      { x: 162, y: 558.9, w: 166, h: 35.5 },
+    ];
+    const pushed = now.map((l) => ({ ...l, y: l.y + 33 }));
+    const view = shotView(frameAround(section, 1.5, [...now, ...pushed]), 1.5);
+    const edge = view.y + view.h;
+    for (const l of [...now, ...pushed])
+      assert.ok(!(l.y < edge && edge < l.y + l.h), `the foot at ${edge.toFixed(1)} cuts a line`);
+    assert.ok(holds(view, section));
+  });
+
+  it("drifts in about the view's left edge when its centre would push it into a word", () => {
+    const word = { x: 730, y: 400, w: 30, h: 16 };
+    const found = driftFor(rect, 2, [word]);
+    assert.ok(found && found.anchor, "an anchored drift");
+    assert.ok(found.drift > 1.05, `push ${found.drift}`);
+    assert.equal(found.anchor.x, shotView(rect, 2).x);
+    const view = shotView(rect, 2, found.drift, found.anchor);
+    assert.ok(holds(view, word) && holds(view, rect));
+  });
+
+  it("keeps the drift's anchor where it is in the picture, within a picture pixel", () => {
+    const anchor = { x: 720, y: 495 };
+    const keys = cameraKeys([
+      { at: 0, rect, maxZoom: 2, move: 0 },
+      { at: 1, rect, maxZoom: 2, move: 3, drift: 1.06, anchor },
+    ]);
+    const at = (t: number) => toPicture({ ...anchor, w: 0, h: 0 }, cameraAt(keys, t));
+    assert.ok(cameraAt(keys, 4).z > cameraAt(keys, 1).z * 1.05, "it pushes in");
+    // Exact where the drift starts and ends; between, zoom and centre ease together, which moves it
+    // by under a pixel.
+    assert.ok(Math.abs(at(4).x - at(1).x) < 1e-6 && Math.abs(at(4).y - at(1).y) < 1e-6);
+    for (const t of [1.5, 2, 2.5, 3, 3.5]) {
+      assert.ok(Math.abs(at(t).x - at(1).x) < 1, `x at ${t}: ${at(t).x} vs ${at(1).x}`);
+      assert.ok(Math.abs(at(t).y - at(1).y) < 1, `y at ${t}: ${at(t).y} vs ${at(1).y}`);
+    }
   });
 });
 
