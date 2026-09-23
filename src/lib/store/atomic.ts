@@ -5,6 +5,26 @@ import { randomUUID } from "node:crypto";
 import { setTimeout as delay } from "node:timers/promises";
 import { dataDir } from "./projects";
 
+/** Reads what updateJson writes (the bucket object on Cloud Run, the local file otherwise). */
+export async function readJson<T>(key: string, initial: () => T): Promise<T> {
+  const bucketName = process.env.DATA_BUCKET;
+  if (bucketName) {
+    try {
+      const [body] = await new Storage().bucket(bucketName).file(key).download();
+      return JSON.parse(body.toString());
+    } catch (e) {
+      if (Number((e as { code?: number }).code) === 404) return initial();
+      throw e;
+    }
+  }
+  try {
+    return JSON.parse(await readFile(join(dataDir(), key), "utf8"));
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return initial();
+    throw e;
+  }
+}
+
 /** Conditional object writes on Cloud Run; a filesystem lock + atomic rename locally. */
 export async function updateJson<T, R>(
   key: string,

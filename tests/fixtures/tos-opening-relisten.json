@@ -1,0 +1,132 @@
+{
+  "_source": "Tears of Steel opening (tos-opening, 65 s, en-US). firstPass: Chirp 3 speech saved in runtime/projects/tos-opening/analysis-speech.json (2026-09-21). relisten: the re-listen of gap g2 (4.21-6.59 s, padded slice 3.71-7.09 s), word offsets relative to the slice, placing 'We have main engine start.' at 4.40-6.16 s as faster-whisper small measured on the isolated slice and the full clip (probe 2026-09-23); the trailing '4' is the countdown's first word in the right padding. Other slices return no words.",
+  "clipSeconds": 65,
+  "firstPass": [
+    {
+      "start": 2.32,
+      "end": 3.96,
+      "speaker": "",
+      "text": "We have main engine start."
+    },
+    {
+      "start": 6.84,
+      "end": 8.92,
+      "speaker": "",
+      "text": "4 3 2"
+    },
+    {
+      "start": 9.28,
+      "end": 9.76,
+      "speaker": "",
+      "text": "1"
+    },
+    {
+      "start": 10.6,
+      "end": 10.76,
+      "speaker": "",
+      "text": "and go."
+    },
+    {
+      "start": 23.2,
+      "end": 30.16,
+      "speaker": "",
+      "text": "You're a jerk, dumb. Look, Celia, we have to follow our passions. You have your robotics and I just want to be awesome in space."
+    },
+    {
+      "start": 30.56,
+      "end": 36.04,
+      "speaker": "",
+      "text": "Why don't you just admit that you're freaked out by my robot hand? I'm not freaked out, but it's"
+    },
+    {
+      "start": 37.6,
+      "end": 43.56,
+      "speaker": "",
+      "text": "All right, fine. I'm freaked out. I'm having nightmares that I'm being chased by these giant robotic claws of death. Whatever, dumb."
+    },
+    {
+      "start": 44.28,
+      "end": 45.16,
+      "speaker": "",
+      "text": "We're done."
+    },
+    {
+      "start": 50.08,
+      "end": 52.8,
+      "speaker": "",
+      "text": "Robot's memory synced and"
+    },
+    {
+      "start": 53.28,
+      "end": 53.72,
+      "speaker": "",
+      "text": "locked."
+    },
+    {
+      "start": 60.88,
+      "end": 62.4,
+      "speaker": "",
+      "text": "This is pretty freaky."
+    }
+  ],
+  "showcaseGap": {
+    "id": "g2",
+    "start": 4.21,
+    "end": 6.59
+  },
+  "showcaseLine": {
+    "gapId": "g2",
+    "at": 4.5,
+    "text": "망고 오픈 무비 프로젝트."
+  },
+  "relisten": [
+    {
+      "from": 3.71,
+      "response": {
+        "results": [
+          {
+            "alternatives": [
+              {
+                "words": [
+                  {
+                    "word": "We",
+                    "startOffset": "0.690s",
+                    "endOffset": "0.930s"
+                  },
+                  {
+                    "word": "have",
+                    "startOffset": "0.930s",
+                    "endOffset": "1.130s"
+                  },
+                  {
+                    "word": "main",
+                    "startOffset": "1.130s",
+                    "endOffset": "1.490s"
+                  },
+                  {
+                    "word": "engine",
+                    "startOffset": "1.490s",
+                    "endOffset": "1.930s"
+                  },
+                  {
+                    "word": "start.",
+                    "startOffset": "1.930s",
+                    "endOffset": "2.450s"
+                  },
+                  {
+                    "word": "4",
+                    "startOffset": "3.130s",
+                    "endOffset": "3.380s"
+                  }
+                ]
+              }
+            ]
+          }
+        ],
+        "metadata": {
+          "totalBilledDuration": "3s"
+        }
+      }
+    }
+  ]
+}

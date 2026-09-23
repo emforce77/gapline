@@ -3,7 +3,8 @@
  * traced to a sentence a regulator or a streaming platform wrote — not to a rule we invented.
  *
  * KMCC = Korea Media & Communications Commission, 『장애인방송 프로그램 제공 가이드라인』 (accessible PDF),
- *        section 2 "화면해설방송", pages 6–10. https://www.kmcc.go.kr/download.do?fileSeq=62457
+ *        section 2 "화면해설방송", pages 6–10 (printed page numbers, "- 7 -" in the footer).
+ *        https://www.kmcc.go.kr/download.do?fileSeq=62457
  * NFLX = Netflix Audio Description Style Guide v2.5.
  *        https://partnerhelp.netflixstudios.com/hc/en-us/articles/215510667
  */
@@ -100,10 +101,18 @@ export const GUIDELINE_RULES: GuidelineRule[] = [
     check:
       "Repeats what the dialogue or an obvious sound already tells the listener, or spends the gap on " +
       "something unimportant while a more important visual goes undescribed.",
-    title: { en: "Redundant with the soundtrack", ko: "대사·소리와 중복" },
+    // Two halves, two clauses: p.7 lists what must be described (so a minor detail cannot take the
+    // room of on-screen text or a new place); p.8 lists what needs no description.
+    title: { en: "Redundant or low priority", ko: "중복·덜 중요한 정보" },
     source: {
-      en: "KMCC guideline p.8 (no description for what dialogue conveys); Netflix AD Style Guide §1.2",
-      ko: "방미통위 가이드라인 p.8 「대사로 알 수 있는 정보 해설 불필요」; Netflix 화면해설 가이드 §1.2",
+      en:
+        "KMCC guideline p.7 (must describe: characters, place, time, movement, unidentifiable " +
+        "sounds, on-screen text), p.8 (no description for sounds recognised at once or feelings " +
+        "the dialogue conveys); Netflix AD Style Guide §1.2",
+      ko:
+        "방미통위 가이드라인 p.7 「반드시 해설할 요소: 등장인물·장소·시간·움직임·식별이 불가능한 " +
+        "소리·자막」, p.8 「즉시 식별 가능한 소리, 대사로 알 수 있는 감정은 해설 불필요」; " +
+        "Netflix 화면해설 가이드 §1.2",
     },
   },
   {

@@ -43,6 +43,26 @@ export function findGaps(map: DialogueMap, clipSeconds: number): Gap[] {
   return gaps;
 }
 
+/** Below this much total room a clip can hold at most a line or two, whatever the writer does. */
+export const LITTLE_ROOM_MIN_SECONDS = 3;
+/** ...or below this share of the clip, for longer clips. */
+export const LITTLE_ROOM_SHARE = 0.05;
+
+/**
+ * Total speakable room and whether it is too little for meaningful description. Pure, so the
+ * browser can warn from a saved analysis before any paid run.
+ */
+export function assessRoom(
+  gaps: Gap[],
+  clipSeconds: number,
+): { gapSeconds: number; thresholdSeconds: number; little: boolean } {
+  const gapSeconds = round(gaps.reduce((s, g) => s + g.end - g.start, 0));
+  const thresholdSeconds = round(
+    Math.max(LITTLE_ROOM_MIN_SECONDS, LITTLE_ROOM_SHARE * clipSeconds),
+  );
+  return { gapSeconds, thresholdSeconds, little: gapSeconds < thresholdSeconds };
+}
+
 function round(seconds: number): number {
   return Math.round(seconds * 100) / 100;
 }

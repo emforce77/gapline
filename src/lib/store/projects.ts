@@ -1,7 +1,8 @@
 import { mkdir, readdir, readFile, writeFile, copyFile, access, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { z } from "zod";
-import type { RunSummary } from "../pipeline/events";
+import { RUN_TIME_LIMIT_SECONDS, type ActiveRun, type RunStatus } from "../api-contract";
+import type { RunSummary, TimedRunEvent } from "../pipeline/events";
 import type { SceneMap, SpeechSegment } from "../pipeline/schemas";
 
 /**
@@ -13,6 +14,7 @@ import type { SceneMap, SpeechSegment } from "../pipeline/schemas";
  *   projects/<id>/analysis-{speech,scene}.json  separately validated keyed components
  *   projects/<id>/analysis.json  combined analysis for display and legacy results
  *   projects/<id>/runs/<runId>/  events, ledger, script and media of one run
+ *   projects/<id>/runs/<runId>/owner.json  who started a live run (never served)
  */
 export function dataDir(): string {
   return resolve(process.env.DATA_DIR || "runtime");
@@ -39,6 +41,8 @@ export interface RunListing {
   density: string;
   summary: RunSummary | null;
   createdAt: string;
+  /** The editor's change that produced this run; absent for automatic runs. */
+  lastEdit?: { cueId: string; action: "rewrite" | "remove" };
 }
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,63}$/;
@@ -115,6 +119,7 @@ export async function listRuns(projectId: string): Promise<RunListing[]> {
     const script = join(root, runId, "script.json");
     if (!(await exists(script))) continue;
     const parsed = JSON.parse(await readFile(script, "utf8"));
+    const edit = parsed.humanEdits?.at(-1);
     const started = JSON.parse(
       (await readFile(join(root, runId, "events.jsonl"), "utf8")).split("\n")[0],
     );
@@ -124,9 +129,90 @@ export async function listRuns(projectId: string): Promise<RunListing[]> {
       density: started.density,
       summary: parsed.summary ?? null,
       createdAt: (await stat(script)).mtime.toISOString(),
+      ...(edit
+        ? {
+            lastEdit: {
+              cueId: edit.cueId,
+              action: edit.action === "remove" ? ("remove" as const) : ("rewrite" as const),
+            },
+          }
+        : {}),
     });
   }
   return listings.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+/** Written when a live run starts, so its starter can find it again after a reload. */
+export const RUN_OWNER_FILE = "owner.json";
+export interface RunOwner {
+  ownerHash: string;
+  startedAt: string;
+  language: ActiveRun["language"];
+  density: ActiveRun["density"];
+}
+
+async function readEvents(file: string): Promise<TimedRunEvent[]> {
+  return (await readFile(file, "utf8"))
+    .split("\n")
+    .filter(Boolean)
+    .map((line) => JSON.parse(line) as TimedRunEvent);
+}
+
+function withinTimeLimit(since: Date | string, now: number): boolean {
+  return now - new Date(since).getTime() < RUN_TIME_LIMIT_SECONDS * 1000;
+}
+
+/**
+ * State of one run from its files: script.json means done, a run_failed event means failed, and a
+ * run with neither is running until the time limit passes, then interrupted (its process is gone).
+ */
+export async function runStatus(
+  projectId: string,
+  runId: string,
+  now = Date.now(),
+): Promise<RunStatus> {
+  const dir = runDir(projectId, runId);
+  if (await exists(join(dir, "script.json"))) return "done";
+  const eventsFile = join(dir, "events.jsonl");
+  if ((await readEvents(eventsFile)).some((e) => e.type === "run_failed")) return "failed";
+  const ownerFile = join(dir, RUN_OWNER_FILE);
+  // Runs started without an owner (scripts, older runs): no run lasts past the limit after its last event.
+  const since = (await exists(ownerFile))
+    ? (JSON.parse(await readFile(ownerFile, "utf8")) as RunOwner).startedAt
+    : (await stat(eventsFile)).mtime;
+  return withinTimeLimit(since, now) ? "running" : "interrupted";
+}
+
+/** Unfinished runs this viewer started, still within the time limit, newest first. */
+export async function listActiveRuns(
+  projectId: string,
+  viewerHash: string | undefined,
+  now = Date.now(),
+): Promise<ActiveRun[]> {
+  const root = join(projectDir(projectId), "runs");
+  if (!viewerHash || !(await exists(root))) return [];
+  const active: ActiveRun[] = [];
+  for (const runId of await readdir(root)) {
+    if (!ID_PATTERN.test(runId)) continue;
+    const dir = join(root, runId);
+    const ownerFile = join(dir, RUN_OWNER_FILE);
+    if (!(await exists(ownerFile)) || (await exists(join(dir, "script.json")))) continue;
+    const owner = JSON.parse(await readFile(ownerFile, "utf8")) as RunOwner;
+    if (owner.ownerHash !== viewerHash || !withinTimeLimit(owner.startedAt, now)) continue;
+    // The owner file is written just before the first event, so a very young run has none yet.
+    const eventsFile = join(dir, "events.jsonl");
+    const written = await exists(eventsFile);
+    const events = written ? await readEvents(eventsFile) : [];
+    if (events.some((e) => e.type === "run_failed" || e.type === "run_done")) continue;
+    active.push({
+      runId,
+      language: owner.language,
+      density: owner.density,
+      startedAt: owner.startedAt,
+      lastEventAt: written ? (await stat(eventsFile)).mtime.toISOString() : owner.startedAt,
+    });
+  }
+  return active.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
 }
 
 export async function importFile(source: string, projectId: string, name: string): Promise<void> {

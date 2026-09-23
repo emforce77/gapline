@@ -2,14 +2,36 @@ import { randomBytes } from "node:crypto";
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { createProject, MAX_UPLOAD_SECONDS } from "@/lib/store/ingest";
+import {
+  MAX_UPLOAD_BYTES,
+  MAX_UPLOAD_SECONDS,
+  type ApiErrorBody,
+  type UploadErrorCode,
+} from "@/lib/api-contract";
+import { UploadError } from "@/lib/errors";
+import { createProject } from "@/lib/store/ingest";
 import { listProjects } from "@/lib/store/projects";
 import { canAccess, ownerHash, publicProject, sameOrigin, sessionToken } from "@/lib/store/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const MAX_UPLOAD_BYTES = 200 * 1024 * 1024;
+/** Multipart boundaries and part headers around the file; generous so a 30 MiB file still passes. */
+const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
+const UPLOAD_STATUS: Record<UploadError["code"], number> = {
+  too_large: 413,
+  too_long: 422,
+  no_video_stream: 422,
+  unreadable: 422,
+};
+
+function fail(status: number, body: ApiErrorBody<UploadErrorCode>): Response {
+  return Response.json(body, { status });
+}
+
+function tooLarge(): Response {
+  return fail(413, { error: "too_large", maxBytes: MAX_UPLOAD_BYTES });
+}
 
 export async function GET() {
   const token = await sessionToken();
@@ -21,14 +43,18 @@ export async function GET() {
 
 /** Accepts one short video, normalises it into a new project and returns the project id. */
 export async function POST(request: Request) {
-  if (!sameOrigin(request)) return new Response("Forbidden", { status: 403 });
-  const form = await request.formData();
-  const file = form.get("video");
-  if (!(file instanceof File))
-    return Response.json({ error: "video file is required" }, { status: 400 });
-  if (file.size > MAX_UPLOAD_BYTES) return Response.json({ error: "too_large" }, { status: 413 });
-  if (!file.type.startsWith("video/"))
-    return Response.json({ error: "not_video" }, { status: 415 });
+  if (!sameOrigin(request)) return fail(403, { error: "forbidden" });
+  // Reject before reading the body when the declared size already says no.
+  const declared = Number(request.headers.get("content-length") ?? "0");
+  if (declared > MAX_UPLOAD_BYTES + MULTIPART_OVERHEAD_BYTES) return tooLarge();
+  const form = await request.formData().catch((error: unknown) => {
+    console.error("upload: unreadable multipart body", error);
+    return null;
+  });
+  const file = form?.get("video");
+  if (!(file instanceof File)) return fail(400, { error: "missing_file" });
+  if (file.size > MAX_UPLOAD_BYTES) return tooLarge();
+  if (!file.type.startsWith("video/")) return fail(415, { error: "not_video" });
 
   const dir = await mkdtemp(join(tmpdir(), "scene-upload-"));
   try {
@@ -49,10 +75,16 @@ export async function POST(request: Request) {
     });
     return Response.json({ id: project.id });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
+    if (error instanceof UploadError) {
+      console.warn(`upload rejected: code=${error.code} size=${file.size} ${error.message}`);
+      return fail(UPLOAD_STATUS[error.code], {
+        error: error.code,
+        ...(error.code === "too_long" ? { maxSeconds: MAX_UPLOAD_SECONDS } : {}),
+        ...(error.seconds === undefined ? {} : { seconds: Math.round(error.seconds) }),
+      });
+    }
     console.error("upload failed", error);
-    const tooLong = message.includes(`limit is ${MAX_UPLOAD_SECONDS}`);
-    return Response.json({ error: tooLong ? "too_long" : "unreadable" }, { status: 422 });
+    return fail(500, { error: "internal" });
   } finally {
     await rm(dir, { recursive: true, force: true });
   }

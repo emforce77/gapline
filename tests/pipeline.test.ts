@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderGaps } from "../src/lib/pipeline/context";
 import { findGaps, MIN_GAP_SECONDS, SPEECH_GUARD_SECONDS } from "../src/lib/pipeline/gaps";
-import { placeCues } from "../src/lib/pipeline/run";
+import { placeCues } from "../src/lib/pipeline/cues";
 import { spokenUnits, unitBudget } from "../src/lib/pipeline/length";
 import { foldRun } from "../src/lib/pipeline/reduce";
 import type { TimedRunEvent } from "../src/lib/pipeline/events";

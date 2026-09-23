@@ -140,7 +140,8 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
     await assert.rejects(
       runDescription({ ...common, runId: "failed-run", runDir: runDir(project.id, "failed-run") }),
     );
-    assert.deepEqual(counts, { hear: 1, watch: 1, voice: 0 });
+    // Hearing is the whole clip, then its one silence (0–5 s) again on its own.
+    assert.deepEqual(counts, { hear: 2, watch: 1, voice: 0 });
     const cached = await readAnalysisParts(project, key);
     assert.ok(cached.speech && cached.scene);
     writerFails = false;
@@ -152,7 +153,7 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
       runDir: runDir(project.id, "base-run"),
       emit: (e) => events.push(e),
     });
-    assert.equal(counts.hear, 1);
+    assert.equal(counts.hear, 2);
     assert.equal(counts.watch, 1);
     assert.equal(result.cues.find((c) => c.id === "L1")!.droppedReason, "unchanged");
     assert.equal(events.filter((e) => e.type === "cue_reviewed" && e.cueId === "L1").length, 1);

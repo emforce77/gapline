@@ -84,6 +84,7 @@ export function renderScene(scene: SceneMap): string {
 }
 
 export function renderGaps(gaps: Gap[]): string {
+  if (gaps.length === 0) return "(none)";
   return gaps
     .map(
       (g) => `- ${g.id}: ${seconds(g.start)}–${seconds(g.end)} s (${seconds(g.end - g.start)} s)`,

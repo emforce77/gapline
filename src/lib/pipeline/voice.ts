@@ -1,3 +1,4 @@
+import { retryableStatus, ServiceError } from "../errors";
 import { appendCallRecord } from "../llm/ledger";
 import { googleHeaders } from "../google/auth";
 import { parseWav } from "../media/wav";
@@ -48,7 +49,11 @@ export async function synthesizeLine(input: {
       }),
     });
     if (!response.ok)
-      throw new Error(`Text-to-Speech HTTP ${response.status}: ${await response.text()}`);
+      throw new ServiceError(
+        "voice_failed",
+        `Text-to-Speech HTTP ${response.status}: ${await response.text()}`,
+        retryableStatus(response.status),
+      );
     const body = (await response.json()) as { audioContent: string };
     const wav = Buffer.from(body.audioContent, "base64");
     const characters = [...input.text].length;

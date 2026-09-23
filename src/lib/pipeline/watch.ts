@@ -1,4 +1,6 @@
+import { ModelOutputError } from "../errors";
 import { callStructured } from "../llm/openrouter";
+import { clampToClip, CLIP_END_TOLERANCE_SECONDS } from "../store/analysis";
 import { reasoningEffort } from "../models";
 import { SceneMapSchema, type SceneMap } from "./schemas";
 
@@ -53,9 +55,31 @@ export async function watchClip(input: {
     reasoningEffort: reasoningEffort("watch"),
     onDelta: input.onDelta,
   });
-  const outside = [...data.shots, ...data.sounds].filter((s) => s.end > input.clipSeconds + 0.5);
-  if (outside.length > 0) {
-    throw new Error(`watch: ${outside.length} spans end after the clip (${input.clipSeconds} s)`);
-  }
-  return data;
+  return fitSceneToClip(data, input.clipSeconds);
+}
+
+/**
+ * Times within CLIP_END_TOLERANCE_SECONDS past the end are clamped to it, so the scene passes the
+ * same validation as stored analysis; anything further out is a wrong answer, not rounding.
+ */
+export function fitSceneToClip(scene: SceneMap, clipSeconds: number): SceneMap {
+  const limit = clipSeconds + CLIP_END_TOLERANCE_SECONDS;
+  const outside = [...scene.shots, ...scene.sounds].filter((s) => s.end > limit).length;
+  const lateName = scene.characters.filter(
+    (c) => c.nameFirstSpokenAt !== null && c.nameFirstSpokenAt > limit,
+  ).length;
+  if (outside + lateName > 0)
+    throw new ModelOutputError(
+      `watch: ${outside + lateName} times end after the clip (${clipSeconds} s)`,
+    );
+  return {
+    ...scene,
+    shots: clampToClip(scene.shots, clipSeconds),
+    sounds: clampToClip(scene.sounds, clipSeconds),
+    characters: scene.characters.map((c) =>
+      c.nameFirstSpokenAt !== null && c.nameFirstSpokenAt > clipSeconds
+        ? { ...c, nameFirstSpokenAt: clipSeconds }
+        : c,
+    ),
+  };
 }

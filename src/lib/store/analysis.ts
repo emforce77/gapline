@@ -10,7 +10,8 @@ import {
 } from "../pipeline/schemas";
 import { projectDir, type Project } from "./projects";
 
-export const ANALYSIS_VERSION = "2";
+/** 3: speech includes the per-gap re-listen (relisten.ts); older saved analyses are heard again. */
+export const ANALYSIS_VERSION = "3";
 export interface AnalysisParts {
   speech?: SpeechSegment[];
   scene?: SceneMap;
@@ -26,13 +27,32 @@ export async function analysisKey(project: Project, model: string): Promise<stri
   return hash.digest("hex");
 }
 
+/**
+ * Model and recognizer times may overshoot the clip end by up to this much (the watch prompt asks for
+ * one-decimal times); such times are clamped to the end before validation. Beyond it, the watch
+ * result is rejected.
+ */
+export const CLIP_END_TOLERANCE_SECONDS = 0.5;
+/** Stored analysis is already clamped; this only absorbs float noise in older cached results. */
+const STORED_END_SLACK_SECONDS = 0.05;
+
+/** Spans ending past the clip are cut at its end; spans starting at or after the end are dropped. */
+export function clampToClip<T extends { start: number; end: number }>(
+  spans: T[],
+  clipSeconds: number,
+): T[] {
+  return spans
+    .filter((s) => s.start < clipSeconds)
+    .map((s) => (s.end > clipSeconds ? { ...s, end: clipSeconds } : s));
+}
+
 export function validateAnalysis(part: AnalysisParts, duration: number): AnalysisParts {
   const speech =
     part.speech === undefined ? undefined : SpeechSegmentSchema.array().parse(part.speech);
   const scene = part.scene === undefined ? undefined : SceneMapSchema.parse(part.scene);
   const spans = [...(speech ?? []), ...(scene?.shots ?? []), ...(scene?.sounds ?? [])];
   if (
-    spans.some((s) => s.end > duration + 0.05) ||
+    spans.some((s) => s.end > duration + STORED_END_SLACK_SECONDS) ||
     scene?.characters.some((c) => c.nameFirstSpokenAt !== null && c.nameFirstSpokenAt > duration)
   )
     throw new Error("Analysis timestamp exceeds the clip");

@@ -1,8 +1,9 @@
-import type { RunFiles, RunSummary, StageId, TimedRunEvent } from "./events";
+import type { RelistenReport, RunFiles, RunSummary, StageId, TimedRunEvent } from "./events";
 import type { Cue, Density, Gap, Language, MissingItem, SceneMap, SpeechSegment } from "./schemas";
 
 export const STAGES: StageId[] = [
   "hear",
+  "relisten",
   "watch",
   "gaps",
   "write",
@@ -33,6 +34,10 @@ export interface RunView {
   summary: RunSummary | null;
   files: RunFiles | null;
   error: string | null;
+  /** Set when the clip leaves too little room to describe much (little_room event). */
+  littleRoom: { gapSeconds: number; thresholdSeconds: number } | null;
+  /** What this run's re-listen of each silence found; null when it did not run one. */
+  relisten: RelistenReport | null;
   /** Seconds since the run started, from the latest event. */
   t: number;
   writerChars: number;
@@ -53,6 +58,8 @@ export function emptyRun(clipSeconds: number): RunView {
     summary: null,
     files: null,
     error: null,
+    littleRoom: null,
+    relisten: null,
     t: 0,
     writerChars: 0,
   };
@@ -92,17 +99,31 @@ export function reduceRun(view: RunView, event: TimedRunEvent): RunView {
     case "speech":
     case "scene": {
       // A run that reuses an earlier analysis emits the data without the stages.
-      const key = event.type === "speech" ? "hear" : "watch";
-      const stages =
-        next.stages[key].state === "waiting"
-          ? { ...next.stages, [key]: { state: "reused" as const } }
-          : next.stages;
+      const keys: StageId[] =
+        event.type === "scene" ? ["watch"] : event.relistened ? ["hear", "relisten"] : ["hear"];
+      const stages = { ...next.stages };
+      for (const key of keys)
+        if (stages[key].state === "waiting") stages[key] = { state: "reused" as const };
       return event.type === "speech"
         ? { ...next, stages, speech: event.segments }
         : { ...next, stages, scene: event.map };
     }
+    case "relisten":
+      return {
+        ...next,
+        relisten: {
+          gapsChecked: event.gapsChecked,
+          wordsFound: event.wordsFound,
+          blockedSeconds: event.blockedSeconds,
+        },
+      };
     case "gaps":
       return { ...next, gaps: event.gaps };
+    case "little_room":
+      return {
+        ...next,
+        littleRoom: { gapSeconds: event.gapSeconds, thresholdSeconds: event.thresholdSeconds },
+      };
     case "writer_delta":
       return { ...next, writerChars: next.writerChars + event.text.length };
     case "cue_written":
@@ -151,7 +172,7 @@ export function reduceRun(view: RunView, event: TimedRunEvent): RunView {
         files: event.files,
       };
     case "run_failed":
-      return { ...next, error: event.error };
+      return { ...next, error: event.code ?? event.error };
   }
 }
 

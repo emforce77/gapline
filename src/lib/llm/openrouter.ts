@@ -62,6 +62,12 @@ export function retryAfterSeconds(value: string | null, now = Date.now()): numbe
   return Number.isFinite(seconds) ? Math.max(0, seconds) : 2;
 }
 
+/**
+ * Longest Retry-After waited out inside a request. A longer one ends the run with a retryable
+ * error (provider_busy) instead of holding the viewer's request open.
+ */
+export const MAX_RETRY_WAIT_SECONDS = 30;
+
 /** One retry, with a separate ledger entry for every attempt, including streamed errors. */
 export async function callStructured<T>(
   call: StructuredCall<T>,
@@ -74,7 +80,7 @@ export async function callStructured<T>(
         !(error instanceof ProviderError) ||
         !error.retryable ||
         attempt === 2 ||
-        error.retryAfterSeconds > 600
+        error.retryAfterSeconds > MAX_RETRY_WAIT_SECONDS
       )
         throw error;
       await delay(error.retryAfterSeconds * 1000, undefined, { signal: call.signal });
@@ -83,7 +89,7 @@ export async function callStructured<T>(
 }
 
 /**
- * One Gemini/Gemma call through OpenRouter with a JSON-schema response.
+ * One Gemini call through OpenRouter with a JSON-schema response.
  * Streams (first byte early, UI can watch), reads the exact charge from the final usage chunk,
  * validates the parsed JSON with zod and records every call — failed ones included — in the ledger.
  */

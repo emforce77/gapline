@@ -39,10 +39,14 @@ export function publicProject(project: Project): Omit<Project, "ownerHash"> {
   const { ownerHash: _owner, ...visible } = project;
   return visible;
 }
+/**
+ * Mutations (upload, run, edit) must come from this site's own pages. Browsers send Origin with
+ * every POST, same-origin included, so a request without one is a script, not the app.
+ */
 export function sameOrigin(request: Request): boolean {
   if (request.headers.get("sec-fetch-site") === "cross-site") return false;
   const origin = request.headers.get("origin");
-  if (!origin) return true;
+  if (!origin) return false;
   try {
     // Next's request URL can use localhost behind Cloud Run's reverse proxy.
     // Browser cross-site requests are rejected above; compare its public forwarded host.

@@ -10,6 +10,8 @@ export const SpeechSegmentSchema = z
       .string()
       .describe("Short visual-free descriptor, e.g. 'young man' — never a guessed name"),
     text: z.string().describe("Verbatim words in the original language"),
+    /** "relisten": found when the gap it sits in was recognized again on its own (relisten.ts). */
+    heard: z.literal("relisten").optional(),
   })
   .refine((s) => s.end > s.start, "end must follow start");
 
@@ -113,7 +115,11 @@ export const VerdictSchema = z
     violations: z.array(ViolationSchema),
     fix: z
       .string()
-      .describe("How to fix it in one sentence, in the language of the line; empty when pass"),
+      .describe(
+        "How to fix it in one sentence, in the language of the line; any wording it suggests must " +
+          "itself obey every rule (for on-screen text, read the text; never say it appears on " +
+          "screen); empty when pass",
+      ),
   })
   .refine(
     (v) => (v.pass ? v.violations.length === 0 && v.fix.trim() === "" : v.violations.length > 0),
@@ -155,17 +161,21 @@ export const RevisionSchema = z
     "Duplicate revision id",
   );
 
-/** How each version of a line came to be; the UI shows this history. */
+/**
+ * How each version of a line came to be; the UI shows this history. A "remove" version records an
+ * editor taking the line out of the track: its text is the removed words, and it is never voiced.
+ */
 export interface CueVersion {
   text: string;
-  by: "write" | "revise" | "shorten" | "add" | "human";
+  by: "write" | "revise" | "shorten" | "add" | "human" | "remove";
   start?: number;
   model: string;
   review?: Verdict;
   voice?: { seconds: number; rate: number };
 }
 
-export type CueStatus = "approved" | "fits" | "dropped";
+/** "removed": an editor took a line out of the track. "dropped" is always the pipeline's decision. */
+export type CueStatus = "approved" | "fits" | "dropped" | "removed";
 
 export interface Cue {
   id: string;

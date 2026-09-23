@@ -20,6 +20,10 @@ export interface CallRecord {
   error?: string;
   /** TTS only: characters billed. */
   characters?: number;
+  /** STT only: words returned without usable timing (kept as blocked spans). */
+  untimedWords?: number;
+  /** STT only: audio seconds the provider billed (metadata.totalBilledDuration). */
+  billedSeconds?: number;
 }
 
 export function summarizeCosts(calls: CallRecord[]) {

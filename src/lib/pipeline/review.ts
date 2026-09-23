@@ -12,7 +12,8 @@ import {
 import { ruleSummaryForPrompt } from "./guidelines";
 import { ReviewSchema, type MissingItem, type Verdict } from "./schemas";
 
-function reviewerSystem(context: ClipContext, finalOutput = false): string {
+/** Exported for tests, which pin the instructions the reviewer is given. */
+export function reviewerSystem(context: ClipContext, finalOutput = false): string {
   return `You review ${languageName(context.language)} audio description lines for blind and low-vision viewers
 against published guidelines. You did not write them. You see the clip itself; judge every line against
 the picture and the soundtrack at that moment.
@@ -22,7 +23,10 @@ ${ruleSummaryForPrompt()}
 
 For each line return pass=true with no violations, or pass=false with every violation: the rule id, the
 exact words that break it, and a one-sentence reason. "fix" says how to repair the line in one sentence.
-Write reason and fix in ${languageName(context.language)}. Be strict about spoiler and unseen. For every
+Write reason and fix in ${languageName(context.language)}. The fix must itself obey every rule above: any
+wording it suggests must pass this same review. For example, a fix for on-screen text reads the text
+itself; it never says the text appears or is shown on screen, because that is viewer or camera framing.
+Be strict about spoiler and unseen. For every
 person a line mentions, find them in the People list: naming someone before the time given, naming someone
 the list says is never named, or identifying an unnamed person with a named one ("older Thom") is a
 spoiler; anything known only from outside the clip — including knowledge of this film — is unseen.

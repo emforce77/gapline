@@ -1,0 +1,311 @@
+{
+  "_source": "Real Chirp 3 (Speech-to-Text v2) response for the 40 s Korean held-out evaluation clip, captured 2026-09-22 (runtime/evaluation/speech-diagnostic-raw.json), trimmed to word timings. Audio: 'WIKITONGUES: Hanbid speaking Korean', Wikitongues / Teddy Nee, CC BY-SA 4.0, https://commons.wikimedia.org/wiki/File:WIKITONGUES-_Hanbid_speaking_Korean.webm (from 90 s, 40 s). The first three words come back with start = end = 0.",
+  "metadata": {
+    "totalBilledDuration": "40s"
+  },
+  "results": [
+    {
+      "alternatives": [
+        {
+          "words": [
+            {
+              "startOffset": "0s",
+              "endOffset": "0s",
+              "word": "어쩔"
+            },
+            {
+              "startOffset": "0s",
+              "endOffset": "0s",
+              "word": "수"
+            },
+            {
+              "startOffset": "0s",
+              "endOffset": "0s",
+              "word": "없고요."
+            },
+            {
+              "startOffset": "1.240s",
+              "endOffset": "1.880s",
+              "word": "뭐"
+            },
+            {
+              "startOffset": "2.200s",
+              "endOffset": "2.480s",
+              "word": "제가"
+            },
+            {
+              "startOffset": "2.480s",
+              "endOffset": "2.840s",
+              "word": "대만에"
+            },
+            {
+              "startOffset": "2.840s",
+              "endOffset": "3.120s",
+              "word": "왔을"
+            },
+            {
+              "startOffset": "3.120s",
+              "endOffset": "3.440s",
+              "word": "때"
+            },
+            {
+              "startOffset": "5.240s",
+              "endOffset": "5.400s",
+              "word": "많은"
+            },
+            {
+              "startOffset": "5.400s",
+              "endOffset": "6.320s",
+              "word": "사람들로부터"
+            },
+            {
+              "startOffset": "7.440s",
+              "endOffset": "7.800s",
+              "word": "대만"
+            },
+            {
+              "startOffset": "7.800s",
+              "endOffset": "8.440s",
+              "word": "여자들이"
+            },
+            {
+              "startOffset": "8.960s",
+              "endOffset": "9.200s",
+              "word": "어떤"
+            },
+            {
+              "startOffset": "9.200s",
+              "endOffset": "9.440s",
+              "word": "대만"
+            },
+            {
+              "startOffset": "9.440s",
+              "endOffset": "10.080s",
+              "word": "여자들이"
+            },
+            {
+              "startOffset": "10.560s",
+              "endOffset": "11.040s",
+              "word": "그"
+            },
+            {
+              "startOffset": "11.280s",
+              "endOffset": "12s",
+              "word": "한국"
+            },
+            {
+              "startOffset": "12.120s",
+              "endOffset": "12.480s",
+              "word": "남자에"
+            },
+            {
+              "startOffset": "12.480s",
+              "endOffset": "12.800s",
+              "word": "대한"
+            },
+            {
+              "startOffset": "12.840s",
+              "endOffset": "13.560s",
+              "word": "이미지가"
+            },
+            {
+              "startOffset": "13.760s",
+              "endOffset": "14.120s",
+              "word": "많이"
+            },
+            {
+              "startOffset": "14.120s",
+              "endOffset": "14.600s",
+              "word": "세련되어"
+            },
+            {
+              "startOffset": "14.600s",
+              "endOffset": "14.960s",
+              "word": "있다고"
+            },
+            {
+              "startOffset": "14.960s",
+              "endOffset": "15.400s",
+              "word": "하네요."
+            },
+            {
+              "startOffset": "16.200s",
+              "endOffset": "16.320s",
+              "word": "뭐"
+            },
+            {
+              "startOffset": "16.320s",
+              "endOffset": "16.520s",
+              "word": "그럴"
+            },
+            {
+              "startOffset": "16.520s",
+              "endOffset": "16.680s",
+              "word": "수는"
+            },
+            {
+              "startOffset": "16.680s",
+              "endOffset": "17.040s",
+              "word": "있어요."
+            },
+            {
+              "startOffset": "17.760s",
+              "endOffset": "18.040s",
+              "word": "한국"
+            },
+            {
+              "startOffset": "18.040s",
+              "endOffset": "18.360s",
+              "word": "드라마에"
+            },
+            {
+              "startOffset": "18.360s",
+              "endOffset": "18.840s",
+              "word": "나온"
+            },
+            {
+              "startOffset": "18.880s",
+              "endOffset": "19.760s",
+              "word": "남주인공들이"
+            },
+            {
+              "startOffset": "19.840s",
+              "endOffset": "19.960s",
+              "word": "다"
+            },
+            {
+              "startOffset": "19.960s",
+              "endOffset": "20.200s",
+              "word": "그렇게"
+            },
+            {
+              "startOffset": "20.200s",
+              "endOffset": "20.760s",
+              "word": "생겼으니까."
+            },
+            {
+              "startOffset": "21.600s",
+              "endOffset": "22s",
+              "word": "그런데"
+            },
+            {
+              "startOffset": "22.520s",
+              "endOffset": "22.920s",
+              "word": "현실을"
+            },
+            {
+              "startOffset": "22.920s",
+              "endOffset": "23.320s",
+              "word": "직시해야"
+            },
+            {
+              "startOffset": "23.320s",
+              "endOffset": "23.680s",
+              "word": "합니다."
+            },
+            {
+              "startOffset": "27.280s",
+              "endOffset": "27.600s",
+              "word": "물론"
+            },
+            {
+              "startOffset": "27.600s",
+              "endOffset": "28s",
+              "word": "다"
+            },
+            {
+              "startOffset": "28.040s",
+              "endOffset": "28.680s",
+              "word": "잘생기고"
+            },
+            {
+              "startOffset": "28.720s",
+              "endOffset": "29s",
+              "word": "키도"
+            },
+            {
+              "startOffset": "29s",
+              "endOffset": "29.200s",
+              "word": "크고"
+            },
+            {
+              "startOffset": "29.200s",
+              "endOffset": "29.880s",
+              "word": "잘생기고"
+            },
+            {
+              "startOffset": "29.960s",
+              "endOffset": "30.120s",
+              "word": "돈"
+            },
+            {
+              "startOffset": "30.120s",
+              "endOffset": "30.800s",
+              "word": "많고"
+            },
+            {
+              "startOffset": "30.800s",
+              "endOffset": "31.200s",
+              "word": "그런"
+            },
+            {
+              "startOffset": "31.760s",
+              "endOffset": "32.320s",
+              "word": "남자는"
+            },
+            {
+              "startOffset": "32.520s",
+              "endOffset": "32.680s",
+              "word": "전"
+            },
+            {
+              "startOffset": "32.680s",
+              "endOffset": "32.920s",
+              "word": "세계"
+            },
+            {
+              "startOffset": "32.920s",
+              "endOffset": "33.200s",
+              "word": "어디를"
+            },
+            {
+              "startOffset": "33.200s",
+              "endOffset": "33.440s",
+              "word": "다"
+            },
+            {
+              "startOffset": "33.440s",
+              "endOffset": "33.720s",
+              "word": "가도"
+            },
+            {
+              "startOffset": "33.720s",
+              "endOffset": "34.240s",
+              "word": "있습니다."
+            },
+            {
+              "startOffset": "35.680s",
+              "endOffset": "35.760s",
+              "word": "뭐"
+            },
+            {
+              "startOffset": "37.080s",
+              "endOffset": "37.240s",
+              "word": "물론"
+            },
+            {
+              "startOffset": "37.240s",
+              "endOffset": "37.560s",
+              "word": "한국도"
+            },
+            {
+              "startOffset": "37.560s",
+              "endOffset": "38.200s",
+              "word": "마찬가지고요."
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
