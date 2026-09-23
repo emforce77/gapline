@@ -1,25 +1,67 @@
 /**
  * Checks run in the rendered deck before anything is written: fonts actually painted, text size floors,
  * contrast, text leaving its slide, clipped labels, overlapping text, how much text each slide carries,
- * cross-references by slide number, and that every endnote marker has its note. Each returns readable
- * problem strings; the build fails when any list is non-empty.
+ * cross-references by slide number, that every endnote marker has its note, and the wording rules
+ * (no defensive negatives anywhere, no audit jargon on a slide face). Each returns readable problem
+ * strings; the build fails when any list is non-empty.
  */
 import type { Page } from "playwright-core";
 import { WORD_BUDGET } from "./html";
 import { COLOR, MIN_GREY_PX, MIN_SMALL_PX, MIN_TEXT_PX } from "./theme";
 
-const MIN_CONTRAST = 4.5;
-const MAX_HEADLINE_WORDS = 14;
+export const MIN_CONTRAST = 4.5;
+export const MAX_HEADLINE_WORDS = 14;
 /** Prose outside the headline and the exhibit (the `.body` paragraphs of a slide). */
-const MAX_PROSE_WORDS = 40;
+export const MAX_PROSE_WORDS = 35;
 /** Text may come no closer to a slide edge than this, except on film frames that bleed. */
-const SAFE_EDGE = 24;
+export const SAFE_EDGE = 24;
+
+/**
+ * Wording the deck never uses, on any page. The default is stated plainly ("one press runs every
+ * step"); a line that argues no person touched the track still puts the person at the centre.
+ * Narrow on purpose: "no human voice" describes a sound and stays allowed.
+ */
+const DEFENSIVE_NEGATIVES: RegExp[] = [
+  /\bno[- ]one\s+(?:edited|edits|stepped|touched|intervened|was in the loop)/i,
+  /\bwith no one\b/i,
+  /\bno[- ]one in the loop\b/i,
+  /\b(?:no|0|zero)\s+edits?\b/i,
+  /\bwithout\s+(?:an?\s+)?(?:editors?|edits?|anyone|human (?:help|input|review))\b/i,
+  /\bunattended\b/i,
+];
+
+/** Audit vocabulary that belongs in the notes, never on a slide face (English text only). */
+const FACE_JARGON: [RegExp, string][] = [
+  [/\b\d{8}t\d{6,9}\b|\bedit-[0-9a-f]{8,}/i, "a run id"],
+  [/\b[a-z]+(?:_[a-z]+)+\b/, "a rule or field id"],
+  [/\bKMCC\b/, "the guideline's acronym"],
+  [/\bpp?\.\s?\d+|§\s?\d+/, "a page or section citation"],
+  [/\binferred\b/i, '"inferred"'],
+  [/\d\.\d+\s?[×x](?!\w)/, "a speed multiplier"],
+];
+
+/**
+ * Mentions of editing on a slide face. The cover states the promise (one press, and a person may
+ * still change a line); besides it, the optional edit is told on one slide at most.
+ */
+const EDIT_MENTION = /\bedit(?:s|ed|ing|or|ors)?\b|\bchange any line\b/gi;
+
+export interface PageWords {
+  name: string;
+  /** Words of all visible text but the page number. */
+  words: number;
+  budget: number | null;
+  headline: number;
+  prose: number;
+  /** How often the slide face mentions editing (0 on the notes pages, which are not counted). */
+  edits: number;
+}
 
 export interface CheckReport {
   painted: string[];
   problems: string[];
-  /** Words of visible text per slide, for the check note. */
-  words: { name: string; words: number; budget: number | null }[];
+  /** Word counts per page, for the check note. */
+  words: PageWords[];
 }
 
 /** Which font files Chrome used to paint representative nodes (not just which were requested). */
@@ -70,10 +112,22 @@ const hexToRgb = (hex: string): string => {
   return `rgb(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255})`;
 };
 
+/** A page's visible text, handed back from the page for the wording rules. */
+interface PageText {
+  name: string;
+  kind: string;
+  /** All visible text but the page number. */
+  all: string;
+  /** The same without Korean text: what the jargon rules read. */
+  english: string;
+}
+
 /** Layout, size, contrast, length and reference checks, all computed in the page. */
-async function layoutProblems(
-  page: Page,
-): Promise<{ problems: string[]; words: CheckReport["words"] }> {
+async function layoutProblems(page: Page): Promise<{
+  problems: string[];
+  words: Omit<PageWords, "edits">[];
+  texts: PageText[];
+}> {
   const limits: PageLimits = {
     minPx: MIN_TEXT_PX,
     minGreyPx: MIN_GREY_PX,
@@ -87,7 +141,8 @@ async function layoutProblems(
   };
   return page.evaluate((L: PageLimits) => {
     const out: string[] = [];
-    const words: { name: string; words: number; budget: number | null }[] = [];
+    const words: Omit<PageWords, "edits">[] = [];
+    const texts: PageText[] = [];
     const lum = (rgb: number[]) => {
       const [r, g, b] = rgb.map((v) => {
         const c = v / 255;
@@ -196,20 +251,24 @@ async function layoutProblems(
 
       // How much text the slide carries: everything visible but the page number.
       const all = textOf(slide, ".folio");
+      texts.push({ name, kind, all, english: textOf(slide, ".folio, [lang=ko]") });
       const count = countWords(all);
       const budget = L.budgets[kind] ?? null;
-      words.push({ name, words: count, budget });
-      if (budget !== null && count > budget)
-        out.push(`${name}: ${count} words of visible text, over ${budget}`);
+      let headline = 0;
       slide.querySelectorAll(".headline").forEach((h) => {
         const n = countWords(textOf(h, "sup.fn"));
+        headline = Math.max(headline, n);
         if (n > L.maxHeadline) out.push(`${name}: headline has ${n} words, over ${L.maxHeadline}`);
       });
       const prose = [...slide.querySelectorAll(".body")].reduce(
         (n, el) => n + countWords(textOf(el, "sup.fn")),
         0,
       );
-      if (prose > L.maxProse) out.push(`${name}: ${prose} words of prose, over ${L.maxProse}`);
+      words.push({ name, words: count, budget, headline, prose });
+      if (budget !== null && count > budget)
+        out.push(`${name}: ${count} words of visible text, over ${budget}`);
+      if (!isNotes && prose > L.maxProse)
+        out.push(`${name}: ${prose} words of prose, over ${L.maxProse}`);
       if (!isNotes) {
         const ref = all.match(/\bslides?\s*\d+/i);
         if (ref) out.push(`${name}: refers to another slide by number ("${ref[0]}")`);
@@ -225,16 +284,42 @@ async function layoutProblems(
     const ids = [...document.querySelectorAll("[id^=note-]")].map((e) => `#${e.id}`);
     for (const t of targets) if (!ids.includes(t ?? "")) out.push(`marker ${t} has no note`);
     for (const id of ids) if (!targets.has(id)) out.push(`note ${id} has no marker`);
-    return { problems: out, words };
+    return { problems: out, words, texts };
   }, limits);
+}
+
+/** Decision 2's wording on every page, and the plain-face rule on the slides (not the notes). */
+function wordingProblems(texts: PageText[]): string[] {
+  const out: string[] = [];
+  const quote = (m: RegExpMatchArray) => `"${m[0].trim()}"`;
+  for (const t of texts) {
+    const flat = t.all.replace(/\s+/g, " ");
+    for (const rule of DEFENSIVE_NEGATIVES) {
+      const m = flat.match(rule);
+      if (m) out.push(`${t.name}: defensive negative ${quote(m)}; state what Scene does instead`);
+    }
+    if (t.kind === "notes") continue;
+    const english = t.english.replace(/\s+/g, " ");
+    for (const [rule, what] of FACE_JARGON) {
+      const m = english.match(rule);
+      if (m) out.push(`${t.name}: ${what} on the slide face (${quote(m)}); move it to a note`);
+    }
+  }
+  return out;
 }
 
 export async function checkDeck(page: Page): Promise<CheckReport> {
   const fonts = await paintedFonts(page);
   const layout = await layoutProblems(page);
+  const edits = new Map(
+    layout.texts.map((t) => [
+      t.name,
+      t.kind === "notes" ? 0 : (t.english.match(EDIT_MENTION) ?? []).length,
+    ]),
+  );
   return {
     painted: fonts.painted,
-    problems: [...fonts.problems, ...layout.problems],
-    words: layout.words,
+    problems: [...fonts.problems, ...layout.problems, ...wordingProblems(layout.texts)],
+    words: layout.words.map((w) => ({ ...w, edits: edits.get(w.name) ?? 0 })),
   };
 }

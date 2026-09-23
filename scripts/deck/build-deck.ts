@@ -72,8 +72,11 @@ function writeHtml(slides: string[]): void {
   writeFileSync(DECK_HTML, html);
 }
 
-/** pdffonts must list every face as embedded and none as Type 3; pdftotext must return the Korean. */
-function checkPdf(): { fonts: string[]; problems: string[] } {
+/**
+ * pdffonts must list every face as embedded and none as Type 3; pdftotext must return every Korean
+ * line the deck prints (compared without whitespace, since the PDF breaks lines where the slide does).
+ */
+function checkPdf(korean: string[]): { fonts: string[]; problems: string[] } {
   const listing = spawnSync("pdffonts", [DECK_PDF], { encoding: "utf8" });
   if (listing.status !== 0) throw new Error(`pdffonts failed: ${listing.stderr}`);
   const rows = listing.stdout.trim().split("\n").slice(2);
@@ -84,9 +87,15 @@ function checkPdf(): { fonts: string[]; problems: string[] } {
     if (/Type 3/.test(row)) problems.push(`Type 3 font in PDF: ${row.trim()}`);
     if (flags[1] !== "yes") problems.push(`font not embedded: ${row.trim()}`);
   }
-  const text = spawnSync("pdftotext", [DECK_PDF, "-"], { encoding: "utf8" });
-  if (!text.stdout.includes("시뮬레이션 준비 완료"))
-    problems.push("pdftotext does not return the Korean lines");
+  // -raw keeps the content-stream order, so text beside a wrapped line cannot land inside it.
+  const text = spawnSync("pdftotext", ["-raw", DECK_PDF, "-"], { encoding: "utf8" });
+  if (text.status !== 0) throw new Error(`pdftotext failed: ${text.stderr}`);
+  const squeeze = (t: string) => t.replace(/\s+/g, "");
+  const extracted = squeeze(text.stdout);
+  if (korean.length === 0) problems.push("the deck prints no Korean text to check in the PDF");
+  for (const line of korean)
+    if (!extracted.includes(squeeze(line)))
+      problems.push(`pdftotext does not return the Korean line "${line}"`);
   return { fonts: rows.map((r) => r.trim().replace(/\s+/g, " ")), problems };
 }
 
@@ -154,6 +163,9 @@ async function main(): Promise<void> {
     const names = await page.$$eval(".slide", (els) =>
       els.map((e) => (e as HTMLElement).dataset.name ?? ""),
     );
+    const korean = await page.$$eval("[lang=ko]", (els) =>
+      els.map((e) => (e.textContent ?? "").trim()).filter((t) => t !== ""),
+    );
     const pngs = names.map((n, i) =>
       join(OUT_SLIDES, `${String(i + 1).padStart(2, "0")}-${n}.png`),
     );
@@ -169,7 +181,7 @@ async function main(): Promise<void> {
     await page.close();
     await buildContactSheet(browser, pngs);
 
-    const pdf = checkPdf();
+    const pdf = checkPdf(korean);
     report.problems.push(...pdf.problems);
     writeCheckNote({
       notes,

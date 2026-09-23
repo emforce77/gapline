@@ -1,117 +1,158 @@
 /**
- * 05. How a line is made: a quiet left-to-right spine of stages, and the two loops that can send a
- * line back (review, then measured fit) drawn heavier, each with what it did in the default
- * reviewer's finished evaluation runs. A rail carries dropped lines to the final check.
+ * 05. How Scene checks itself: the pipeline as run.ts runs it (hear and watch, then
+ * write, review, voice, measure, the final check, fix, and mix last), with the three checks drawn
+ * heavier and what each does with a line that fails: rewrite it from the reviewer's fix, read it
+ * faster or shorten it, or hand it to the fix stage. Each carries what it did in the sample run.
  */
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
+import { GUIDELINE_RULES } from "../../../src/lib/pipeline/guidelines";
 import { fitRule } from "../data/city";
-import { independentOverlaps, loopCounts } from "../data/loops";
-import { launchCall } from "../data/recognizers";
-import { intro, secs, slide } from "../html";
+import { dropped, finalFix, missing, run, runId, summary } from "../data/sample";
+import { lastVersion } from "../data/runs";
+import { dayMonthYear, esc, intro, slide } from "../html";
 import { notesFor } from "../notes";
+import { REPO } from "../paths";
 import { MARGIN, W } from "../theme";
 
 interface Stage {
   title: string;
-  text: string;
-  by: string;
+  text?: string;
+  by?: string;
+  /** One of the three checks a line must pass: drawn heavier. */
+  check?: boolean;
 }
-const STAGES: Stage[] = [
-  { title: "Write", text: "For one silence", by: "Gemini" },
-  { title: "Review", text: "8 rules, each cited", by: "Gemini" },
-  { title: "Voice", text: "", by: "Chirp 3 HD" },
-  { title: "Measure", text: "Times the audio", by: "WAV samples" },
-  { title: "Mix", text: "", by: "FFmpeg" },
-  { title: "Final check", text: "Lists what is missing", by: "Gemini" },
-];
 const INPUTS: Stage[] = [
-  { title: "Hear", text: "Word timings, then each silence alone", by: "Chirp 3" },
-  { title: "Watch", text: "Picture and sound", by: "Gemini" },
+  { title: "Hear", text: "Re-listens to each silence", by: "Chirp 3" },
+  { title: "Watch", by: "Gemini" },
 ];
+/** In the order run.ts runs them (the sample's events record the same order). */
+const STAGES: Stage[] = [
+  { title: "Write", by: "Gemini" },
+  { title: "Review", text: `${GUIDELINE_RULES.length} rules`, by: "Gemini", check: true },
+  { title: "Voice", by: "Chirp 3 HD" },
+  { title: "Measure", text: "Real voice", check: true },
+  { title: "Final check", text: "Whole track", by: "Gemini", check: true },
+  { title: "Fix", by: "Gemini" },
+  { title: "Mix", by: "FFmpeg" },
+];
+const COL = { review: 2, voice: 3, measure: 4, final: 5, fix: 6 };
 
 const COLS = STAGES.length + 1;
-const GAP = 40;
+const GAP = 28;
 const BOX_W = (W - 2 * MARGIN - (COLS - 1) * GAP) / COLS;
-const ROW = { top: 370, h: 196 };
-const INPUT = { h: 206, gap: 16 };
-const LOOP_TOP = 306;
-const LOOP_BOTTOM = 636;
-const DROP_RAIL = 804;
-const SUMMARY_TOP = 872;
-/** Drop lines leave a box off-centre so they never cross a loop. */
-const DROP_OFFSET = 60;
+const ROW = { top: 530, h: 190 };
+const INPUT = { h: 176, gap: 16 };
+/** Where the loops turn: above the row (review, final check) and below it (measure). */
+const LOOP_TOP = 470;
+const LOOP_BOTTOM = 800;
+/** Space between a loop and its label. */
+const LABEL_GAP = 12;
+const LABEL_H = 110;
 const colX = (i: number) => MARGIN + i * (BOX_W + GAP);
 const centre = (i: number) => colX(i) + BOX_W / 2;
+/** Corner radius of the loops. */
+const R = 20;
+
+/** The review rounds a line gets, read from the pipeline so the slide cannot drift from it. */
+const RUN_SOURCE = join(REPO, "src/lib/pipeline/run.ts");
+function maxReviewRounds(): number {
+  const m = readFileSync(RUN_SOURCE, "utf8").match(/const MAX_REVIEW_ROUNDS = (\d+);/);
+  if (!m) throw new Error(`${RUN_SOURCE} has no MAX_REVIEW_ROUNDS`);
+  return Number(m[1]);
+}
 
 function box(s: Stage, left: number, top: number, h: number): string {
-  return `<div class="hw-box" style="left:${left}px;top:${top}px;width:${BOX_W}px;height:${h}px"><p class="hw-t">${s.title}</p>${s.text ? `<p class="hw-x">${s.text}</p>` : ""}<p class="hw-by">${s.by}</p></div>`;
+  return `<div class="hw-box${s.check ? " check" : ""}" style="left:${left}px;top:${top}px;width:${BOX_W}px;height:${h}px"><p class="hw-t">${s.title}</p>${s.text ? `<p class="hw-x">${s.text}</p>` : ""}${s.by ? `<p class="hw-by">${s.by}</p>` : ""}</div>`;
+}
+
+/** A loop from one column's box edge to another's, turning at `y` (above or below the row). */
+function loop(from: number, to: number, edge: number, y: number): string {
+  const dir = y < edge ? 1 : -1;
+  const side = to < from ? -1 : 1;
+  const x1 = centre(from);
+  const x2 = centre(to);
+  return `<path d="M${x1} ${edge} V${y + dir * R} Q${x1} ${y} ${x1 + side * R} ${y} H${x2 - side * R} Q${x2} ${y} ${x2} ${y + dir * R} V${edge - dir * 8}" class="hw-loop" marker-end="url(#hw-head)"/>`;
 }
 
 const noun = (n: number) => (n === 1 ? "line" : "lines");
+const isoDay = (d: Date) => d.toISOString().slice(0, 10);
 
 export function howSlide(): string {
-  const note = notesFor(5, "Two loops decide…");
-  const c = loopCounts;
+  const note = notesFor("How it checks itself");
+  const rounds = maxReviewRounds();
+  const rewrites = rounds - 1;
+  if (dropped.rounds.length !== rounds || dropped.rewrites !== rewrites)
+    throw new Error(`the dropped line did not go through all ${rounds} review rounds`);
+  const shipped = run.cues.filter((c) => c.status === "fits");
+  const atNormalSpeed = shipped.filter(
+    (c) => lastVersion(c).voice?.rate === 1 && !c.versions.some((v) => v.by === "shorten"),
+  );
+  const droppedCount = run.cues.filter((c) => c.status === "dropped").length;
+  if (droppedCount !== 1 || run.cues.length - shipped.length !== droppedCount)
+    throw new Error("the sample's lines no longer split into shipped and one dropped");
+  const faster = Math.round((fitRule.maxRate - 1) * 100);
+
   const mid = ROW.top + ROW.h / 2;
+  const bottom = ROW.top + ROW.h;
   const inputsTop = mid - INPUT.h - INPUT.gap / 2;
   const inputs = INPUTS.map((s, i) =>
     box(s, colX(0), inputsTop + i * (INPUT.h + INPUT.gap), INPUT.h),
   ).join("");
   const stages = STAGES.map((s, i) => box(s, colX(i + 1), ROW.top, ROW.h)).join("");
-  const review = 2;
-  const measure = 4;
-  const final = 6;
-  const bottom = ROW.top + ROW.h;
-  const arrow = (x1: number, x2: number, y: number) =>
-    `<path d="M${x1} ${y} H${x2 - 4}" class="hw-line" marker-end="url(#hw-head-dim)"/>`;
-  const flows = [1, 2, 3, 4, 5].map((i) => arrow(colX(i) + BOX_W, colX(i + 1), mid)).join("");
+  const flows = STAGES.slice(1)
+    .map(
+      (_, i) =>
+        `<path d="M${colX(i + 1) + BOX_W} ${mid} H${colX(i + 2) - 4}" class="hw-line" marker-end="url(#hw-head-dim)"/>`,
+    )
+    .join("");
   const inputArrows = INPUTS.map((_, i) => {
     const y = inputsTop + i * (INPUT.h + INPUT.gap) + INPUT.h / 2;
-    return `<path d="M${colX(0) + BOX_W} ${y} C${colX(0) + BOX_W + 24} ${y} ${colX(1) - 24} ${mid} ${colX(1) - 4} ${mid}" class="hw-line" marker-end="url(#hw-head-dim)"/>`;
+    return `<path d="M${colX(0) + BOX_W} ${y} C${colX(0) + BOX_W + 20} ${y} ${colX(1) - 20} ${mid} ${colX(1) - 4} ${mid}" class="hw-line" marker-end="url(#hw-head-dim)"/>`;
   }).join("");
-  const loopUp = `<path d="M${centre(review)} ${ROW.top} V${LOOP_TOP + 20} Q${centre(review)} ${LOOP_TOP} ${centre(review) - 20} ${LOOP_TOP} H${centre(1) + 20} Q${centre(1)} ${LOOP_TOP} ${centre(1)} ${LOOP_TOP + 20} V${ROW.top - 8}" class="hw-loop" marker-end="url(#hw-head)"/>`;
-  const loopDown = `<path d="M${centre(measure)} ${bottom} V${LOOP_BOTTOM - 20} Q${centre(measure)} ${LOOP_BOTTOM} ${centre(measure) - 20} ${LOOP_BOTTOM} H${centre(review) + 20} Q${centre(review)} ${LOOP_BOTTOM} ${centre(review)} ${LOOP_BOTTOM - 20} V${bottom + 8}" class="hw-loop" marker-end="url(#hw-head)"/>`;
-  const dropFrom = [centre(review) - DROP_OFFSET, centre(measure) + DROP_OFFSET];
-  const drops = dropFrom
-    .map((x) => `<path d="M${x} ${bottom} V${DROP_RAIL}" class="hw-drop"/>`)
-    .join("");
-  const rail = `<path d="M${dropFrom[0]} ${DROP_RAIL} H${centre(final)} V${bottom + 6}" class="hw-drop" marker-end="url(#hw-head-dim)"/>`;
-  if (c.written - c.voiced !== 2) throw new Error("the drop note says the final check listed both");
-  const faster = c.fasterRates.map((r) => `${r.toFixed(2)}×`).join(", ");
-  const sameModel = note(
-    `Writer and reviewer: one Gemini model, separate instructions; the reviewer at temperature 0 with the most reasoning. One rewrite per rejection; at most ${fitRule.shortenings} shortenings.`,
+  const loops = [
+    loop(COL.review, 1, ROW.top, LOOP_TOP),
+    loop(COL.measure, COL.voice, bottom, LOOP_BOTTOM),
+    loop(COL.final, COL.fix, ROW.top, LOOP_TOP),
+  ].join("");
+
+  // Called in reading order (top left, top right, bottom), so the markers number that way.
+  const sample = note(
+    `Counts from the sample, one automatic Korean run of the ${summary.clipSeconds} s opening, ${dayMonthYear(isoDay(summary.day))} (${esc(runId)}), line by line from its records; its hearing and watching came from an earlier run of the same clip. Writer, reviewer and final check are one Gemini model with separate instructions, the reviewer at temperature 0 with the most reasoning. The ${GUIDELINE_RULES.length} rules come from Korea’s audio-description guideline (KMCC) and Netflix’s AD style guide; a line is reviewed at most ${rounds} times.`,
   );
-  const io = independentOverlaps;
-  if (io.longest.cueId !== launchCall.line.id || io.longest.projectId !== "tos-opening")
-    throw new Error("the longest flagged overlap is no longer the opening's launch-call line");
-  const counts = note(
-    `The default reviewer’s ${c.runs} finished evaluation runs, 22 Sep 2026, counted line by line; they predate the second listen to each silence (23 Sep). ${c.disputedRejections} of the ${c.sentBack} rejections is disputed: a rifle-scope line sent back for “crosshairs” not on screen, where the film’s master shows a faint reticle. No voiced line overlaps Chirp 3’s speech, but an independent recognizer flags possible overlaps in ${io.runs} of the ${c.runs}; the longest, the opening’s ${secs(io.longest.seconds)} line, was real: Chirp 3 had timed the launch call ${secs(launchCall.early)} early. Whether a dropped line is reported depends on the final check, a model: in these runs it listed both.`,
+
+  const fix = note(
+    `The final check reads the whole voiced track once. Its fix stage rewrites a failing line from the check’s fix and may write a new line where a missed moment’s silence still has room; both are reviewed and voiced like any other line before the mix. In the sample it sent ${finalFix.failing} ${noun(finalFix.failing)} back and listed ${finalFix.missing} missed moments, ${missing.filter((m) => m.duringDialogue).length} of them during dialogue; the fix stage added ${finalFix.added === 0 ? "none" : finalFix.added}.`,
   );
+  const speed = note(
+    `A take that overruns its room is voiced again at rate = take ÷ room × ${fitRule.headroom}, at most ${fitRule.maxRate}×; a line that needs more is shortened, reviewed and voiced again, at most ${fitRule.shortenings} times, then dropped.`,
+  );
+  const label = (
+    place: "above" | "below",
+    left: number,
+    width: number,
+    title: string,
+    count: string,
+  ) =>
+    `<div class="hw-note ${place}" style="left:${left}px;top:${place === "above" ? LOOP_TOP - LABEL_GAP - LABEL_H : LOOP_BOTTOM + LABEL_GAP}px;width:${width}px"><p class="hw-nt">${title}</p><p class="hw-nc">${count}</p></div>`;
 
   return slide({
     id: "s-how",
     name: "how-it-works",
-    folio: 5,
     kind: "exhibit",
     body: `
-${intro("Two loops decide whether a line is heard.", undefined, 1500)}
+${intro("Every line is reviewed, timed and checked again before the mix.", undefined, 1500)}
 <svg class="hw-svg" width="${W}" height="1080" viewBox="0 0 ${W} 1080" aria-hidden="true">
   <defs>
     <marker id="hw-head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ece9e3"/></marker>
     <marker id="hw-head-dim" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#80848b"/></marker>
   </defs>
-  ${inputArrows}${flows}${drops}${rail}${loopUp}${loopDown}
+  ${inputArrows}${flows}${loops}
 </svg>
 ${inputs}${stages}
-<div class="hw-note" style="left:${centre(1) + 20}px;top:${LOOP_TOP - 94}px;width:${centre(final) - centre(1)}px">
-  <p class="hw-nt">Rejected: one rewrite, reviewed again${sameModel}</p>
-  <p class="hw-nc"><b>${c.sentBack} ${noun(c.sentBack)} sent back:</b> ${c.passedRewrite} passed on the rewrite, ${c.droppedAfterReview} dropped</p>
-</div>
-<div class="hw-note" style="left:${centre(review) + 24}px;top:${LOOP_BOTTOM + 12}px;width:${centre(measure) - centre(review) - 48}px">
-  <p class="hw-nt">Too long: up to ${fitRule.maxRate}× faster, else shortened and reviewed again</p>
-  <p class="hw-nc"><b>${c.ranLong} ran long:</b> ${c.fittedFaster} fitted at ${faster}, ${c.droppedTooLong} dropped</p>
-</div>
-<p class="hw-drop-note" style="right:${W - centre(final) + 16}px;top:${DROP_RAIL + 12}px">Dropped: the final check listed both as missing.</p>
-<p class="hw-sum" style="left:${MARGIN}px;top:${SUMMARY_TOP}px"><b>${c.voiced} of ${c.written} lines voiced</b> across ${c.runs} finished test runs${counts}</p>`,
+${label("above", centre(1) - R, centre(COL.final) - centre(1) - GAP, `Breaks a rule: rewritten as the reviewer suggests, up to ${rewrites === 2 ? "twice" : `${rewrites} times`}`, `Sample: ${droppedCount} of ${run.cues.length} dropped after ${rewrites} rewrites${sample}`)}
+${label("above", centre(COL.final) - R, W - MARGIN - centre(COL.final) + R, `Fails the whole-track check: rewritten${fix}`, `Sample: ${finalFix.rewritten} ${noun(finalFix.rewritten)} rewritten; ${finalFix.missing} missed moments listed, ${finalFix.added === 0 ? "none" : finalFix.added} added`)}
+${label("below", centre(COL.voice) - R, centre(COL.fix) - centre(COL.voice), `Too long: up to ${faster}% faster, else shortened${speed}`, `Sample: ${atNormalSpeed.length} of ${shipped.length} fit at normal speed`)}`,
   });
 }
 
@@ -119,16 +160,13 @@ export const HOW_CSS = `
 .hw-svg { position:absolute; left:0; top:0; }
 .hw-line { fill:none; stroke:var(--ink-400); stroke-width:2; }
 .hw-loop { fill:none; stroke:var(--ink-100); stroke-width:4; }
-.hw-drop { fill:none; stroke:var(--ink-400); stroke-width:2; stroke-dasharray:6 6; }
-.hw-box { position:absolute; border:1px solid var(--rule); border-radius:6px; background:var(--lane); padding:14px 18px; }
-.hw-t { font-size:28px; font-weight:600; color:var(--ink-100); }
-.hw-x { margin-top:6px; font-size:24px; line-height:1.3; color:var(--ink-300); }
-.hw-by { position:absolute; left:18px; bottom:12px; font-size:24px; color:var(--ink-400); }
-.hw-note { position:absolute; }
-.hw-nt { font-size:24px; line-height:1.35; font-weight:600; color:var(--ink-100); }
-.hw-nc { margin-top:4px; font-size:24px; line-height:1.35; color:var(--ink-300); }
-.hw-nc b { font-weight:600; color:var(--ink-100); }
-.hw-drop-note { position:absolute; font-size:24px; color:var(--ink-300); text-align:right; }
-.hw-sum { position:absolute; font-size:32px; line-height:1.3; color:var(--ink-300); }
-.hw-sum b { font-weight:600; color:var(--ink-100); }
+.hw-box { position:absolute; border:1px solid var(--rule); border-radius:6px; background:var(--lane); padding:14px 16px; }
+.hw-box.check { border:2px solid var(--ink-100); }
+.hw-t { font-size:28px; line-height:1.2; font-weight:600; color:var(--ink-100); }
+.hw-x { margin-top:6px; font-size:var(--fs-label); line-height:1.25; color:var(--ink-300); }
+.hw-by { position:absolute; left:16px; bottom:12px; font-size:var(--fs-label); color:var(--ink-400); }
+.hw-note { position:absolute; display:flex; flex-direction:column; height:${LABEL_H}px; }
+.hw-note.above { justify-content:flex-end; }
+.hw-nt { font-size:var(--fs-label); line-height:1.3; font-weight:600; color:var(--ink-100); }
+.hw-nc { margin-top:4px; font-size:var(--fs-label); line-height:1.3; color:var(--ink-300); }
 `;

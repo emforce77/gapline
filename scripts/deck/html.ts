@@ -32,21 +32,46 @@ export const usd = (x: number, digits = 2): string => `$${x.toFixed(digits)}`;
 
 /**
  * How much text a slide may carry (checked by the build over all visible text but the page number):
- * "prose" slides 90 words, "exhibit" slides (a table, a chart, a diagram) 120, the notes page no cap.
+ * "prose" slides 75 words, "exhibit" slides (a table, a chart, a diagram) 100, the notes pages no cap.
  */
 export type SlideKind = "prose" | "exhibit" | "notes";
 export const WORD_BUDGET: Record<SlideKind, number | null> = {
-  prose: 90,
-  exhibit: 120,
+  prose: 75,
+  exhibit: 100,
   notes: null,
 };
+
+/** Where the page being built sits in the deck. `slides/index.ts` sets it before each builder runs. */
+export interface Place {
+  /** 1-based position in the deck, in the order of `slides/index.ts`. */
+  position: number;
+  /** Page number printed on the slide: its position, or null on pages that print none. */
+  folio: number | null;
+}
+
+let building: Place | null = null;
+
+/** Called by `slides/index.ts` (and the one-slide renderer) around each page it builds. */
+export function placePage(place: Place | null): void {
+  building = place;
+}
+
+/** The place of the page being built; a slide built outside the deck order has none. */
+export function currentPlace(): Place {
+  if (!building)
+    throw new Error("a slide was built without a place: build it through slides/index.ts");
+  return building;
+}
 
 export interface SlideParts {
   id: string;
   /** Short name used for the PNG file and the build report. */
   name: string;
-  /** Page number; null on the cover, the close and the notes. */
-  folio: number | null;
+  /**
+   * @deprecated Ignored. The page number follows the slide's position in `slides/index.ts`, so
+   * reordering the deck never leaves a stale number; omit it.
+   */
+  folio?: number | null;
   kind: SlideKind;
   body: string;
   /** Print the film's credit in small type: every slide that shows a frame of the film. */
@@ -56,10 +81,11 @@ export interface SlideParts {
 export const FILM_CREDIT_SHORT = "<i>Tears of Steel</i> © Blender Foundation, CC BY 3.0";
 
 export function slide(p: SlideParts): string {
+  const { folio, position } = currentPlace();
   const credit = p.filmCredit ? `<p class="credit">${FILM_CREDIT_SHORT}</p>` : "";
-  return `<section class="slide ${p.id}" data-name="${esc(p.name)}" data-kind="${p.kind}">
+  return `<section class="slide ${p.id}" data-name="${esc(p.name)}" data-kind="${p.kind}" data-position="${position}">
 ${p.body}
-${p.folio === null ? "" : `<p class="folio">${String(p.folio).padStart(2, "0")}</p>`}
+${folio === null ? "" : `<p class="folio">${String(folio).padStart(2, "0")}</p>`}
 ${credit}
 </section>`;
 }

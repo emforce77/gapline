@@ -7,12 +7,25 @@
 export const W = 1920;
 export const H = 1080;
 export const MARGIN = 96;
+/**
+ * The type scale. A 1920 px slide is printed on a 1440 pt PDF page and often read in a viewer ~1000 px
+ * wide, so a 26 px label shows at about 13.5 px there: the smallest size a judge still reads at a skim.
+ */
+export const TYPE_PX = {
+  headline: 72,
+  /** Running prose (`.body`). */
+  body: 30,
+  /** Labels, tags, verdicts, page numbers: the smallest text on a slide face. */
+  label: 26,
+  /** Film credits, endnote markers and the notes pages. */
+  fine: 20,
+} as const;
 /** No text on any slide is set smaller than this (checked by the build). */
-export const MIN_TEXT_PX = 22;
-/** Grey text (the two lighter inks) needs more size to read from the back of a room. */
-export const MIN_GREY_PX = 24;
-/** Film credits, note markers and the notes page may go down to this, never below. */
-export const MIN_SMALL_PX = 18;
+export const MIN_TEXT_PX = TYPE_PX.label;
+/** Grey text (the two lighter inks): the same floor, kept separate so the build can name it. */
+export const MIN_GREY_PX = TYPE_PX.label;
+/** Film credits, note markers and the notes pages may go down to this, never below. */
+export const MIN_SMALL_PX = TYPE_PX.fine;
 
 export const COLOR = {
   screen: "#09090a",
@@ -65,6 +78,7 @@ export const BASE_CSS = `${FONT_FACES}
   --sans: "Pretendard", "Apple SD Gothic Neo", "Noto Sans KR", sans-serif;
   --mono: "IBM Plex Mono", monospace;
   --margin: ${MARGIN}px;
+  --fs-body: ${TYPE_PX.body}px; --fs-label: ${TYPE_PX.label}px; --fs-fine: ${TYPE_PX.fine}px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { background: var(--screen); }
@@ -73,28 +87,28 @@ body { font-family: var(--sans); color: var(--ink-100); -webkit-font-smoothing: 
 .slide { position: relative; width: ${W}px; height: ${H}px; overflow: hidden; background: var(--screen);
   break-after: page; }
 
-.headline { font-family: var(--serif); font-weight: 400; font-size: 72px; line-height: 1.08;
+.headline { font-family: var(--serif); font-weight: 400; font-size: ${TYPE_PX.headline}px; line-height: 1.08;
   letter-spacing: -0.012em; color: var(--ink-100); text-wrap: balance; }
-.body { font-size: 30px; line-height: 1.5; color: var(--ink-300); text-wrap: pretty; }
+.body { font-size: var(--fs-body); line-height: 1.5; color: var(--ink-300); text-wrap: pretty; }
 .body q, .headline q { quotes: "\\201C" "\\201D"; }
 .body b { font-weight: 500; color: var(--ink-100); }
-.label { font-size: 24px; line-height: 1.3; font-weight: 600; color: var(--ink-300); }
+.label { font-size: var(--fs-label); line-height: 1.3; font-weight: 600; color: var(--ink-300); }
 .muted { color: var(--ink-400); }
 .mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
 .num { font-family: var(--serif); font-variant-numeric: lining-nums tabular-nums; letter-spacing: -0.01em; }
 .amber { color: var(--amber); }
 [lang=ko] { word-break: keep-all; }
-.folio { position: absolute; left: var(--margin); bottom: 36px; font-family: var(--mono); font-size: 24px;
+.folio { position: absolute; left: var(--margin); bottom: 36px; font-family: var(--mono); font-size: var(--fs-label);
   color: var(--ink-400); }
 /* The film's licence travels with every frame the deck shows, small. */
-.credit { position: absolute; right: var(--margin); bottom: 40px; font-size: 18px; line-height: 1.3;
+.credit { position: absolute; right: var(--margin); bottom: 40px; font-size: var(--fs-fine); line-height: 1.3;
   color: var(--ink-400); }
 /* Endnote markers: small, grey, linked to the notes page. */
-sup.fn { font-family: var(--sans); font-size: 18px; font-weight: 500; line-height: 0; vertical-align: super;
+sup.fn { font-family: var(--sans); font-size: var(--fs-fine); font-weight: 500; line-height: 0; vertical-align: super;
   margin-left: 2px; letter-spacing: 0; font-style: normal; }
 sup.fn a { color: var(--ink-400); text-decoration: none; }
 /* A source named on the slide itself, when the number is the slide's point. */
-.tag { font-size: 24px; line-height: 1.3; color: var(--ink-300); }
+.tag { font-size: var(--fs-label); line-height: 1.3; color: var(--ink-300); }
 
 .intro { position: absolute; left: var(--margin); top: 76px; width: ${W - 2 * MARGIN}px; }
 .intro .headline { max-width: 1240px; }
@@ -118,6 +132,6 @@ sup.fn a { color: var(--ink-400); text-decoration: none; }
 del.strike { text-decoration: line-through; text-decoration-thickness: 3px; text-decoration-color: var(--ink-100); }
 .changed { text-decoration: underline; text-decoration-color: var(--amber); text-decoration-thickness: 3px;
   text-underline-offset: 7px; }
-.verdict { display: flex; align-items: center; gap: 12px; font-size: 24px; font-weight: 600; color: var(--ink-100); }
+.verdict { display: flex; align-items: center; gap: 12px; font-size: var(--fs-label); font-weight: 600; color: var(--ink-100); }
 .verdict svg { flex: none; }
 `;

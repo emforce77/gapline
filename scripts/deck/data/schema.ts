@@ -1,11 +1,17 @@
 /**
- * The parts of Scene's run records the deck reads. Parsing with these schemas makes a missing file or
- * field stop the build with its path, instead of drawing a slide from an undefined.
+ * The parts of Scene's run records the deck and the film read. Parsing with these schemas makes a
+ * missing file or field stop the build with its path, instead of drawing a slide from an undefined.
  */
 import { readFileSync } from "node:fs";
 import { z } from "zod";
 
 const Span = z.object({ start: z.number(), end: z.number() });
+
+/** runtime/showcase.json: the one sample run the app, the film and the deck show. */
+export const ShowcasePinSchema = z.object({
+  projectId: z.string(),
+  runs: z.object({ ko: z.string() }),
+});
 
 const Violation = z.object({ rule: z.string(), quote: z.string(), reason: z.string() });
 const Review = z.object({ pass: z.boolean(), violations: z.array(Violation), fix: z.string() });
@@ -30,16 +36,8 @@ export type RunVersion = z.infer<typeof Version>;
 
 const Missing = z.object({ gapId: z.string(), at: z.number(), what: z.string() });
 
-/** What an editor changed in one session: a line rewritten, or (action "remove") taken out. */
-const HumanEdit = z.object({
-  cueId: z.string(),
-  action: z.string().optional(),
-  before: z.string(),
-  after: z.string().optional(),
-  from: z.number(),
-  at: z.string(),
-});
-export type HumanEditRecord = z.infer<typeof HumanEdit>;
+/** A change made in the editor (only edit runs carry these; the sample must have none). */
+const HumanEdit = z.object({ cueId: z.string(), at: z.string() });
 
 export const ScriptSchema = z.object({
   runId: z.string(),
@@ -56,9 +54,21 @@ export const ScriptSchema = z.object({
     costByStage: z.record(z.string(), z.number()),
     cuesShipped: z.number(),
     finalReview: z.object({ missing: z.array(Missing) }),
+    /** What the final check found and the fix stage turned into voiced lines (runs from 23 Sep 2026). */
+    finalFix: z
+      .object({
+        failing: z.number(),
+        missing: z.number(),
+        rewritten: z.number(),
+        added: z.number(),
+      })
+      .optional(),
+    /** Whether hearing and watching came from an earlier run of the clip (runs from 23 Sep 2026). */
+    analysisReused: z.object({ speech: z.boolean(), scene: z.boolean() }).optional(),
   }),
   gaps: z.array(Span.extend({ id: z.string() })),
-  speech: z.array(Span.extend({ text: z.string() })),
+  /** "relisten": heard when a silence was recognized again on its own (src/lib/pipeline/relisten.ts). */
+  speech: z.array(Span.extend({ text: z.string(), heard: z.literal("relisten").optional() })),
   scene: z.object({
     shots: z.array(
       Span.extend({ setting: z.string(), action: z.string(), onScreenText: z.string() }),
@@ -69,8 +79,51 @@ export const ScriptSchema = z.object({
 });
 export type Script = z.infer<typeof ScriptSchema>;
 
+// ------------------------------------------------------------------ a run's events.jsonl and ledger.jsonl
+/** A stage starting or finishing; `t` is seconds since the run started. */
+export const StageEventSchema = z.object({
+  type: z.literal("stage"),
+  stage: z.string(),
+  state: z.enum(["started", "done"]),
+  seconds: z.number().optional(),
+  t: z.number(),
+});
+/**
+ * One review of one line. Rounds 1–3 are the per-line reviewer; round 0 is the final check's verdict
+ * on a voiced line, recorded by the fix stage (src/lib/pipeline/run.ts).
+ */
+export const CueReviewedEventSchema = z.object({
+  type: z.literal("cue_reviewed"),
+  cueId: z.string(),
+  round: z.number(),
+  verdict: Review,
+  t: z.number(),
+});
+/** What recognizing each usable silence again on its own found (src/lib/pipeline/relisten.ts). */
+export const RelistenEventSchema = z.object({
+  type: z.literal("relisten"),
+  gapsChecked: z.number(),
+  wordsFound: z.number(),
+  blockedSeconds: z.number(),
+  t: z.number(),
+});
+export type StageEvent = z.infer<typeof StageEventSchema>;
+export type CueReviewedEvent = z.infer<typeof CueReviewedEventSchema>;
+export type RelistenEvent = z.infer<typeof RelistenEventSchema>;
+
+/** One billed call in a run's ledger.jsonl. */
+export const LedgerEntrySchema = z.object({
+  at: z.string(),
+  label: z.string(),
+  costUsd: z.number(),
+  /** Speech-to-Text only: the seconds Google billed. */
+  billedSeconds: z.number().optional(),
+});
+export type LedgerEntry = z.infer<typeof LedgerEntrySchema>;
+
 export const LiveCheckSchema = z.object({
   service: z.string().url(),
+  revision: z.string(),
   parentRunId: z.string(),
   childRunId: z.string(),
   unchangedWavFilesIdentical: z.number(),
@@ -154,5 +207,18 @@ export function readJsonFile<T>(path: string, schema: z.ZodType<T>): T {
   const parsed = schema.safeParse(raw);
   if (!parsed.success)
     throw new Error(`${path} does not match what the deck needs:\n${parsed.error.message}`);
+  return parsed.data;
+}
+
+/** Validate one record of a JSON-lines file; the error names the file and the line. */
+export function parseJsonLine<T>(
+  path: string,
+  line: number,
+  raw: unknown,
+  schema: z.ZodType<T>,
+): T {
+  const parsed = schema.safeParse(raw);
+  if (!parsed.success)
+    throw new Error(`${path}:${line} does not match what the deck needs:\n${parsed.error.message}`);
   return parsed.data;
 }

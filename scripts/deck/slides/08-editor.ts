@@ -1,11 +1,16 @@
 /**
- * 08. The product: the whole English workspace, captured fresh at device scale 2 with the line the
- * editor restored (54.2 s) selected, and three numbered callouts placed from the element boxes the
- * capture recorded. Beside it, the editor's fix in two sentences and a plain count of the lines an
- * editor typed in this track and the one an editor removed.
+ * 08. The product: one press of Generate makes the whole track.
+ * Four crops of the workspace on the pinned sample run, each shown at 1:1 of the 2x capture so the
+ * app's own text reads at slide size: the Generate button, the player's switches (Eyes closed), the
+ * timeline around the chosen line, and the panel of the line the final check sent back and Scene
+ * rewrote. Each crop has its caption above it, and a ring marks what the caption names. The prose
+ * tells the optional edit once (its cost, measured on the live service, is in the notes), and the
+ * sample's own figures with the reused hearing and watching said beside them.
  */
-import { editSession, lineHistory, opening } from "../data/demo";
-import { dayMonthYear, esc, px, secs, slide, usd } from "../html";
+import { analysis } from "../data/analysis";
+import { liveCheck } from "../data/live-check";
+import { line, runId, summary } from "../data/sample";
+import { dayMonthYear, esc, intro, px, slide, usd } from "../html";
 import { notesFor } from "../notes";
 import {
   DEVICE_SCALE,
@@ -14,121 +19,141 @@ import {
   WORKSPACE_VIEWPORT,
   workspaceCapture,
   type Box,
-  type WorkspaceBoxes,
+  type ScreenKey,
 } from "../screens";
 import { MARGIN, W } from "../theme";
 
-/** The workspace capture, scaled to this width; its height follows the crop under the timeline. */
-const SHOT = { left: MARGIN, top: 196, width: 1310 };
-const COL_GAP = 40;
-const MARKER = 44;
-/** The eyes-closed inset: a window on the centre of the blacked-out player, enlarged. */
-const EYES = { width: 1600 };
-const EYES_BOX = { w: 348, h: 124 };
-/** Where each marker sits on its box, as fractions of the box (chosen to avoid covering text). */
-const CALLOUTS: {
-  key: keyof WorkspaceBoxes;
-  at: [number, number];
-  text: string;
-}[] = [
-  {
-    key: "timeline",
-    at: [0.06, 0.12],
-    text: "Timeline: each line’s room, its measured voice inside",
-  },
-  {
-    key: "rejection",
-    at: [0.93, 0.08],
-    text: "Rejections with rule, page and every version",
-  },
-  {
-    key: "eyesClosed",
-    at: [0.5, -0.9],
-    text: "Eyes closed: hear it as its audience will",
-  },
-];
+/** The headline column: it ends before the Generate button, which spans the right column. */
+const HEADLINE_W = 1000;
+const INTRO_TOP = 76;
+/** Where the two columns of crops start, under the headline. */
+const ROW_TOP = 282;
+/** A caption line above each crop, and the space under a crop before the next caption. */
+const CAPTION_H = 40;
+const STACK_GAP = 22;
+/** How far a ring stands off the element it marks. */
+const RING_PAD = 6;
+const SECONDS_PER_MINUTE = 60;
+/** How wide the fade is where the timeline crop cuts into the clip. */
+const FADE_PX = 64;
+/** The prose under the line panel: three lines of 30 px type at the theme's 1.5 line height. */
+const BODY_LINES = 3;
+const BODY_LINE_PX = 45;
+
+const minutesSeconds = (s: number) =>
+  `${Math.floor(s / SECONDS_PER_MINUTE)} min ${Math.round(s % SECONDS_PER_MINUTE)} s`;
+const isoDay = (d: Date) => d.toISOString().slice(0, 10);
+
+interface Placed {
+  key: ScreenKey;
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+/** The timeline crop starts mid-clip, so its left edge fades out instead of ending hard. */
+const CUT_LEFT: ScreenKey = "timeline";
+
+/** A crop at 1:1 of its PNG. */
+function crop(p: Placed): string {
+  return `<div class="pd-shot${p.key === CUT_LEFT ? " cut-left" : ""}" style="left:${px(p.left)};top:${px(p.top)};width:${px(p.width)};height:${px(p.height)}"><img src="${screenUrl(p.key)}" alt="" style="width:${px(p.width)};height:${px(p.height)}"></div>`;
+}
+
+/** A ring around an element of a placed crop (box in CSS pixels of the capture). */
+function ring(p: Placed, b: Box): string {
+  const s = DEVICE_SCALE;
+  return `<div class="pd-ring" style="left:${px(p.left + b.x * s - RING_PAD)};top:${px(p.top + b.y * s - RING_PAD)};width:${px(b.width * s + 2 * RING_PAD)};height:${px(b.height * s + 2 * RING_PAD)}"></div>`;
+}
 
 export function editorSlide(): string {
-  const note = notesFor(8, "Every line shows its room…");
-  const size = screenSize("workspace");
-  if (size.width !== WORKSPACE_VIEWPORT.width * DEVICE_SCALE)
-    throw new Error("workspace capture is not at 2x");
-  const scale = SHOT.width / WORKSPACE_VIEWPORT.width;
-  const shotW = SHOT.width;
-  const shotH = (size.height / DEVICE_SCALE) * scale;
-  const { capturedAt, boxes, lineHeading } = workspaceCapture();
-  const lineName = lineHeading.match(/^Line \d+/)?.[0];
-  if (!lineName || !lineHeading.includes(String(lineHistory.start)))
-    throw new Error(
-      `the captured line is "${lineHeading}", not the line at ${lineHistory.start} s`,
-    );
-  const place = (b: Box, [fx, fy]: [number, number]) => ({
-    x: SHOT.left + (b.x + b.width * fx) * scale,
-    y: SHOT.top + (b.y + b.height * fy) * scale,
-  });
-  const markers = CALLOUTS.map((c, i) => {
-    const p = place(boxes[c.key], c.at);
-    return `<span class="ed-mark" style="left:${px(p.x - MARKER / 2)};top:${px(p.y - MARKER / 2)}">${i + 1}</span>`;
-  }).join("");
-  const colLeft = SHOT.left + shotW + COL_GAP;
-  // The eyes-closed frame, enlarged around its centre so the spoken line reads at slide size.
-  const eyesSize = screenSize("eyesClosed");
-  const eyesScale = EYES.width / eyesSize.width;
-  const eyes = {
-    width: EYES.width,
-    left: (eyesSize.width / 2) * eyesScale - EYES_BOX.w / 2,
-    top: (eyesSize.height / 2) * eyesScale - EYES_BOX.h / 2,
+  const note = notesFor("Product");
+  const capture = workspaceCapture();
+  const size = (key: ScreenKey) => {
+    const png = screenSize(key);
+    const css = capture.crops[key];
+    if (Math.abs(png.width - css.width * DEVICE_SCALE) > DEVICE_SCALE)
+      throw new Error(`${key} is not a ${DEVICE_SCALE}x capture`);
+    return png;
   };
-  const shotNote = note(
-    `Captured ${dayMonthYear(capturedAt)} from the app at 2× (${WORKSPACE_VIEWPORT.width} × ${WORKSPACE_VIEWPORT.height} window, cropped under the timeline): English interface, Korean narration, the finished sample track. ${lineName}, at ${lineHistory.start} s, is scrolled to its second rejection and the editor’s version.`,
+  if (!capture.lineHeading.includes(String(line.start)))
+    throw new Error(
+      `the captured line is "${capture.lineHeading}", not the line at ${line.start} s`,
+    );
+  if (line.rejectedBy !== "final check")
+    throw new Error("the caption says the final check sent the captured line back");
+
+  // Right column: the line panel, then the prose. Left column: the switches, then the timeline.
+  const lineSize = size("line");
+  const rightX = W - MARGIN - lineSize.width;
+  const lineShot: Placed = { key: "line", left: rightX, top: ROW_TOP + CAPTION_H, ...lineSize };
+  const controlsSize = size("controls");
+  const controls: Placed = {
+    key: "controls",
+    left: MARGIN,
+    top: ROW_TOP + CAPTION_H,
+    ...controlsSize,
+  };
+  const timelineTop = controls.top + controls.height + STACK_GAP + CAPTION_H;
+  const timeline: Placed = { key: "timeline", left: MARGIN, top: timelineTop, ...size("timeline") };
+  if (timeline.width !== controls.width)
+    throw new Error("the switches and the timeline no longer line up");
+  if (MARGIN + timeline.width > rightX) throw new Error("the timeline runs into the line panel");
+  // Top right, beside the headline: the button the headline is about.
+  const generateSize = size("generate");
+  const generate: Placed = {
+    key: "generate",
+    left: W - MARGIN - generateSize.width,
+    top: INTRO_TOP + CAPTION_H,
+    ...generateSize,
+  };
+  if (MARGIN + HEADLINE_W > generate.left)
+    throw new Error("the headline runs into the Generate button");
+
+  const shots = note(
+    `Captured ${dayMonthYear(capture.capturedAt)} from the app at ${DEVICE_SCALE}× in a ${WORKSPACE_VIEWPORT.width} × ${WORKSPACE_VIEWPORT.height} window, English interface, Korean narration, on the sample run (${esc(capture.runId)}) with “${esc(capture.lineHeading)}” chosen; the Generate button with Brief density chosen, which has no track of this clip. Each crop is shown pixel for pixel; the timeline starts at the player’s switches.`,
   );
-  const typed = opening.lines.filter((l) => l.byEditor);
-  const fixNote = note(
-    `That session, on the live service, 22 Sep 2026: ${usd(editSession.costUsd, 3)} of API calls and ${Math.round(editSession.seconds)} s; the other ${editSession.reusedAudioFiles} audio files byte-identical; the previous version kept. An editor’s sentence that is too long or breaks a rule comes back with the reason; Scene does not rewrite it.`,
+  const edit = note(
+    `Measured on the live Cloud Run service (revision ${esc(liveCheck.revision)}), ${dayMonthYear(isoDay(liveCheck.day))}, editing one line of an earlier track of this clip: ${usd(liveCheck.editCostUsd, 6)} of API calls and ${liveCheck.editSeconds} s until the new track was mixed; the other ${liveCheck.reusedAudioFiles} lines’ audio reused byte for byte.`,
   );
-  const gone = opening.removed.map((l) => `“${esc(l.gloss)}” at ${secs(l.start, 1)}`).join(", ");
-  const typedNote = note(
-    `Typed: the lines at ${typed.map((l) => secs(l.start, 1)).join(" and ")}. Removed: ${gone}, which played over dialogue. ${opening.sessions} editor sessions in all.`,
+  const figures = note(
+    `The sample run, ${dayMonthYear(isoDay(summary.day))} (${esc(runId)}): ${usd(summary.costUsd, 4)} and ${summary.seconds} s by its own summary and call ledger, for ${summary.lines} lines in ${summary.clipSeconds} s of film. It was started from the command line through the same path as the Generate button. It reused the hearing and watching of an earlier run of the clip (${esc(analysis.runId)}): ${usd(analysis.costUsd, 4)} and ${analysis.seconds} s.`,
   );
-  if (typed.length !== 2 || opening.removed.length !== 1)
-    throw new Error("the slide says two lines were typed and one removed by an editor");
+
+  // Under the line panel: the prose, then the sample's figures in small type.
+  const bodyTop = lineShot.top + lineShot.height + STACK_GAP;
+  const figuresTop = bodyTop + BODY_LINES * BODY_LINE_PX + STACK_GAP;
+
+  const caption = (text: string, left: number, top: number, width: number, align = "left") =>
+    `<p class="pd-cap" style="left:${px(left)};top:${px(top)};width:${px(width)};text-align:${align}">${text}</p>`;
+  const { callouts } = capture;
 
   return slide({
     id: "s-editor",
     name: "product",
-    folio: 8,
-    kind: "prose",
+    kind: "exhibit",
     filmCredit: true,
     body: `
-<div class="intro"><h1 class="headline" style="max-width:1728px">Every line shows its room, its rule and its history.</h1></div>
-<div class="ed-shot" style="left:${SHOT.left}px;top:${SHOT.top}px;width:${px(shotW)};height:${px(shotH)}">
-  <img src="${screenUrl("workspace")}" alt="" style="width:${px(shotW)};height:${px(shotH)}">
-</div>
-${markers}
-<div class="ed-col" style="left:${px(colLeft)};top:${SHOT.top}px;width:${px(W - MARGIN - colLeft)}">
-  <ol class="ed-callouts">${CALLOUTS.map((c, i) => `<li><span class="ed-num">${i + 1}</span><p>${esc(c.text)}${i === 0 ? shotNote : ""}</p></li>`).join("")}</ol>
-  <div class="ed-eyes"><img src="${screenUrl("eyesClosed")}" alt="" style="width:${px(eyes.width)};margin:${px(-eyes.top)} 0 0 ${px(-eyes.left)}"></div>
-  <p class="body ed-story">An editor typed the reviewer’s second fix. Scene re-voiced only that line and kept the original: ${usd(editSession.costUsd, 3)} of API calls, ${secs(editSession.seconds, 0)}${fixNote}</p>
-  <p class="ed-typed">${typed.length} of the ${opening.lines.length} lines in this track were typed by an editor; an editor removed ${opening.removed.length} more.${typedNote}</p>
-</div>`,
+${intro("One press of Generate makes the whole track.", undefined, HEADLINE_W)}
+${caption("One press runs every step", generate.left - MARGIN, INTRO_TOP, generate.width + MARGIN, "right")}
+${crop(generate)}
+${caption("Eyes closed: listen as its audience will", controls.left, ROW_TOP, controls.width, "right")}
+${crop(controls)}${ring(controls, callouts.eyesClosed.box)}
+${caption(`Each line in the silence it fits${shots}`, timeline.left, timelineTop - CAPTION_H, timeline.width)}
+${crop(timeline)}
+${caption("Sent back by the final check, rewritten by Scene", lineShot.left, ROW_TOP, lineShot.width)}
+${crop(lineShot)}${ring(lineShot, callouts.fixed.box)}
+<p class="body pd-body" style="left:${px(rightX)};top:${px(bodyTop)};width:${px(lineShot.width)}">Want different words? You can still edit any line; Scene re-voices just that one and checks the track again.${edit}</p>
+<p class="tag pd-figures" style="left:${px(rightX)};top:${px(figuresTop)};width:${px(lineShot.width)}">Sample: ${summary.lines} lines in ${minutesSeconds(summary.seconds)} for ${usd(summary.costUsd)} in API calls; the clip’s hearing and watching came from an earlier run.${figures}</p>`,
   });
 }
 
 export const EDITOR_CSS = `
-.ed-shot { position:absolute; overflow:hidden; border-radius:10px; border:1px solid var(--rule); background:var(--lane); }
-.ed-shot img { display:block; }
-.ed-mark { position:absolute; width:${MARKER}px; height:${MARKER}px; border-radius:50%; background:var(--ink-100);
-  color:var(--screen); font-size:26px; font-weight:600; line-height:${MARKER}px; text-align:center;
-  box-shadow:0 0 0 4px rgba(9,9,10,.85); }
-.ed-col { position:absolute; }
-.ed-callouts { list-style:none; display:grid; row-gap:20px; }
-.ed-callouts li { display:grid; grid-template-columns:${MARKER}px 1fr; column-gap:16px; align-items:start; }
-.ed-num { width:${MARKER}px; height:${MARKER}px; border-radius:50%; border:2px solid var(--ink-100); font-size:24px;
-  font-weight:600; line-height:${MARKER - 4}px; text-align:center; color:var(--ink-100); }
-.ed-callouts p { font-size:26px; line-height:1.3; color:var(--ink-100); }
-.ed-eyes { width:${EYES_BOX.w}px; height:${EYES_BOX.h}px; overflow:hidden; margin:18px 0 0 ${MARKER + 16}px;
-  border:1px solid var(--rule); border-radius:8px; background:#000; }
-.ed-eyes img { display:block; }
-.ed-story { margin-top:28px; padding-top:18px; border-top:1px solid var(--rule); font-size:26px; line-height:1.4; }
-.ed-typed { margin-top:18px; font-size:26px; line-height:1.4; color:var(--ink-100); }
+.pd-shot { position:absolute; overflow:hidden; border-radius:10px; outline:1px solid var(--rule); background:var(--lane); }
+.pd-shot.cut-left img { -webkit-mask-image:linear-gradient(to right, transparent 0, #000 ${FADE_PX}px);
+  mask-image:linear-gradient(to right, transparent 0, #000 ${FADE_PX}px); }
+.pd-shot img { display:block; }
+.pd-ring { position:absolute; border:2px solid var(--ink-100); border-radius:12px; }
+.pd-cap { position:absolute; font-size:var(--fs-label); line-height:1.3; font-weight:600; color:var(--ink-100); }
+.pd-body { position:absolute; }
+.pd-figures { position:absolute; color:var(--ink-300); }
 `;

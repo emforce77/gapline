@@ -93,11 +93,11 @@ export interface CompetitorCell {
   span?: number;
 }
 export const COMPARE_COLUMNS = [
-  "Fits by measured voice",
-  "Re-checks shortenings and edits",
-  "Cites a written guideline",
-  "Lists what it missed",
-  "Korean guideline and voice",
+  "Fits measured voice",
+  "Re-checks every change",
+  "Cites a guideline",
+  "Reports what it missed",
+  "Korean guideline, voice",
   "Pauses the film",
 ];
 /**
@@ -119,7 +119,8 @@ export const COMPETITORS: { name: string; kind: string; cells: CompetitorCell[] 
   },
   {
     name: "ViddyScribe",
-    kind: "Gemini API winner, 2024",
+    // Gemini API Developer Competition winner, 2024: in the slide's note, to keep the face short.
+    kind: "",
     cells: [
       { support: "partly", note: "" },
       { support: "unknown", note: "" },
@@ -133,7 +134,8 @@ export const COMPETITORS: { name: string; kind: string; cells: CompetitorCell[] 
     name: "Microsoft, open source",
     kind: "",
     cells: [
-      { support: "yes", note: "up to 1.15×" },
+      // Its tempo cap, 1.15×, said in words: the slide face carries no multipliers.
+      { support: "yes", note: "up to 15% faster" },
       { support: "partly", note: "fit only; render fails" },
       { support: "no", note: "" },
       { support: "no", note: "" },
@@ -147,20 +149,21 @@ export const COMPETITORS: { name: string; kind: string; cells: CompetitorCell[] 
     cells: [
       { support: "unknown", note: "" },
       { support: "yes", note: "human QA" },
-      { support: "partly", note: "DCMP" },
+      { support: "partly", note: "US DCMP guide" },
       { support: "unknown", note: "" },
       { support: "unknown", note: "" },
       { support: "yes", note: "" },
     ],
   },
 ];
+/** Scene's own row. Guideline names are said in words: the slide face carries no acronyms. */
 export const SCENE_ROW: CompetitorCell[] = [
   { support: "yes", note: "speed, shorten, drop" },
-  { support: "yes", note: "same checks" },
-  { support: "yes", note: "KMCC, Netflix" },
+  { support: "yes", note: "rewrites, shortenings, fixes" },
+  { support: "yes", note: "Korea, Netflix" },
   { support: "yes", note: "model-written" },
-  { support: "yes", note: "KMCC, Korean voice" },
-  { support: "no", note: "drops the line" },
+  { support: "yes", note: "" },
+  { support: "no", note: "" },
 ];
 
 /** KOFIC's barrier-free film programme in 2025, via Newspim (24 Mar 2026); single secondary source. */

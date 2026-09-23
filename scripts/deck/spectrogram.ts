@@ -7,7 +7,7 @@
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { runFfmpeg } from "../../src/lib/media/ffmpeg";
-import { seven } from "./data/demo";
+import { seven } from "./data/sample";
 import { OPENING_SPAN } from "./data/recognizers";
 import { OUT, SHOWCASE_CLIP, SPECTROGRAMS } from "./paths";
 

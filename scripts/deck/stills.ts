@@ -1,6 +1,6 @@
 /** Which film frames the deck uses, as seconds into the film. Slides refer to them by name. */
 import { coverLine, newspaper } from "./data/city";
-import { lineHistory, opening, seven } from "./data/demo";
+import { line, opening, seven } from "./data/sample";
 import type { StillSpec } from "./film";
 
 const FULL = 1920;
@@ -23,16 +23,22 @@ SEVEN_FRAMES.forEach((t, i) => {
     throw new Error(`frame ${t}s is outside shot ${i + 1}`);
 });
 
-/** The reviewer slide's frame: inside the line it rejected, on the shot that shows SIMULATION READY. */
-const READY_FRAME = 55.8;
-const readyShot = opening.shots.find((s) => READY_FRAME >= s.start && READY_FRAME < s.end);
+/**
+ * The reviewer slide's frame: inside the line the final check sent back (Line 5, 47.2 s), on the shot
+ * whose on-screen words the rewrite reads ("MEMORY PLAYBACK - GLOBAL" in the sample's scene map).
+ */
+const PLAYBACK_FRAME = 48.5;
+const playbackShot = opening.shots.find((s) => PLAYBACK_FRAME >= s.start && PLAYBACK_FRAME < s.end);
+if (!playbackShot)
+  throw new Error(`no shot holds the reviewer slide's frame at ${PLAYBACK_FRAME}s`);
 if (
-  !readyShot ||
-  !/SIMULATION READY/.test(readyShot.onScreenText) ||
-  READY_FRAME < lineHistory.start ||
-  READY_FRAME >= lineHistory.windowEnd
+  !/MEMORY PLAYBACK/.test(playbackShot.onScreenText) ||
+  PLAYBACK_FRAME < line.start ||
+  PLAYBACK_FRAME >= line.windowEnd
 )
   throw new Error("the reviewer slide's frame is outside its line or its shot");
+/** The shot the reviewer slide's frame comes from. */
+const frameShot: NonNullable<typeof playbackShot> = playbackShot;
 
 export const thumbTimes = Array.from({ length: THUMB_COUNT }, (_, i) => {
   const slot = opening.clip / THUMB_COUNT;
@@ -46,7 +52,7 @@ export const STILL_SPECS: StillSpec[] = [
   ),
   ...thumbTimes.map((t, i) => ({ name: `thumb-${i}`, filmTime: t, width: THUMB })),
   { name: "news", filmTime: newspaper.filmTime, width: FULL },
-  { name: "ready", filmTime: READY_FRAME, width: FULL },
+  { name: "playback", filmTime: PLAYBACK_FRAME, width: FULL },
 ];
 
 export const stillUrl = (name: string): string => {
@@ -54,4 +60,4 @@ export const stillUrl = (name: string): string => {
   return `assets/stills/${name}.jpg`;
 };
 
-export { sevenShots };
+export { frameShot as playbackShot, sevenShots };

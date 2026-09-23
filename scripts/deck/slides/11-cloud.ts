@@ -1,15 +1,18 @@
 /**
  * 11. Built on Google Cloud, drawn as an architecture diagram: the project's region with the deploy
  * path (Cloud Build into Artifact Registry), the Cloud Run service and its container with the stages
- * that call each Google AI API, Cloud Storage with the two mechanisms that make it safe to share
- * (a mounted volume, conditional writes) and Secret Manager; the browser outside, fed by server-sent
- * events; two checks made on the live service. Service settings are read from deploy/cloud-run.sh and
- * the Gemini access wording from GEMINI_ACCESS_LABEL (src/lib/models.ts), the one place it may change.
+ * in the order the pipeline runs them (src/lib/pipeline/run.ts: the final check, then Fix, then Mix)
+ * and the Google AI API each one calls, Cloud Storage with what it keeps and its promise that each
+ * dollar is spent once (the conditional writes behind it are in the note; the volume mount is in the
+ * service's note) and Secret Manager; the browser outside, fed by server-sent events; what the live service does for its
+ * visitors. Service settings are read from
+ * deploy/cloud-run.sh and the Gemini access wording from GEMINI_ACCESS_LABEL (src/lib/models.ts), the
+ * one place it may change.
  */
 import { GEMINI_ACCESS_LABEL, MODELS } from "../../../src/lib/models";
-import { editSession } from "../data/demo";
+import { liveCheck } from "../data/live-check";
 import { SPEC } from "../data/deploy";
-import { esc, PASS_MARK, slide } from "../html";
+import { dayMonthYear, esc, PASS_MARK, slide } from "../html";
 import { notesFor } from "../notes";
 import { MARGIN, W } from "../theme";
 
@@ -30,9 +33,10 @@ const RUN: Rect = { x: 462, y: 352, w: 866, h: 388 };
 const BOX: Rect = { x: 486, y: 446, w: 818, h: 272 };
 const API_X = 1400;
 const API_W = W - MARGIN - API_X;
-const STT: Rect = { x: API_X, y: 452, w: API_W, h: 84 };
-const GEMINI: Rect = { x: API_X, y: 548, w: API_W, h: 112 };
-const TTS: Rect = { x: API_X, y: 672, w: API_W, h: 84 };
+/** Model boxes: a title and one line (Gemini: two), each arrow at a box's middle within the container. */
+const STT: Rect = { x: API_X, y: 436, w: API_W, h: 88 };
+const GEMINI: Rect = { x: API_X, y: 536, w: API_W, h: 124 };
+const TTS: Rect = { x: API_X, y: 672, w: API_W, h: 88 };
 const STORAGE: Rect = { x: 462, y: 780, w: 560, h: 150 };
 const SECRET: Rect = { x: 1042, y: 780, w: 286, h: 150 };
 const BROWSER: Rect = { x: MARGIN, y: 480, w: 150, h: 110 };
@@ -40,12 +44,14 @@ const LIVE_TOP = 800;
 /**
  * The stages inside the container, named as the how-it-works slide names them. Hear and Watch run
  * side by side (the pipeline starts both at once), then Write, Review and Voice run right, and
- * Measure, Mix and Final check run back left under them.
+ * Measure, Final check, Fix and Mix run back left under them: Mix is last.
  */
 const PARALLEL = ["Hear", "Watch"];
 const TOP_ROW = ["Write", "Review", "Voice"];
-const BACK_ROW = ["Measure", "Mix", "Final check"];
-const CHIP = { w: 150, h: 44, gap: 36, left: 510, parallel: [520, 580], row: 550, back: 668 };
+const BACK_ROW = ["Measure", "Final check", "Fix", "Mix"];
+const CHIP = { w: 164, h: 44, gap: 40, left: 508, parallel: [520, 580], row: 550, back: 668 };
+if (BACK_ROW.length > TOP_ROW.length + 1)
+  throw new Error("the back row runs past the first column of the container");
 
 const midY = (r: Rect) => r.y + r.h / 2;
 const at = (r: Rect) => `left:${r.x}px;top:${r.y}px;width:${r.w}px;height:${r.h}px`;
@@ -56,20 +62,22 @@ function box(r: Rect, title: string, lines: string[], cls = ""): string {
 }
 
 export function cloudSlide(): string {
-  const note = notesFor(11, "One Cloud Run service…");
-  if (!editSession.idempotentRepeat)
-    throw new Error("the live check no longer shows an idempotent edit");
+  const note = notesFor("Google Cloud");
+  if ([STT, GEMINI, TTS].some((r) => midY(r) <= BOX.y || midY(r) >= BOX.y + BOX.h))
+    throw new Error("a model's arrow would leave the container outside its height");
+  if (liveCheck.privateRoutesDenied !== liveCheck.privateRoutesChecked)
+    throw new Error("the live check no longer shows every private route denied");
   const settings = note(
-    `From the deploy script: ${SPEC.env}, ${SPEC.cpu} vCPU, ${SPEC.memory}, concurrency ${SPEC.concurrency}, ${SPEC.min}–${SPEC.max} instances, the bucket mounted as a volume, the model key from Secret Manager; built from source by Cloud Build into Artifact Registry. A run is one request; progress streams back as server-sent events.`,
+    `From the deploy script: ${SPEC.env}, ${SPEC.cpu} vCPU, ${SPEC.memory}, concurrency ${SPEC.concurrency}, ${SPEC.min}–${SPEC.max} instances, the bucket mounted as a volume, the model key from Secret Manager; built from source by Cloud Build into Artifact Registry.`,
   );
   const storage = note(
-    "A budget reservation or an edit request is claimed by writing an object only if its generation still matches (ifGenerationMatch). Two tabs cannot spend the same dollar or make the same edit twice. Each paid call is logged with its cost.",
+    "Holds clips, saved analysis and every run and version. A budget reservation or an edit request is claimed by writing an object only if its generation still matches (ifGenerationMatch), so two tabs cannot spend the same dollar or make the same edit twice. Each paid call is logged with its cost.",
   );
   const apis = note(
-    `Speech-to-Text v2, Chirp 3, called in the “us” multi-region: Google lists Chirp 3 only in the us and eu multi-regions (Chirp 3 model page, read 23 Sep 2026). 55 s chunks; since 23 Sep 2026 each silence is also recognized again on its own, a change not deployed yet. Text-to-Speech, Chirp 3 HD voice Charon. Gemini access: ${esc(GEMINI_ACCESS_LABEL)}.`,
+    `Speech-to-Text v2, Chirp 3, called in the “us” multi-region: Google lists Chirp 3 only in the us and eu multi-regions (Chirp 3 model page, read 23 Sep 2026). The whole clip in 55 s chunks, then each silence again on its own. Text-to-Speech, Chirp 3 HD voice Charon. Gemini access: ${esc(GEMINI_ACCESS_LABEL)}.`,
   );
   const live = note(
-    `22 Sep 2026, on the revision then deployed: an edit request sent twice made one version; ${editSession.privateRoutesDenied} of ${editSession.privateRoutesChecked} private routes answered 404 to a visitor who does not own them.`,
+    `Progress: a run is one request, and it streams its stages back as server-sent events. Private files: checked on ${dayMonthYear(liveCheck.day.toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" }))}, revision ${esc(liveCheck.revision)}: ${liveCheck.privateRoutesDenied} of ${liveCheck.privateRoutesChecked} private routes answered 404 to a visitor who does not own them.`,
   );
   const arrowPath = (x1: number, y1: number, x2: number, y2: number) =>
     `<path d="M${x1} ${y1} L${x2} ${y2}" class="cl-c thin" marker-end="url(#cl-s)"/>`;
@@ -134,7 +142,6 @@ export function cloudSlide(): string {
   return slide({
     id: "s-cloud",
     name: "google-cloud",
-    folio: 11,
     kind: "exhibit",
     body: `
 <div class="intro"><h1 class="headline" style="max-width:1728px">One Cloud Run service, three Google models.</h1></div>
@@ -148,23 +155,23 @@ export function cloudSlide(): string {
 ${box(BUILD, "Cloud Build", [], "slim")}
 ${box(REGISTRY, "Artifact Registry", [], "slim")}
 <p class="cl-edge" style="left:${REGISTRY.x + REGISTRY.w / 2 + 14}px;top:${REGISTRY.y + REGISTRY.h + 2}px">deploy</p>
-<div class="cl-box run" style="${at(RUN)}"><p class="cl-t big">Cloud Run service${settings}</p><p class="cl-x">${SPEC.env} · ${SPEC.cpu} vCPU · ${SPEC.memory} · ${SPEC.min}–${SPEC.max} instances</p></div>
-<div class="cl-box inner" style="${at(BOX)}"><p class="cl-t">Container: Next.js + FFmpeg</p></div>
+<div class="cl-box run" style="${at(RUN)}"><p class="cl-t big">Cloud Run service${settings}</p><p class="cl-x">${SPEC.cpu} vCPU · ${SPEC.memory} · ${SPEC.min}–${SPEC.max} instances</p></div>
+<div class="cl-box inner" style="${at(BOX)}"><p class="cl-t">Next.js + FFmpeg</p></div>
 <svg class="cl-svg" width="${W}" height="1080" viewBox="0 0 ${W} 1080" aria-hidden="true">${chipArrows.join("")}</svg>
 ${chips}
 <p class="cl-col-l" style="left:${API_X}px;top:${STT.y - 44}px">Google models${apis}</p>
-${box(STT, "Speech-to-Text v2, Chirp 3", ["word timings"])}
-${box(GEMINI, GEMINI_NAME, [`<span class="cl-aside">${esc(GEMINI_ACCESS_LABEL)}</span>`, "watches, writes, reviews"])}
-${box(TTS, "Text-to-Speech, Chirp 3 HD", ["one voice per line"])}
-${box(STORAGE, `Cloud Storage${storage}`, ["mounted as a volume: clips, runs, audio", "conditional writes: no double spend"])}
-${box(SECRET, "Secret Manager", ["model API key"])}
-${box(BROWSER, "Browser", ["the editor"])}
-<p class="cl-edge" style="left:${BROWSER.x + BROWSER.w + 12}px;top:${midY(BROWSER) - 62}px">clip, edits</p>
-<p class="cl-edge" style="left:${BROWSER.x + BROWSER.w + 12}px;top:${midY(BROWSER) + 34}px">progress (SSE)</p>
+${box(STT, "Speech-to-Text v2, Chirp 3", ["word timings, heard twice"])}
+${box(GEMINI, GEMINI_NAME, [`<span class="cl-aside">${esc(GEMINI_ACCESS_LABEL)}</span>`, "watches, writes, checks, fixes"])}
+${box(TTS, "Text-to-Speech, Chirp 3 HD", ["voices each line"])}
+${box(STORAGE, `Cloud Storage${storage}`, ["uploads, tracks and every version", "each dollar spent once"])}
+${box(SECRET, "Secret Manager", ["API key"])}
+${box(BROWSER, "Browser", ["you"])}
+<p class="cl-edge" style="left:${BROWSER.x + BROWSER.w + 12}px;top:${midY(BROWSER) - 62}px">clip</p>
+<p class="cl-edge" style="left:${BROWSER.x + BROWSER.w + 12}px;top:${midY(BROWSER) + 34}px">progress</p>
 <div class="cl-live" style="left:${API_X}px;top:${LIVE_TOP}px;width:${API_W}px">
-  <p class="label">Checked on the live service${live}</p>
-  <p class="cl-check">${PASS_MARK}An edit sent twice made one version</p>
-  <p class="cl-check">${PASS_MARK}Other visitors get 404 on private files</p>
+  <p class="label">Live service${live}</p>
+  <p class="cl-check">${PASS_MARK}Progress streams live</p>
+  <p class="cl-check">${PASS_MARK}Your uploads stay private</p>
 </div>`,
   });
 }
@@ -174,21 +181,21 @@ export const CLOUD_CSS = `
 .cl-c { fill:none; stroke:var(--ink-300); stroke-width:2; }
 .cl-c.dash { stroke-dasharray:7 6; }
 .cl-region { position:absolute; border:2px dashed #4a4d53; border-radius:14px; }
-.cl-region-l { position:absolute; font-size:24px; font-weight:600; color:var(--ink-300); }
+.cl-region-l { position:absolute; font-size:var(--fs-label); font-weight:600; color:var(--ink-300); }
 .cl-box { position:absolute; border:2px solid #3a3c41; border-radius:8px; background:var(--lane); padding:10px 16px; }
 .cl-box.slim { display:flex; align-items:center; padding:0 16px; }
 .cl-box.run { border-color:var(--ink-300); background:#101012; padding:14px 22px; }
 .cl-box.inner { border-color:#4a4d53; background:var(--lane); padding:12px 20px; }
-.cl-t { font-size:26px; line-height:1.2; font-weight:600; color:var(--ink-100); }
-.cl-t.big { font-size:30px; }
-.cl-x { margin-top:4px; font-size:24px; line-height:1.25; color:var(--ink-300); }
+.cl-t { font-size:var(--fs-label); line-height:1.2; font-weight:600; color:var(--ink-100); }
+.cl-t.big { font-size:var(--fs-body); }
+.cl-x { margin-top:4px; font-size:var(--fs-label); line-height:1.25; color:var(--ink-300); }
 .cl-aside { color:var(--ink-100); font-weight:500; }
 .cl-stage { position:absolute; display:flex; align-items:center; justify-content:center; border:1px solid #4a4d53;
-  border-radius:22px; background:var(--screen); font-size:24px; font-weight:500; color:var(--ink-100); white-space:nowrap; }
+  border-radius:22px; background:var(--screen); font-size:var(--fs-label); font-weight:500; color:var(--ink-100); white-space:nowrap; }
 .cl-c.thin { stroke:var(--ink-400); stroke-width:2; }
-.cl-col-l { position:absolute; font-size:24px; font-weight:600; color:var(--ink-300); }
-.cl-edge { position:absolute; font-size:24px; color:var(--ink-300); white-space:nowrap; }
+.cl-col-l { position:absolute; font-size:var(--fs-label); font-weight:600; color:var(--ink-300); }
+.cl-edge { position:absolute; font-size:var(--fs-label); color:var(--ink-300); white-space:nowrap; }
 .cl-live { position:absolute; }
-.cl-check { display:flex; align-items:center; gap:12px; margin-top:12px; font-size:26px; line-height:1.3; color:var(--ink-100); }
+.cl-check { display:flex; align-items:center; gap:12px; margin-top:12px; font-size:var(--fs-label); line-height:1.3; color:var(--ink-100); text-wrap:balance; }
 .cl-check svg { flex:none; }
 `;

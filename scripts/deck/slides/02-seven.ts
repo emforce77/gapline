@@ -1,9 +1,9 @@
 /**
  * 02. The hook, drawn to scale: the picture strip is exactly the silence between "…locked." and
- * "This is pretty freaky.", cut at its real shot boundary, with the dialogue at both ends and Scene's
- * two lines as measured voice inside their room. The line an editor typed says so.
+ * "This is pretty freaky.", cut at its real shot boundary, with the dialogue at both ends and the
+ * sample's two lines as measured voice inside their slots.
  */
-import { seven } from "../data/demo";
+import { opening, seven, summary } from "../data/sample";
 import { sevenHeard } from "../data/recognizers";
 import { dayMonthYear, esc, px, secs, slide } from "../html";
 import { notesFor } from "../notes";
@@ -15,13 +15,13 @@ const Y = {
   edge: 292,
   strip: 338,
   stripH: 404,
-  sub: 606,
+  sub: 598,
   dlgText: 758,
   dlg: 798,
   dlgH: 64,
   ad: 884,
   adH: 50,
-  tag: 942,
+  slot: 942,
 };
 const SHOT_GAP = 3;
 /** Lower share of each frame darkened under the subtitles, as film subtitles are, so they stay legible. */
@@ -31,13 +31,15 @@ const SUB_INSET = 24;
 const PAD_S = 0.3;
 /** Where each shot's crop sits in its frame, chosen by eye for the lettering and the brain. */
 const FOCUS = ["22% 40%", "50% 34%"];
+/** The body calls what a viewer hears in the silence "a hum": Scene's own sound label must say so. */
+const HUM = /\bhum/i;
 
 const domain = [seven.locked.start - PAD_S, seven.freaky.end + PAD_S] as const;
 const pps = (W - 2 * MARGIN) / (domain[1] - domain[0]);
 const x = (t: number) => MARGIN + (t - domain[0]) * pps;
 
 export function sevenSlide(): string {
-  const note = notesFor(2, "For seven seconds…");
+  const note = notesFor("Seven seconds");
   const from = seven.locked.end;
   const to = seven.freaky.start;
   const shown = sevenShots.filter((s) => s.end > from && s.start < to);
@@ -67,11 +69,23 @@ export function sevenSlide(): string {
     })
     .join("");
 
-  const hum = note(
-    `No words between ${secs(from)} and ${secs(to)}: Chirp 3 (Speech-to-Text v2) and a second recognizer (faster-whisper small) hear none on the whole clip, and the second hears none in that stretch recognized on its own (${dayMonthYear(sevenHeard.checkedAt)}); its spectrogram shows no voice, only steady tones. “Hum and music” is Scene’s own sound label (Gemini); no person has listened for it.`,
+  // What a viewer hears instead of words: Scene's own sound label over the silence.
+  const hum = opening.sounds.find((s) => s.start < to && s.end > from && HUM.test(s.label));
+  if (!hum) throw new Error("no sound label over the seven seconds says hum; the body does");
+  const humNote = note(
+    `No words between ${secs(from)} and ${secs(to)}: neither Chirp 3 (Speech-to-Text v2) nor a second recognizer (faster-whisper small) hears any, on the whole clip or on that stretch alone (${dayMonthYear(sevenHeard.checkedAt)}). “A hum” is Scene’s own sound label for it (Gemini: “${esc(hum.label)}”, ${hum.start}–${secs(hum.end, 1)}).`,
   );
-  const typed = seven.lines.filter((l) => l.byEditor);
-  if (typed.length !== 1) throw new Error("expected one editor-typed line in the seven seconds");
+  const last = seven.lines[seven.lines.length - 1];
+  const linesNote = note(
+    `The sample track: one automatic Korean run of the ${opening.clip} s opening, ${dayMonthYear(summary.day.toISOString().slice(0, 10))}. Its lines here: ${seven.lines
+      .map(
+        (l) =>
+          `at ${secs(l.start)}, ${secs(l.voiced)} of voice in a ${secs(l.windowEnd - l.start)} slot`,
+      )
+      .join(
+        "; ",
+      )}. The second ends ${secs(to - (last.start + last.voiced))} before the next word. The English glosses under the Korean lines are ours.`,
+  );
   const clips = seven.lines
     .map(
       (l) =>
@@ -79,27 +93,24 @@ export function sevenSlide(): string {
         `<div class="clip ad" style="left:${px(x(l.start) - MARGIN)};width:${px(l.voiced * pps)}"><span class="sv-clip">${secs(l.voiced)}</span></div>`,
     )
     .join("");
-  const tags = typed
+  const slots = seven.lines
     .map(
       (l) =>
-        `<p class="sv-tag" style="left:${px(x(l.start))};top:${Y.tag}px">typed by an editor${note(
-          `Typed by an editor from the reviewer’s suggested fix, then voiced, measured and reviewed by Scene. Glosses are ours.`,
-        )}</p>`,
+        `<p class="sv-slot" style="left:${px(x(l.start))};top:${Y.slot}px">in a ${secs(l.windowEnd - l.start)} slot</p>`,
     )
     .join("");
 
   return slide({
     id: "s-seven",
     name: "seven-seconds",
-    folio: 2,
     kind: "exhibit",
     filmCredit: true,
     body: `
 <div class="intro"><h1 class="headline" style="max-width:1728px">For seven seconds, a blind viewer hears no words.</h1></div>
-<p class="body sv-body" style="left:${MARGIN}px;top:${Y.body}px">Only hum and music${hum}, then someone says <q>This is pretty freaky.</q> In Scene’s Korean track, two lines fill the silence and end before the next word.</p>
+<p class="body sv-body" style="left:${MARGIN}px;top:${Y.body}px">Only a hum${humNote}, then someone says <q>This is pretty freaky.</q> Scene fit two lines${linesNote} into that silence; each ends before the next word.</p>
 <p class="sv-edge" style="left:${px(x(from))};top:${Y.edge}px">${secs(from)}</p>
 <p class="sv-edge" style="right:${px(W - x(to))};top:${Y.edge}px;text-align:right">${secs(to)}</p>
-<div class="sv-inout" style="left:${px(x(from))};width:${px(x(to) - x(from))};top:${Y.edge + 34}px"></div>
+<div class="sv-inout" style="left:${px(x(from))};width:${px(x(to) - x(from))};top:${Y.edge + 38}px"></div>
 ${shots}
 ${subs}
 <p class="sv-say" style="right:${px(W - x(from))};top:${Y.dlgText}px;text-align:right">“…${esc(seven.locked.text)}”</p>
@@ -110,23 +121,23 @@ ${subs}
   <div class="clip dialogue" style="left:${px(x(to) - MARGIN)};width:${px((seven.freaky.end - seven.freaky.start) * pps)}"></div>
 </div>
 <div class="lane" style="left:${MARGIN}px;width:${W - 2 * MARGIN}px;top:${Y.ad}px;height:${Y.adH}px">${clips}</div>
-${tags}`,
+${slots}`,
   });
 }
 
 export const SEVEN_CSS = `
 .sv-body { position:absolute; width:1240px; }
-.sv-edge { position:absolute; font-size:24px; color:var(--ink-100); font-variant-numeric:tabular-nums; }
+.sv-edge { position:absolute; font-size:var(--fs-label); color:var(--ink-100); font-variant-numeric:tabular-nums; }
 .sv-inout { position:absolute; height:14px; border-left:2px solid var(--ink-100); border-right:2px solid var(--ink-100);
   border-top:2px solid var(--ink-100); }
 .sv-scrim { position:absolute; background:linear-gradient(to bottom, rgba(9,9,10,0), rgba(9,9,10,.72)); }
 .sv-sub { font-size:36px; line-height:1.25; }
-.sv-sub .gloss { font-size:24px; }
-.sv-say { position:absolute; font-size:24px; font-weight:500; color:var(--ink-100); white-space:nowrap; }
+.sv-sub .gloss { font-size:var(--fs-label); }
+.sv-say { position:absolute; font-size:var(--fs-label); font-weight:500; color:var(--ink-100); white-space:nowrap; }
 .sv-span { position:absolute; top:0; height:100%; display:flex; align-items:center; gap:24px; }
 .sv-span i { flex:1; height:2px; background:var(--ink-400); }
-.sv-span span { font-size:28px; color:var(--ink-300); white-space:nowrap; }
+.sv-span span { font-size:var(--fs-body); color:var(--ink-300); white-space:nowrap; }
 .sv-span b { font-weight:400; font-size:60px; color:var(--ink-100); margin-right:10px; vertical-align:-4px; }
-.sv-clip { display:block; padding:0 12px; font-size:22px; font-weight:600; line-height:${Y.adH}px; font-variant-numeric:tabular-nums; }
-.sv-tag { position:absolute; font-size:24px; color:var(--ink-300); white-space:nowrap; }
+.sv-clip { display:block; padding:0 12px; font-size:var(--fs-label); font-weight:600; line-height:${Y.adH}px; font-variant-numeric:tabular-nums; }
+.sv-slot { position:absolute; font-size:var(--fs-label); color:var(--ink-300); white-space:nowrap; font-variant-numeric:tabular-nums; }
 `;

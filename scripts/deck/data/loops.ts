@@ -1,7 +1,8 @@
 /**
  * What the two loops did in the default reviewer's finished evaluation runs (22 Sep 2026), counted
  * line by line from each run's script.json and cross-checked against the runs' own summaries. The
- * how-it-works slide prints these counts on its loops.
+ * film's evidence caption prints these counts (scripts/demo/storyboard.ts, the "evidence" scene);
+ * the limits slide's note gives the finished runs' lines beside the default-setting runs that stopped.
  */
 import { join } from "node:path";
 import { EVAL_SUMMARY, REPO } from "../paths";
@@ -10,6 +11,10 @@ import { EvalSummarySchema, readJsonFile, ScriptSchema, type RunCue } from "./sc
 const summary = readJsonFile(EVAL_SUMMARY, EvalSummarySchema);
 const runs = summary.runs.filter((r) => r.setting === "high" && r.status === "done");
 if (runs.length === 0) throw new Error("no finished default-reviewer runs in the evaluation");
+/** Default-reviewer evaluation runs that stopped before a track (the evaluation's "failed"). */
+export const stoppedDefaultRuns = summary.runs.filter(
+  (r) => r.setting === "high" && r.status === "failed",
+).length;
 const scripts = runs.map((r) =>
   readJsonFile(
     join(REPO, "runtime/projects", r.projectId, "runs", r.runId, "script.json"),

@@ -5,7 +5,7 @@
 import { readFileSync } from "node:fs";
 import { spokenUnits, UNITS_PER_SECOND } from "../../../src/lib/pipeline/length";
 import { CITY_RUN, FIT_SOURCE } from "../paths";
-import { round2 } from "./showcase";
+import { round2 } from "./runs";
 import { readJsonFile, ScriptSchema, type RunCue } from "./schema";
 
 /** eval-tos-city.mp4 is film 65–110 s (runtime/evaluation/cases.json "from", frame-checked by film.ts). */

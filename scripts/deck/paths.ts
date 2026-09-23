@@ -20,9 +20,11 @@ export const CONTACT_SHEET = join(OUT, "contact-sheet.png");
 export const CHECK_NOTE = join(OUT, "scene-deck_check.md");
 
 export const PROJECTS = join(REPO, "runtime/projects");
+/** The one sample run the app, the film and the deck show (project and run id). */
+export const SHOWCASE_PIN = join(REPO, "runtime/showcase.json");
 /** The clip Scene heard for the sample (the opening, film 0–65 s). */
 export const SHOWCASE_CLIP = join(PROJECTS, "tos-opening/clip.mp4");
-/** Checks run against the live Cloud Run service after the recorded edit. */
+/** Checks run against the live Cloud Run service on 22 Sep 2026, around one line edit. */
 export const LIVE_CHECK = join(REPO, "runtime/demo-v2/live-check.json");
 /** English run (default reviewer) on the Tears of Steel city sequence, 45 s. */
 export const CITY_RUN = join(
