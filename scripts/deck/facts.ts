@@ -50,7 +50,7 @@ export const HAND_MADE = {
   foreignWonMillions: 31,
   usdThousands: 10,
   source:
-    "Barrier-Free Film Committee FAQ (undated; covers description and captions); 더나은미래 2019 interview",
+    "Barrier-Free Film Committee FAQ (undated; covers description and captions); The Better Future (Futurechosun) 2019 interview",
 };
 
 /** Public subsidy for described, captioned and signed TV, in billions of won. */

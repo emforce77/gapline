@@ -76,7 +76,7 @@ export function whyNowSlide(): string {
   const bar = (year: number, won: number) =>
     `<div class="wn-bar"><span class="wn-by">${year}</span><i style="width:${px((won / SUBSIDY.before.won) * SUBSIDY_BAR_MAX)}"></i><span class="wn-bv">₩${won.toFixed(2)}B</span></div>`;
   const hand = note(
-    `Barrier-Free Film Committee FAQ (undated): about ₩${HAND_MADE.wonMillions}M per Korean film, description and captions together. ${HAND_MADE.months} months, about ${HAND_MADE.specialists} people: committee interview, 더나은미래, 2019. ₩1,358 per US$ (22 Sep 2026).`,
+    `Barrier-Free Film Committee FAQ (undated): about ₩${HAND_MADE.wonMillions}M per Korean film, description and captions together. ${HAND_MADE.months} months, about ${HAND_MADE.specialists} people: committee interview, The Better Future (Futurechosun), 2019. ₩1,358 per US$ (22 Sep 2026).`,
   );
   const subsidy = note(`Korea Blind Union statement and KMCC’s reply to Beminor, 13 Mar 2026.`);
 
