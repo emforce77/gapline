@@ -1,6 +1,6 @@
 /**
- * The hook's two drawn scenes. "dark": a black screen while the film's own sound plays, the dialogue
- * as captions and a line that measures the silence as it passes. "seven": the same seconds drawn to
+ * The hook's two drawn scenes. "dark": "Close your eyes." on a black screen, then the film's own sound
+ * with its dialogue shown and a line that measures the silence as it passes. "seven": the same seconds drawn to
  * scale (deck slide 2), with Scene's two lines growing to their measured length inside their room.
  */
 import { gloss } from "../../deck/glosses";
@@ -9,6 +9,9 @@ import { masterCut } from "../master";
 import { esc, pageHtml, STAGE, still, type PageTiming } from "./shell";
 
 const M = STAGE.margin;
+
+/** How much closer the words held after the film's sound drift, over the rest of the scene. */
+const DRIFT = 0.06;
 
 export function darkPage(timing: PageTiming): string {
   const h = film.hook;
@@ -48,10 +51,13 @@ const cap = (el, a, b) => { el.style.opacity = prog(f, a, 0.15) * (1 - prog(f, b
 cap($('#locked'), D.h.locked.start, D.h.locked.end + 1.0);
 cap($('#freaky'), D.h.freaky.start, D.h.freaky.end + 0.6);
 const s = lin(f, D.h.locked.end, D.h.freaky.start - D.h.locked.end);
-const after = D.S[1];
+const after = D.S[0];
 const on = prog(f, D.h.locked.end, 0.3) * (1 - prog(t, after - 0.2, 0.5));
-reveal($('#sum'), prog(t, after, 0.6) * (1 - prog(t, after + D.L[1] * 0.55, 0.4)), 16);
-reveal($('#open'), prog(t, after + D.L[1] * 0.6, 0.5) * (1 - prog(t, D.T - 0.25, 0.25)), 10);
+reveal($('#sum'), prog(t, after, 0.6) * (1 - prog(t, D.S[1] - 0.1, 0.4)), 16);
+reveal($('#open'), prog(t, D.S[1] + 0.2, 0.5) * (1 - prog(t, D.T - 0.25, 0.25)), 10);
+// A slow push on the words held after the film's sound, so the picture keeps moving while they are read.
+const drift = (el, from) => { el.style.transform += ' scale(' + (1 + ${DRIFT} * lin(t, from, D.T - from)) + ')'; };
+drift($('#sum'), after); drift($('#open'), D.S[1]);
 const w = s * ${width};
 $('#meter').style.width = w + 'px';
 $('#meter').style.opacity = on;
@@ -123,8 +129,6 @@ export async function sevenPage(timing: PageTiming): Promise<string> {
         `<p class="a sv-m" style="left:${x(l.start)}px">${l.voiced.toFixed(2)} s <span>spoken, of ${(l.windowEnd - l.start).toFixed(2)} s</span></p>`,
     )
     .join("");
-  const edited = lines.find((l) => l.byEditor);
-  if (!edited) throw new Error("no editor line in the seven seconds");
   const css = `
 .sv-shot { top:${SEVEN.strip}px; height:${SEVEN.stripH}px; overflow:hidden; opacity:0; }
 .sv-shot img { width:100%; height:100%; object-fit:cover; transform-origin:50% 50%; }
@@ -156,7 +160,7 @@ ${subs}
 <div class="a sv-span" style="left:${silentFrom + 16}px;width:${silentTo - silentFrom - 32}px"><i></i><span><b>${h.silence.toFixed(2)} s</b>with no dialogue</span><i></i></div>
 <div class="lane" style="left:0;width:${STAGE.w}px;top:${SEVEN.ad}px;height:${SEVEN.adH}px">${rooms}</div>
 ${measured}
-<p class="a" id="sv-tag" style="left:${x(edited.start)}px">↑ typed by an editor from the reviewer’s fix</p>
+<p class="a" id="sv-tag" style="left:${x(lines[0].start)}px">↑ both written, reviewed, voiced and measured by Scene, with no edits</p>
 <p class="src">Speech timing from Chirp 3. Amber: Scene’s lines at their measured length, inside the outlined room. Glosses ours.<br><i>Tears of Steel</i> © Blender Foundation, CC BY 3.0</p>`;
   const render = `
 const S = D.S;

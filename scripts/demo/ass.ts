@@ -1,5 +1,5 @@
 /**
- * Subtitle (ASS) documents for each scene: the presenter's captions in the band under the picture,
+ * Subtitle (ASS) documents for each scene: the film's captions in the band under the picture,
  * Scene's own lines as amber subtitles over the film, and the overlays drawn over recorded UI
  * (labels, service chips, and a spotlight that dims everything but one element). The palette is the
  * deck's: ink on near-black, amber only for Scene's words.
@@ -23,12 +23,17 @@ export interface AssEvent {
 }
 
 /** Caption line limits in characters (broadcast practice: about 42 for English, fewer for Korean). */
-export const CAPTION_CHARS = { en: 42, ko: 22 } as const;
+export const CAPTION_CHARS = { en: 42, ko: 26 } as const;
 export type CaptionLanguage = keyof typeof CAPTION_CHARS;
 const CAPTION_LINES = 2;
-/** How many characters of imbalance a break after a comma, or after a full stop, is worth. */
+/**
+ * How many characters of imbalance a break after a comma or a full stop is worth, and a break before
+ * a conjunction (the second line then starts its own clause: "…the reviewer's fix / and reviews it").
+ */
 const CLAUSE_BONUS = 15;
-const SENTENCE_BONUS = 16;
+const SENTENCE_BONUS = 18;
+const CONJUNCTION_BONUS = 10;
+const CONJUNCTION = /^(and|but|or|so|then|while|because|when)$/i;
 /** A caption run may pass its share of the sentence by this factor, or close early at a clause end past this share. */
 const EVEN_SLACK = 1.15;
 const EVEN_EARLY = 0.75;
@@ -57,10 +62,14 @@ const KO_BOUND =
   /^(중|대신|안|동안|전|없이|것|수|하나|함께)(에|에서|에서만|은|는|이|을|를|도|만)?[,.]?$/u;
 /** Two capitalised words in a row are one name (Supreme Court, Cloud Run). */
 const CAPITALISED = /^\p{Lu}/u;
-/** Characters a written number takes when spoken: "14" as fourteen, "2.3" as two point three; 이십, 이 점 삼. */
-const SPOKEN_DIGIT: Record<CaptionLanguage, number> = { en: 4, ko: 1.5 };
-const SPOKEN_POINT: Record<CaptionLanguage, number> = { en: 7, ko: 1 };
 const BAND_CENTRE_Y = CONTENT_HEIGHT + (HEIGHT - CONTENT_HEIGHT) / 2;
+/**
+ * The captions carry the story, so they are set larger than a subtitle (two lines still fit the
+ * 120 px band), in Pretendard Medium, and fade rather than cut.
+ */
+const CAPTION_PX = 41;
+const CAPTION_WEIGHT = 500;
+const CAPTION_FADE_MS = { in: 160, out: 120 };
 
 /** #rrggbb as ASS &HBBGGRR (alpha set separately). */
 const bgr = (hex: string): string => {
@@ -97,7 +106,7 @@ export function assDocument(events: AssEvent[]): string {
     "",
     "[V4+ Styles]",
     "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    STYLE("Say", 38, INK, false, 5),
+    STYLE("Say", CAPTION_PX, INK, false, 5),
     STYLE("Sub", 46, AMBER, false, 2),
     STYLE("Dlg", 38, INK_300, false, 2),
     STYLE("Tag", 26, INK, true, 7),
@@ -178,7 +187,13 @@ function balance(text: string, limit: number): string[] {
     const a = chunks.slice(0, i).join(" ");
     const b = chunks.slice(i).join(" ");
     if (a.length > limit || b.length > limit) continue;
-    const bonus = /[.?!]$/.test(a) ? SENTENCE_BONUS : /[,:;]$/.test(a) ? CLAUSE_BONUS : 0;
+    const bonus = /[.?!]$/.test(a)
+      ? SENTENCE_BONUS
+      : /[,:;]$/.test(a)
+        ? CLAUSE_BONUS
+        : CONJUNCTION.test(chunks[i].split(" ")[0])
+          ? CONJUNCTION_BONUS
+          : 0;
     const s = Math.abs(a.length - b.length) - bonus;
     if (s < score) {
       score = s;
@@ -222,22 +237,6 @@ function evenRuns(text: string, count: number, limit: number): string[] {
   return runs;
 }
 
-/** Length of `text` as heard: characters, with written numbers counted as spoken. */
-function spokenLength(text: string, lang: CaptionLanguage): number {
-  const said = text.replace(/(?<=\d),(?=\d)/g, "");
-  const digits = said.match(/\d/g)?.length ?? 0;
-  const points = said.match(/(?<=\d)\.(?=\d)/g)?.length ?? 0;
-  return said.length - digits - points + digits * SPOKEN_DIGIT[lang] + points * SPOKEN_POINT[lang];
-}
-
-/** When a sentence's captions are on screen, and when its words are heard (the same clock). */
-export interface CaptionTiming {
-  show: number;
-  hide: number;
-  speechFrom: number;
-  speechTo: number;
-}
-
 /** Caption groups set by hand for one sentence, checked against its text and the line limits. */
 function givenGroups(text: string, limit: number, groups: string[][]): string[][] {
   if (groups.map((g) => g.join(" ")).join(" ") !== text)
@@ -248,50 +247,33 @@ function givenGroups(text: string, limit: number, groups: string[][]): string[][
 }
 
 /**
- * One sentence as caption events of up to two lines. The first shows at `show` and the last hides at
- * `hide`; in between, a caption changes when its first words are due, by its share of the spoken
- * length across the heard span. `given` sets the groups instead of the break rules.
+ * One sentence as captions of up to two lines each, split where the break rules find the natural
+ * seams; `given` sets the groups instead.
  */
-export function sentenceCaptions(
-  text: string,
-  lang: CaptionLanguage,
-  timing: CaptionTiming,
-  given?: string[][],
-): Caption[] {
+export function captionGroups(text: string, lang: CaptionLanguage, given?: string[][]): string[][] {
   const limit = CAPTION_CHARS[lang];
+  if (given) return givenGroups(text, limit, given);
+  // One caption when the sentence splits into two lines that both fit.
+  if (text.length <= limit) return [[text]];
+  const pair = balance(text, limit);
+  if (pair.length === CAPTION_LINES) return [pair];
   const greedy = captionLines(text, limit);
   const count = Math.ceil(greedy.length / CAPTION_LINES);
-  let groups = given
-    ? givenGroups(text, limit, given)
-    : evenRuns(text, count, limit).map((run) =>
-        run.length <= limit ? [run] : balance(run, limit),
-      );
-  if (!given && groups.some((g) => g.some((line) => line.length > limit))) {
-    groups = [];
-    for (let i = 0; i < greedy.length; i += CAPTION_LINES)
-      groups.push(greedy.slice(i, i + CAPTION_LINES));
-  }
-  const weights = groups.map((g) => spokenLength(g.join(" "), lang));
-  const total = weights.reduce((n, w) => n + w, 0);
-  const heard = timing.speechTo - timing.speechFrom;
-  let said = 0;
-  const due = [timing.show];
-  for (const w of weights.slice(0, -1)) {
-    said += w;
-    due.push(timing.speechFrom + (heard * said) / total);
-  }
-  return groups.map((lines, k) => ({
-    start: due[k],
-    end: k === groups.length - 1 ? timing.hide : due[k + 1],
-    lines,
-  }));
+  const groups = evenRuns(text, count, limit).map((run) =>
+    run.length <= limit ? [run] : balance(run, limit),
+  );
+  if (!groups.some((g) => g.some((line) => line.length > limit))) return groups;
+  const fallback: string[][] = [];
+  for (let i = 0; i < greedy.length; i += CAPTION_LINES)
+    fallback.push(greedy.slice(i, i + CAPTION_LINES));
+  return fallback;
 }
 
 export const sayEvent = (c: Caption): AssEvent => ({
   start: c.start,
   end: c.end,
   style: "Say",
-  text: `{\\pos(${WIDTH / 2},${BAND_CENTRE_Y})}${c.lines.map(assText).join("\\N")}`,
+  text: `{\\pos(${WIDTH / 2},${BAND_CENTRE_Y})\\b${CAPTION_WEIGHT}\\fad(${CAPTION_FADE_MS.in},${CAPTION_FADE_MS.out})}${c.lines.map(assText).join("\\N")}`,
 });
 
 /** Scene's line over the film: Korean in amber, our English gloss under it in ink. */

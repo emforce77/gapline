@@ -1,6 +1,6 @@
 /**
  * Records the app scenes (beats.ts) in Chrome at 2× device scale (2880×1440 frames from a 1440×720
- * viewport), in the English interface, timed by the presenter's plan for the film's language.
+ * viewport), in the English interface, timed by the caption plan for the film's language.
  * Requests that would start a paid run or edit are aborted; if any was attempted the recording fails.
  *
  * Output: runtime/demo-v3/<lang>/rec/{frames/*.jpg, frames.json, beats.json}
@@ -10,19 +10,11 @@ import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { probeMedia } from "../../src/lib/media/ffmpeg";
 import { SCRIPTS } from "./beats";
-import {
-  BASE_URL,
-  CHROME_PATH,
-  DEVICE_SCALE,
-  EDIT_CHILD_RUN,
-  EDIT_PARENT_RUN,
-  ORIGINAL_RUN,
-  PROJECT_ID,
-  VIEWPORT,
-} from "./config";
+import { BASE_URL, CHROME_PATH, DEVICE_SCALE, PROJECT_ID, SAMPLE_RUN, VIEWPORT } from "./config";
 import { BeatClock, CURSOR_SCRIPT, type BeatRecord, type Frame } from "./recorder-kit";
 import type { Scene } from "./storyboard";
-import { planScene, type VoicedSentence } from "./voice";
+import type { Language } from "../../src/lib/pipeline/schemas";
+import { planScene } from "./timing";
 
 const PAID = /\/(runs|edits)(\/|$|\?)/;
 const JPEG_QUALITY = 88;
@@ -33,18 +25,17 @@ function median(values: number[]): number {
   return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
 }
 
-/** Stops before recording anything when the service does not hold the pinned runs. */
+/** Stops before recording anything when the service does not hold the sample run. */
 async function checkPinnedRuns(): Promise<void> {
   const response = await fetch(`${BASE_URL}/api/projects/${PROJECT_ID}/runs`);
   if (!response.ok) throw new Error(`${BASE_URL}: runs HTTP ${response.status}`);
   const ids = ((await response.json()) as { runs: { runId: string }[] }).runs.map((r) => r.runId);
-  for (const id of [ORIGINAL_RUN, EDIT_PARENT_RUN, EDIT_CHILD_RUN])
-    if (!ids.includes(id)) throw new Error(`${BASE_URL} does not have run ${id}`);
+  if (!ids.includes(SAMPLE_RUN)) throw new Error(`${BASE_URL} does not have run ${SAMPLE_RUN}`);
 }
 
 export async function recordApp(input: {
   scenes: Scene[];
-  voiced: VoicedSentence[];
+  lang: Language;
   outDir: string;
 }): Promise<void> {
   await checkPinnedRuns();
@@ -97,7 +88,7 @@ export async function recordApp(input: {
     for (const scene of input.scenes) {
       if (!("beat" in scene.show)) continue;
       const beat = scene.show.beat;
-      const plan = planScene(scene, input.voiced);
+      const plan = planScene(scene, input.lang);
       await SCRIPTS[beat].before(page);
       const clock = new BeatClock(page, beat, plan.seconds);
       await SCRIPTS[beat].run(page, clock, plan);

@@ -3,7 +3,7 @@
  *   page   — a motion page rendered frame by frame (motion.ts);
  *   film   — the described film itself, letterboxed, with Scene's lines as amber subtitles;
  *   beat   — the app recording, retimed through its squeezed waits, with the camera and overlays.
- * The caption band under the picture carries the presenter's captions in every scene.
+ * The caption band under the picture carries the film's captions in every scene.
  */
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -20,7 +20,7 @@ import {
   type AssEvent,
 } from "./ass";
 import { cameraAt, cameraFilters, cameraKeys, settledAt, toPicture } from "./camera";
-import { CONTENT_HEIGHT, EDIT_CHILD_RUN, FPS, HEIGHT, runFile, WIDTH } from "./config";
+import { CONTENT_HEIGHT, FPS, HEIGHT, runFile, SAMPLE_RUN, WIDTH } from "./config";
 import { encodeArgs, subtitlesFilter } from "./encode";
 import { film } from "./facts";
 import { masterCut } from "./master";
@@ -28,9 +28,9 @@ import { renderMotion } from "./motion";
 import { PAGES } from "./pages/index";
 import { toOutput, type BeatRecord, type Frame } from "./recorder-kit";
 import type { Scene } from "./storyboard";
-import type { ScenePlan } from "./voice";
+import type { ScenePlan } from "./timing";
 
-export const DESCRIBED_FILM = runFile(EDIT_CHILD_RUN, "described.mp4");
+export const DESCRIBED_FILM = runFile(SAMPLE_RUN, "described.mp4");
 const BAND = COLOR.screen.replace("#", "0x");
 const FILM_H = 800;
 const FILM_TOP = (CONTENT_HEIGHT - FILM_H) / 2;
@@ -80,7 +80,7 @@ async function encodeWithFilters(
 
 async function pageSegment(s: SegmentInput): Promise<void> {
   if (!("page" in s.scene.show)) throw new Error("not a page scene");
-  const says = s.plan.parts.filter((p) => p.sentence);
+  const says = s.plan.parts.filter((p) => p.captions);
   const filmPart = s.plan.parts.find((p) => "film" in p.part);
   const timing = {
     T: s.seconds,

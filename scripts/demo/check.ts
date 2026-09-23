@@ -1,27 +1,27 @@
 /**
  * Writes scene-demo-<lang>_check.md next to the film: length, picture, loudness, the pacing limits
- * (longest frozen stretch, presenter words per minute, caption line length), what the recording
- * captured, the presenter's text-to-speech spend, and whether the cloud page still shows the
- * development Gemini access label. Also writes the contact sheet (one frame every four seconds).
- * Unchecked boxes are limits the film does not meet.
+ * (longest frozen stretch, caption reading pace, caption line length, blank caption band), what the
+ * recording captured, and whether the cloud page still shows the development Gemini access label.
+ * Also writes the contact sheet (one frame every four seconds). Unchecked boxes are limits the film
+ * does not meet.
  */
-import { existsSync } from "node:fs";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { readCallRecords } from "../../src/lib/llm/ledger";
 import { GEMINI_ACCESS_LABEL } from "../../src/lib/models";
 import { integratedLufs } from "../../src/lib/media/mix";
 import { probeDurationSeconds, probeMedia, runFfmpeg } from "../../src/lib/media/ffmpeg";
 import type { Language } from "../../src/lib/pipeline/schemas";
 import { CAPTION_CHARS } from "./ass";
-import { CONTENT_HEIGHT, MAX_SECONDS, OUT, WIDTH } from "./config";
+import type { SrtCue } from "./build";
+import { CONTENT_HEIGHT, MAX_SECONDS, WIDTH } from "./config";
 import type { Placed } from "./mix";
 import type { Frame } from "./recorder-kit";
-import { MAX_WPM, type VoicedSentence } from "./voice";
+import { MIN_CAPTION_S, READING_CPS } from "./timing";
 
 export const MAX_FROZEN_S = 4;
 const MAX_CAPTION_CHARS = 42;
-const TTS_BUDGET_USD = 0.5;
+/** Longest stretch with no caption up, outside film sound (where the film's own words speak). */
+const MAX_BLANK_S = 6;
 const CONTACT_EVERY_S = 4;
 const FREEZE = "freezedetect=n=0.001:d=2";
 
@@ -47,34 +47,18 @@ async function frozenStretches(file: string): Promise<{ start: number; seconds: 
     .sort((a, b) => b.seconds - a.seconds);
 }
 
-async function ttsSpend(): Promise<{ lang: string; usd: number; chars: number }[]> {
-  const rows = [];
-  for (const lang of ["en", "ko"]) {
-    const ledger = join(OUT, lang, "voice", "ledger.jsonl");
-    if (!existsSync(ledger)) continue;
-    const calls = await readCallRecords(ledger);
-    rows.push({
-      lang,
-      usd: calls.reduce((n, c) => n + c.costUsd, 0),
-      chars: calls.filter((c) => c.ok).reduce((n, c) => n + (c.characters ?? 0), 0),
-    });
-  }
-  return rows;
-}
-
 export async function writeCheck(input: {
   lang: Language;
   out: string;
   outDir: string;
   placed: Placed[];
   total: number;
-  voiced: VoicedSentence[];
-  captionLines: string[];
+  captions: SrtCue[];
   frames: Frame[];
   soundNotes: string[];
   recDir: string;
 }): Promise<string> {
-  const { lang, out, outDir, placed, voiced } = input;
+  const { lang, out, outDir, placed, captions } = input;
   const box = (ok: boolean) => (ok ? "[x]" : "[ ]");
   const source = JSON.parse(await readFile(join(input.recDir, "source.json"), "utf8")) as {
     baseUrl: string;
@@ -87,12 +71,27 @@ export async function writeCheck(input: {
   const size = (await stat(out)).size;
   const frozen = await frozenStretches(out);
   const longest = frozen[0]?.seconds ?? 0;
-  const estimated = voiced.some((v) => v.file === null);
-  const fastest = [...voiced].sort((a, b) => b.wpm - a.wpm)[0];
   const lineLimit = Math.min(MAX_CAPTION_CHARS, CAPTION_CHARS[lang]);
-  const widest = [...input.captionLines].sort((a, b) => b.length - a.length)[0] ?? "";
-  const spend = await ttsSpend();
-  const spent = spend.reduce((n, s) => n + s.usd, 0);
+  const widest =
+    captions.flatMap((c) => c.text.split("\n")).sort((a, b) => b.length - a.length)[0] ?? "";
+  const pace = (c: SrtCue) => c.text.replace("\n", " ").length / (c.end - c.start);
+  const fastest = [...captions].sort((a, b) => pace(b) - pace(a))[0];
+  const briefest = [...captions].sort((a, b) => a.end - a.start - (b.end - b.start))[0];
+  // Film sound (the hook and its reveal, the played line) is meant to be heard without captions.
+  const heard = placed.flatMap((p) => [
+    ...p.plan.parts
+      .filter((x) => "film" in x.part)
+      .map((x) => ({ start: p.start + x.start, end: p.start + x.start + x.seconds })),
+    ...("film" in p.scene.show ? [{ start: p.start, end: p.start + p.seconds }] : []),
+  ]);
+  const covered = [...captions, ...heard].sort((a, b) => a.start - b.start);
+  let blank = { start: 0, seconds: 0 };
+  let reach = 0;
+  for (const c of covered) {
+    if (c.start - reach > blank.seconds) blank = { start: reach, seconds: c.start - reach };
+    reach = Math.max(reach, c.end);
+  }
+  if (input.total - reach > blank.seconds) blank = { start: reach, seconds: input.total - reach };
   const contact = join(outDir, `scene-demo-${lang}_contact.jpg`);
   const cols = 6;
   const rows = Math.ceil(duration / CONTACT_EVERY_S / cols);
@@ -133,14 +132,13 @@ export async function writeCheck(input: {
     ...frozen
       .slice(0, 5)
       .map((f) => `  - ${r1(f.start)}–${r1(f.start + f.seconds)} s (${r1(f.seconds)} s)`),
-    `- ${box(!estimated && fastest.wpm <= MAX_WPM)} presenter pace: fastest sentence ${fastest.wpm.toFixed(0)} words/min (limit ${MAX_WPM}): "${fastest.text}"${estimated ? " — ESTIMATED, not voiced" : ""}`,
+    `- ${box(pace(fastest) <= READING_CPS[lang] + 0.05)} caption reading pace: ${captions.length} captions, fastest ${pace(fastest).toFixed(1)} characters/s (limit ${READING_CPS[lang]}): "${fastest.text.replace("\n", " ")}"`,
+    `- ${box(briefest.end - briefest.start >= MIN_CAPTION_S - 0.01)} shortest caption on screen: ${r1(briefest.end - briefest.start)} s (at least ${MIN_CAPTION_S} s)`,
     `- ${box(widest.length <= lineLimit)} captions: longest line ${widest.length} characters (limit ${lineLimit}): "${widest}"`,
-    estimated
-      ? `- [ ] **presenter NOT VOICED**: sentence lengths are estimates (npm run demo -- ${lang} voice --estimate); the film has no presenter sound. Synthesize with \`npm run demo -- ${lang} voice\`, then record and build again.`
-      : `- [x] presenter: ${voiced.length} sentences, voice ${[...new Set(voiced.map((v) => v.voice))].join(", ")}`,
+    `- ${box(blank.seconds <= MAX_BLANK_S)} longest stretch with no caption and no film sound: ${r1(blank.seconds)} s from ${r1(blank.start)} s (limit ${MAX_BLANK_S} s)`,
+    `- [x] no presenter voice: the sound is the film's own, and captions tell the story`,
     // Same open item as the deck's (scripts/deck/build-deck.ts): the cloud page prints this label.
     `- ${box(!/openrouter/i.test(GEMINI_ACCESS_LABEL))} Gemini access on the cloud page: "${GEMINI_ACCESS_LABEL}"${/openrouter/i.test(GEMINI_ACCESS_LABEL) ? " — the development label; switch to the Gemini API (Google AI Studio), change GEMINI_ACCESS_LABEL and build again before submission" : ""}`,
-    `- ${box(spent <= TTS_BUDGET_USD)} presenter text-to-speech spend so far: $${spent.toFixed(4)} of $${TTS_BUDGET_USD.toFixed(2)} (${spend.map((s) => `${s.lang} ${s.chars} characters $${s.usd.toFixed(4)}`).join(", ") || "no calls"})`,
     `- [x] recording (2880×1440 frames):`,
     ...beatRows,
     `- [x] sound:`,

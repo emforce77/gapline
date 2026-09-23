@@ -142,14 +142,8 @@ export async function constraintPage(timing: PageTiming): Promise<string> {
         `<div class="clip ad ct-bar" data-w="${l.voiced * pps}" style="left:${x(l.start) - C.x0}px;width:0"></div>`,
     )
     .join("");
-  // Lines an editor typed say so, as on the deck's constraint slide.
-  const typed = o.lines.filter((l) => l.byEditor).length;
   const shortest = o.gaps.find((g) => g.id === o.shortestId);
   if (!shortest) throw new Error(`shortest gap ${o.shortestId} is not among the gaps`);
-  const editorTags = o.lines
-    .filter((l) => l.byEditor)
-    .map((l) => `<p class="a ct-typed" style="left:${x(l.start)}px">editor</p>`)
-    .join("");
   const ticks = [0, 10, 20, 30, 40, 50, 60]
     .map(
       (s) =>
@@ -169,7 +163,6 @@ export async function constraintPage(timing: PageTiming): Promise<string> {
 .ct-gl.short { color:var(--ink-100); }
 .ct-gl span { display:block; font-family:var(--sans); font-size:22px; color:var(--ink-400); }
 .ct-room { opacity:0; }
-.ct-typed { top:${C.lines + C.linesH + 2}px; font-family:var(--mono); font-size:18px; color:var(--ink-400); opacity:0; }
 #ct-play { top:${C.thumbs - 16}px; width:2px; height:${C.axis - C.thumbs + 16}px; background:var(--ink-100); opacity:0; }
 #ct-chip { top:${C.thumbs - 58}px; font-size:24px; font-weight:600; color:var(--screen); background:var(--ink-100); padding:4px 12px; border-radius:4px; white-space:nowrap; opacity:0; }
 .ct-axis { left:${C.x0}px; top:${C.axis}px; width:${C.x1 - C.x0}px; height:2px; background:var(--rule); }
@@ -186,11 +179,11 @@ ${thumbs}
 <div class="lane a ct-lane" style="top:${C.dlg}px;height:${C.dlgH}px"></div>
 <div class="a ct-lane" id="ct-speech">${speech}</div>
 ${gaps}
-<div class="lane a ct-lane" style="top:${C.lines}px;height:${C.linesH}px">${lines}</div>${editorTags}
+<div class="lane a ct-lane" style="top:${C.lines}px;height:${C.linesH}px">${lines}</div>
 <div class="a ct-axis"></div>${ticks}<p class="a ct-t" style="left:${x(o.clip)}px">${o.clip} s</p>
 <div class="a" id="ct-play"></div><p class="a" id="ct-chip">Speech-to-Text · Chirp 3</p>
-<p class="a" id="ct-result"><b>${o.lines.length}</b> lines, <b>${typed}</b> typed by an editor, <b>${o.narrationTotal.toFixed(2)}</b> seconds of voice, and no overlap with the recognized speech.</p>
-<p class="src">The sample’s final track. Speech timing from Chirp 3; a usable silence is at least 1.2 s and keeps 0.25 s clear of speech.</p>`;
+<p class="a" id="ct-result"><b>${o.lines.length}</b> lines, <b>${o.narrationTotal.toFixed(2)}</b> seconds of voice, and no overlap with the recognized speech.</p>
+<p class="src">The sample’s automatic run. Speech timing from Chirp 3, each silence heard again on its own; a usable silence is at least 1.2 s and keeps 0.25 s clear of speech.</p>`;
   const render = `
 const S = D.S, L = D.L;
 reveal($('#ct-head'), prog(t, 0, 0.7));
@@ -217,7 +210,6 @@ stage.style.transformOrigin = '${x((shortest.start + shortest.end) / 2)}px ${C.d
 stage.style.transform = 'scale(' + (1 + ${(SHORTEST_ZOOM - 1).toFixed(2)} * zoom) + ')';
 $$('.ct-room').forEach((el, i) => { el.style.opacity = prog(t, S[2] + i * 0.12, 0.4); });
 $$('.ct-bar').forEach((el, i) => { el.style.width = Number(el.dataset.w) * prog(t, S[2] + 0.3 + i * 0.18, 0.7) + 'px'; });
-$$('.ct-typed').forEach((el) => { el.style.opacity = prog(t, S[2] + 1.2, 0.5); });
 reveal($('#ct-result'), prog(t, S[2] + 1.4, 0.6));`;
   return pageHtml({ css, body, render, data: timing });
 }

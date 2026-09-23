@@ -4,7 +4,6 @@
  */
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import type { Language } from "../../src/lib/pipeline/schemas";
 
 export const DEMO_SRC = dirname(fileURLToPath(import.meta.url));
 export const REPO = resolve(DEMO_SRC, "../..");
@@ -24,12 +23,11 @@ export const BASE_URL = (process.env.DEMO_BASE_URL || LOCAL_URL).replace(/\/$/, 
 
 export const PROJECT_ID = "tos-opening";
 const RUNS_DIR = join(REPO, "runtime/projects", PROJECT_ID, "runs");
-/** The automatic Korean run the replay and the rejection come from. */
-export const ORIGINAL_RUN = "20260922t051536291-ko-standard-d88b71";
-/** The result the editor typed into (itself an earlier editor session on the original). */
-export const EDIT_PARENT_RUN = "edit-b81cc95c158ee4acf857a44a2f7cf609e1df851c";
-/** The recorded result of that edit; the film shows it instead of paying for the edit again. */
-export const EDIT_CHILD_RUN = "edit-6c4ddb3c5a06c7901a834befe1bb25ba04a7ebde";
+/**
+ * The automatic Korean run the film shows from replay to playback: made end to end on 23 Sep 2026
+ * with the final check's fix stage, with no editor (runtime/showcase.json pins it for the app too).
+ */
+export const SAMPLE_RUN = "20260923t065852164-ko-standard-350b05";
 
 export const runFile = (runId: string, file: string): string => join(RUNS_DIR, runId, file);
 export const CLIP_FILE = join(REPO, "runtime/projects", PROJECT_ID, "clip.mp4");
@@ -49,9 +47,3 @@ export const CSS_TO_OUT = WIDTH / VIEWPORT.width;
 
 export const CHROME_PATH = "/usr/bin/google-chrome";
 export const FONTS_DIR = join(REPO, "node_modules/pretendard/dist/public/static");
-
-/** The presenter's voice: a different Chirp 3 HD voice from the film's narrator, so the two never blur. */
-export const PRESENTER_VOICES: Record<Language, { languageCode: string; name: string }> = {
-  ko: { languageCode: "ko-KR", name: "ko-KR-Chirp3-HD-Aoede" },
-  en: { languageCode: "en-US", name: "en-US-Chirp3-HD-Aoede" },
-};

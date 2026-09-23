@@ -3,42 +3,55 @@
 ## Direction
 
 Builds the under-3-minute English submission film and a Korean review copy (same picture, Korean
-presenter and captions) into `runtime/demo-v3/<lang>/`: `scene-demo-<lang>.mp4`, `_check.md`,
-`_contact.jpg` and `.srt`. The story follows the deck (`scripts/deck`, direction "Screening room"):
-hook with eyes closed, the same seconds with Scene, why now, the constraint, the product in the app
-(upload, replay, a rule-cited rejection, the editor's fix, the measured fit, playback), Google Cloud,
-evidence, close.
+captions) into `runtime/demo-v3/<lang>/`: `scene-demo-<lang>.mp4`, `_check.md`, `_contact.jpg` and
+`.srt`. There is no presenter voice (the owner found the synthetic narration worse than none,
+2026-09-23): captions tell the story and the only sound is the film's own. The story follows the deck
+(`scripts/deck`, direction "Screening room"): hook with eyes closed, the same seconds with Scene, why
+now, the constraint, the product in the app (upload and Generate, the saved automatic run replayed,
+a line a check sent back and Scene rewrote from the reviewer's fix, the measured fit and playback,
+and an editor's change shown as the option it is), Google Cloud, evidence, close.
 
-- Numbers come from run records through the deck's data modules (`scripts/deck/data`, `facts.ts`),
-  read by `facts.ts` here; nothing on screen or in a sentence is typed by hand. The Gemini access
-  wording is `GEMINI_ACCESS_LABEL` (src/lib/models.ts).
+- The app scenes show one automatic run of the sample, made end to end with no editor (`SAMPLE_RUN`
+  in `config.ts`; `runtime/showcase.json` pins the same run for the app). `sample.ts` reads it and
+  refuses a run with an editor's line; `facts.ts` adds the evaluation (deck data modules) and the
+  outside facts (`scripts/deck/facts.ts`). Nothing on screen or in a caption is typed by hand. The
+  Gemini access wording is `GEMINI_ACCESS_LABEL` (src/lib/models.ts).
+- Timing (`timing.ts`): each caption (up to two lines) stays up 0.5 s plus its characters at 17 per
+  second in English and 10 in Korean (below the Netflix timed-text maxima of 20 and 12, since the
+  picture changes underneath), never under 1.8 s. Scenes are as long as their captions, pauses and
+  film sound; the recorder and the pages key their moves to caption sentence starts.
+- Captions (`ass.ts`): Pretendard Medium 41 px in the band under the picture, fading in and out. A
+  sentence becomes one two-line caption when a break fits both lines (42 characters English, 26
+  Korean), else several; breaks keep names, counted numbers and Korean bound words together, never
+  end a line on an article or preposition, and prefer a clause end or a conjunction at the start of
+  the second line. `groups` on a caption sets them by hand where a list defeats the rules.
 - Motion scenes are HTML pages in the deck's theme, rendered frame by frame in headless Chrome and
-  piped into FFmpeg (`motion.ts`, `pages/`). Their moves are keyed to sentence starts.
+  piped into FFmpeg (`motion.ts`, `pages/`). The cloud scene (`pages/cloud.ts`) is drawn in hairlines:
+  the Cloud Run outline, one line lighting the run's stages in order with the model each calls, the
+  two loops that send a line back, then Cloud Storage and the live progress stream; arrowheads ride
+  the drawn end of each line, and a slow push-in keeps the picture moving while it is read.
 - App scenes are recorded at device scale 2 (2880×1440 frames, 1440×720 CSS viewport). The recorder
   logs element boxes, camera shots and overlays in film time (`recorder-kit.ts`); `camera.ts` turns
   them into eased scale+crop filters; overlays (spotlight, service chips, labels) are ASS drawings,
   because this FFmpeg has no drawtext.
 - Waits (upload preparation, the saved run's replay) are squeezed, and every squeezed stretch carries
   a label with its real length. Film playback in the app stays at 1×; its sound is laid from the
-  page's own media log.
-- The edit is never submitted: the recorder types the reviewer's fix into the parent result and
-  hovers "Review and re-voice", then the next scene opens the result that same edit produced on
-  22 Sep 2026, labelled as such. Requests that could start a paid run or edit are aborted, and the
-  recording fails if one was attempted.
+  page's own media log. One shared gain brings all the film excerpts together to -16 LUFS.
+- Nothing paid is started: Generate is only hovered, the edit is typed but never submitted, and
+  requests that could start a paid run or edit are aborted (the recording fails if one was
+  attempted).
 - The hook's picture is cut from Blender's 1080p master (`master.ts`, same checksum as the deck),
   checked frame by frame against the repo clip; only the 10 MB cut is kept.
 
 ## Production
 
 ```sh
-npm run demo -- en voice            # Google Cloud TTS, cached per sentence (needs gcloud auth)
-npm run demo -- en voice --estimate # no audio: estimated lengths, film built silent and marked
-npm run demo -- en record           # from the local production server (below)
-npm run demo -- en build            # about 4 minutes
+npm run demo -- en record   # from the local production server (below)
+npm run demo -- en build    # about 4 minutes
 ```
 
-The app scenes are recorded from a production build of this repo on 127.0.0.1:21961 (`LOCAL_URL`),
-reading the same `runtime/` data as the dev server:
+Both steps are free. The app scenes are recorded from a production build of this repo on
+127.0.0.1:21961 (`LOCAL_URL`), reading the same `runtime/` data as the dev server:
 
 ```sh
 NEXT_DIST_DIR=.next-verify npm run build
@@ -48,23 +61,16 @@ cd .next-verify/standalone && DATA_DIR=$PWD/../../runtime PORT=21961 HOSTNAME=12
   FFMPEG_PATH=<the FFMPEG_PATH of .env.local> node server.js
 ```
 
-Repeat for `ko`. Recording and building are free; voice costs about $0.05 per language per full
-script (Chirp 3 HD, $30 per 1M characters) and is capped at $0.50 in the check note. The record step
-must follow any voice change, because each app scene is timed by its sentences. The check note says
-which server the app scenes came from. A human voice-over replaces a sentence when
-`runtime/demo-v3/<lang>/takes/<scene>-<n>.wav` exists.
+When the day's live allowance is spent, the workspace shows a notice and disables Generate; the
+films of 2026-09-23 were recorded with `DATA_DIR` pointing at a folder that links every entry of
+`runtime/` except `budget/` (the recording never spends). Repeat both steps for `ko`. The record step
+must follow any caption change, because each app scene is timed by its captions.
 
-Voice files are `voice/<scene>-<n>@<rate>.wav`. A sentence whose text and voice are unchanged is
-reused at whatever rate it was kept, so a re-run pays only for changed sentences; a kept or returned
-file whose first or last 20 ms is above -40 dBFS (a clipped word) is requested again at rate ±0.01.
-Each sentence is mixed at its own gain toward -16 LUFS (within ±3 dB of the whole track's), with a
-5 ms fade-in and 30 ms fade-out, and its captions follow its measured speech onset and offset.
-
-The check note fails (unchecked box) on: length 180 s or more, a frozen stretch over 4 s in the
-picture area, a presenter sentence over 150 words per minute, a caption line over 42 characters
-(22 for Korean), an estimated (unvoiced) presenter, TTS spend over $0.50, and the development Gemini
-label (`GEMINI_ACCESS_LABEL` naming OpenRouter) on the cloud page. It never ticks the human
-watch-through.
+The check note fails (unchecked box) on: length 180 s or more, loudness more than 1.5 LU from
+-16 LUFS, a frozen stretch over 4 s in the picture area, a caption faster than the reading pace or
+shorter than 1.8 s, a line over the caption limit, more than 6 s with neither a caption nor film
+sound, and the development Gemini label (`GEMINI_ACCESS_LABEL` naming OpenRouter) on the cloud page.
+It never ticks the human watch-through.
 
 ## Debug log
 
@@ -104,14 +110,21 @@ watch-through.
   1 ms at full scale are now requested again, and the upload and review scenes seek their video and
   wait for the frame before recording. Caption groups can be set per sentence (`captions` on say())
   where a list defeats the break rules.
+- [2026-09-23] Films without a presenter: captions timed at the old speaking rate ran 225 s. Merging
+  sentences, a reading pace of 17 (English) and 10 (Korean) characters a second and shorter holds
+  brought the plan to 169.5 s (English) and 162.7 s (Korean). Without the presenter the film sound
+  was measured at -17.6 LUFS (gain set from the described reveal alone); the gain is now set from all
+  excerpts together. The replay's close-up on the stage list stood still for 4.8 s: the camera now
+  moves to the timeline for the last sentence, and the words held on the dark page drift slowly.
+- [2026-09-23] The sample changed from the edited track to an automatic run made with the final
+  check's fix stage (20260923t065852164-ko-standard-350b05). A first run of that day
+  (…064439178…) was not used: it still audited the track a second time, which listed its own fix as
+  failing again, so the screen contradicted "fixed by itself".
 
 ## Status
 
-Films of 2026-09-23 after two QA rounds (EN 172.4 s, KO 177.3 s; -16.4 and -16.3 LUFS), voiced with
-Chirp 3 HD and recorded from the local production server (127.0.0.1:21961) after the owner took the
-Cloud Run service down. Each `_check.md` ticks every limit except, for English, the presenter pace
-(short sentences; see the debug log), the development Gemini label (until the switch to Google AI
-Studio) and the human watch-through. The close page prints the Cloud Run URL, which answers again
-only after a redeploy under the same service name. Tests: `tests/demo-captions.test.ts` (caption
-breaks, given groups, timing) and `tests/demo-voice.media.ts` (clipped edges, full-scale bursts,
-voice reuse).
+Rebuilt on 2026-09-23 without the presenter voice, around the automatic sample run; the current
+`_check.md` of each film lists what it meets. Open: the development Gemini label (until the switch to
+Google AI Studio), the human watch-through, and the Cloud Run URL on the close page, which answers
+again only after a redeploy under the same service name. Tests: `tests/demo-captions.test.ts`
+(caption breaks, given groups, reading-time plan).
