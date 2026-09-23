@@ -45,7 +45,10 @@ export interface BeatRecord {
   warps: Warp[];
   shots: Shot[];
   overlays: Overlay[];
-  /** Film playback shown in the scene: wall time it started, media time, and wall time it stopped. */
+  /**
+   * Film playback shown in the scene, from its presented frames: the wall time media time `media`
+   * reached the screen, and the wall time the last frame before the pause did.
+   */
   playback?: { wall: number; media: number; until: number };
   /** Moves that started later than planned (seconds late), for the check note. */
   late: { what: string; by: number }[];
@@ -97,16 +100,30 @@ export class BeatClock {
   }
 
   /**
-   * Runs a wait that the film shows squeezed into `seconds`. The squeezed stretch always carries a
-   * label saying what was shortened, kept on screen a little past it so it can be read.
+   * Runs waits that the film shows squeezed, each one ending by picture time `by` (a wait that is
+   * already shorter plays at its real length). Steps let a long wait land a given moment on a given
+   * sentence. The whole stretch carries one label saying what was shortened, kept on screen `tail`
+   * seconds past it so it can be read.
    */
-  async squeeze(seconds: number, label: (real: number) => string, wait: () => Promise<void>) {
+  async squeeze(
+    steps: { by: number; wait: () => Promise<void> }[],
+    label: (real: number) => string,
+    tail = TAG_TAIL_S,
+  ): Promise<void> {
     const at = this.now();
-    const from = Date.now() / 1000;
-    await wait();
-    const to = Date.now() / 1000;
-    if (to - from > seconds) this.rec.warps.push({ from, to, seconds, label: label(to - from) });
-    this.overlay({ kind: "tag", at, until: this.now() + TAG_TAIL_S, text: label(to - from) });
+    const started = Date.now() / 1000;
+    for (const step of steps) {
+      const seconds = step.by - this.now();
+      if (seconds <= 0)
+        throw new Error(`${this.rec.beat}: a squeezed wait starts past its end ${step.by} s`);
+      const from = Date.now() / 1000;
+      await step.wait();
+      const to = Date.now() / 1000;
+      if (to - from > seconds)
+        this.rec.warps.push({ from, to, seconds, label: label(to - started) });
+    }
+    const real = Date.now() / 1000 - started;
+    this.overlay({ kind: "tag", at, until: this.now() + tail, text: label(real) });
   }
 
   shot(rect: Rect | null, maxZoom?: number, at = this.now()): void {
@@ -154,6 +171,20 @@ export const CURSOR_SCRIPT = `
     window.__mediaLog.push({ type, wall: Date.now() / 1000, media: e.target.currentTime }); };
   document.addEventListener("playing", log("playing"), true);
   document.addEventListener("pause", log("pause"), true);
+  // Frames as they reach the screen: 'playing' fires before the first one does, so the film's
+  // sound is anchored to these. One callback chain per video; it idles while the video is paused.
+  const watched = new WeakSet();
+  document.addEventListener("playing", (e) => {
+    const v = e.target;
+    if (!(v instanceof HTMLVideoElement) || watched.has(v)) return;
+    watched.add(v);
+    const onFrame = (_, meta) => {
+      window.__mediaLog.push({ type: "frame", wall: (performance.timeOrigin + meta.expectedDisplayTime) / 1000,
+        media: meta.mediaTime });
+      v.requestVideoFrameCallback(onFrame);
+    };
+    v.requestVideoFrameCallback(onFrame);
+  }, true);
 })();
 `;
 

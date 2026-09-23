@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { chromium } from "playwright-core";
 import { runFfmpeg } from "../../src/lib/media/ffmpeg";
 import type { Language } from "../../src/lib/pipeline/schemas";
-import { CAPTION_CHARS, sayEvent, sentenceCaptions, type AssEvent } from "./ass";
+import { sayEvent, sentenceCaptions, type AssEvent } from "./ass";
 import { writeCheck } from "./check";
 import { CHROME_PATH, FPS, MAX_SECONDS } from "./config";
 import { mixSound, type Placed } from "./mix";
@@ -18,17 +18,70 @@ import { preparePageAssets } from "./pages/shell";
 import type { BeatRecord, Frame } from "./recorder-kit";
 import { renderSegment } from "./segments";
 import type { Scene } from "./storyboard";
-import { planScene, type VoicedSentence } from "./voice";
+import { measureSpeech, planScene, type VoicedSentence } from "./voice";
 
 /** Segments rendered at once: each is one Chrome page or one FFmpeg encode. */
 const CONCURRENCY = 3;
 const CAPTION_TAIL_S = 0.25;
+/** A sentence's caption appears this long before its first word is heard. */
+const CAPTION_LEAD_S = 0.1;
 const toFrames = (s: number) => Math.round(s * FPS) / FPS;
 
 function srtTime(v: number): string {
   const ms = Math.round(v * 1000);
   const pad = (n: number, w = 2) => String(n).padStart(w, "0");
   return `${pad(Math.floor(ms / 3600000))}:${pad(Math.floor(ms / 60000) % 60)}:${pad(Math.floor(ms / 1000) % 60)},${pad(ms % 1000, 3)}`;
+}
+
+export interface SrtCue {
+  start: number;
+  end: number;
+  text: string;
+}
+
+/**
+ * The presenter's captions for each placed scene, timed from where each sentence's words are heard
+ * in its file (an estimated sentence has no file and fills its slot), and the same cues in film time
+ * for the SRT.
+ */
+export async function presenterCaptions(
+  placed: Placed[],
+  lang: Language,
+): Promise<{ events: AssEvent[][]; srt: SrtCue[]; lines: string[] }> {
+  const events: AssEvent[][] = [];
+  const srt: SrtCue[] = [];
+  const lines: string[] = [];
+  for (const p of placed) {
+    const says = p.plan.parts.flatMap((x) =>
+      x.sentence && "say" in x.part
+        ? [{ start: x.start, sentence: x.sentence, groups: x.part.captions?.[lang] }]
+        : [],
+    );
+    const spans: { from: number; to: number }[] = [];
+    for (const s of says) {
+      const { onset, offset } = s.sentence.file
+        ? await measureSpeech(s.sentence.file)
+        : { onset: 0, offset: s.sentence.seconds };
+      spans.push({ from: s.start + onset, to: s.start + offset });
+    }
+    const shows = says.map((s, k) => Math.max(s.start, spans[k].from - CAPTION_LEAD_S));
+    events.push(
+      says.flatMap((s, k) => {
+        const timing = {
+          show: shows[k],
+          hide: Math.min(spans[k].to + CAPTION_TAIL_S, shows[k + 1] ?? p.seconds),
+          speechFrom: spans[k].from,
+          speechTo: spans[k].to,
+        };
+        return sentenceCaptions(s.sentence.text, lang, timing, s.groups).map((c) => {
+          lines.push(...c.lines);
+          srt.push({ start: p.start + c.start, end: p.start + c.end, text: c.lines.join("\n") });
+          return sayEvent(c);
+        });
+      }),
+    );
+  }
+  return { events, srt, lines };
 }
 
 export async function buildFilm(input: {
@@ -63,19 +116,7 @@ export async function buildFilm(input: {
   if (total >= MAX_SECONDS)
     throw new Error(`film would run ${total.toFixed(2)} s; the limit is under ${MAX_SECONDS}`);
 
-  const captionLines: string[] = [];
-  const srt: { start: number; end: number; text: string }[] = [];
-  const captionsOf = (p: Placed): AssEvent[] => {
-    const says = p.plan.parts.filter((x) => x.sentence);
-    return says.flatMap((s, k) => {
-      const end = Math.min(s.start + s.seconds + CAPTION_TAIL_S, says[k + 1]?.start ?? p.seconds);
-      return sentenceCaptions(s.sentence!.text, s.start, end, CAPTION_CHARS[lang]).map((c) => {
-        captionLines.push(...c.lines);
-        srt.push({ start: p.start + c.start, end: p.start + c.end, text: c.lines.join("\n") });
-        return sayEvent(c);
-      });
-    });
-  };
+  const captions = await presenterCaptions(placed, lang);
 
   await preparePageAssets();
   const browser = await chromium.launch({ executablePath: CHROME_PATH });
@@ -89,7 +130,7 @@ export async function buildFilm(input: {
           scene: job.p.scene,
           plan: job.p.plan,
           seconds: job.p.seconds,
-          captions: captionsOf(job.p),
+          captions: captions.events[job.i],
           workDir,
           out: segments[job.i],
           browser,
@@ -139,7 +180,7 @@ export async function buildFilm(input: {
   ]);
   await writeFile(
     join(outDir, `scene-demo-${lang}.${lang}.srt`),
-    srt
+    captions.srt
       .sort((a, b) => a.start - b.start)
       .map((c, i) => `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`)
       .join("\n"),
@@ -151,7 +192,7 @@ export async function buildFilm(input: {
     placed,
     total,
     voiced,
-    captionLines,
+    captionLines: captions.lines,
     frames,
     soundNotes: sound.notes,
     recDir,

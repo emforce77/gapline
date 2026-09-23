@@ -4,6 +4,7 @@
  */
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import type { Language } from "../../src/lib/pipeline/schemas";
 
 export const DEMO_SRC = dirname(fileURLToPath(import.meta.url));
 export const REPO = resolve(DEMO_SRC, "../..");
@@ -48,3 +49,9 @@ export const CSS_TO_OUT = WIDTH / VIEWPORT.width;
 
 export const CHROME_PATH = "/usr/bin/google-chrome";
 export const FONTS_DIR = join(REPO, "node_modules/pretendard/dist/public/static");
+
+/** The presenter's voice: a different Chirp 3 HD voice from the film's narrator, so the two never blur. */
+export const PRESENTER_VOICES: Record<Language, { languageCode: string; name: string }> = {
+  ko: { languageCode: "ko-KR", name: "ko-KR-Chirp3-HD-Aoede" },
+  en: { languageCode: "en-US", name: "en-US-Chirp3-HD-Aoede" },
+};

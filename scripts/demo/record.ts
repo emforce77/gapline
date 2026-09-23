@@ -27,6 +27,12 @@ import { planScene, type VoicedSentence } from "./voice";
 const PAID = /\/(runs|edits)(\/|$|\?)/;
 const JPEG_QUALITY = 88;
 
+function median(values: number[]): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  const mid = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
+}
+
 /** Stops before recording anything when the service does not hold the pinned runs. */
 async function checkPinnedRuns(): Promise<void> {
   const response = await fetch(`${BASE_URL}/api/projects/${PROJECT_ID}/runs`);
@@ -106,10 +112,17 @@ export async function recordApp(input: {
       const playing = media.find((e) => e.type === "playing");
       if (playing) {
         const paused = media.find((e) => e.type === "pause" && e.wall > playing.wall);
+        const stop = paused?.wall ?? rec.wallEnd;
+        // The picture reaches the screen after 'playing' fires: the presented frames place the sound.
+        const presented = media.filter(
+          (e) => e.type === "frame" && e.wall >= playing.wall && e.wall <= stop,
+        );
+        if (!presented.length) throw new Error(`${beat}: the film played but presented no frames`);
+        const offset = median(presented.map((f) => f.wall - f.media));
         rec.playback = {
-          wall: playing.wall,
+          wall: playing.media + offset,
           media: playing.media,
-          until: paused?.wall ?? rec.wallEnd,
+          until: Math.max(...presented.map((f) => f.media)) + offset,
         };
       }
       beats.push(rec);

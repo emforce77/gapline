@@ -11,6 +11,13 @@ import { esc, pageHtml, STAGE, still, type PageTiming } from "./shell";
 const M = STAGE.margin;
 /** The lawsuit's steps, in the order of LAWSUIT (filed, then each ruling). */
 const EVENT_LABELS = ["Lawsuit filed", "First ruling", "Appeal: 3% cap", "Supreme Court"];
+/**
+ * Shares of the ruling sentence: the timeline reaches the Supreme Court (and its date appears) at the
+ * first, the ruling's text appears at the second. Two large reveals inside one long sentence keep the
+ * page from standing still for more than 4 s (the check note's frozen-picture limit).
+ */
+const RULING_DATE_AT = 0.45;
+const RULING_TEXT_AT = 0.7;
 
 export function stakesPage(timing: PageTiming): string {
   const filed = new Date(LAWSUIT.filed);
@@ -60,7 +67,7 @@ export function stakesPage(timing: PageTiming): string {
 <div class="a st-col" id="st-a" style="left:${M}px">
   <p class="label">Supreme Court of Korea, after a ten-year lawsuit</p>
   <p class="st-big">${esc(dayLabel(final.d))}</p>
-  <p class="body">Cinemas discriminate when films lack audio description and captions.</p>
+  <p class="body" id="st-ruling">The three big cinema chains discriminate when films lack audio description and captions.</p>
 </div>
 <div class="a st-axis"></div>${ticks}${dots}
 <div class="a st-col" id="st-b" style="left:1020px">
@@ -73,8 +80,10 @@ export function stakesPage(timing: PageTiming): string {
   const render = `
 const S = D.S, L = D.L;
 reveal($('#st-head'), prog(t, 0, 0.7));
-reveal($('#st-a'), prog(t, S[0], 0.6));
-const draw = lin(t, S[0] + 0.3, Math.max(2, L[0] - 0.6));
+const dateAt = S[0] + L[0] * ${RULING_DATE_AT};
+reveal($('#st-a'), prog(t, dateAt, 0.6));
+reveal($('#st-ruling'), prog(t, S[0] + L[0] * ${RULING_TEXT_AT}, 0.6));
+const draw = lin(t, S[0] + 0.3, Math.max(1, dateAt - S[0] - 0.3));
 const head = ${AX.x0} + draw * ${AX.x1 - AX.x0};
 $('.st-axis').style.width = (head - ${AX.x0}) + 'px';
 $$('.st-tick, .st-year').forEach((el) => { el.style.opacity = prog(t, S[0] + 0.2, 0.5); });
@@ -86,6 +95,8 @@ $$('.st-people i').forEach((el, i) => el.classList.toggle('on', i < n));`;
   return pageHtml({ css, body, render, data: timing });
 }
 
+/** The camera pushes in this far on the shortest silence while it is named. */
+const SHORTEST_ZOOM = 1.12;
 const C = {
   x0: 330,
   x1: STAGE.w - M,
@@ -131,6 +142,14 @@ export async function constraintPage(timing: PageTiming): Promise<string> {
         `<div class="clip ad ct-bar" data-w="${l.voiced * pps}" style="left:${x(l.start) - C.x0}px;width:0"></div>`,
     )
     .join("");
+  // Lines an editor typed say so, as on the deck's constraint slide.
+  const typed = o.lines.filter((l) => l.byEditor).length;
+  const shortest = o.gaps.find((g) => g.id === o.shortestId);
+  if (!shortest) throw new Error(`shortest gap ${o.shortestId} is not among the gaps`);
+  const editorTags = o.lines
+    .filter((l) => l.byEditor)
+    .map((l) => `<p class="a ct-typed" style="left:${x(l.start)}px">editor</p>`)
+    .join("");
   const ticks = [0, 10, 20, 30, 40, 50, 60]
     .map(
       (s) =>
@@ -150,6 +169,7 @@ export async function constraintPage(timing: PageTiming): Promise<string> {
 .ct-gl.short { color:var(--ink-100); }
 .ct-gl span { display:block; font-family:var(--sans); font-size:22px; color:var(--ink-400); }
 .ct-room { opacity:0; }
+.ct-typed { top:${C.lines + C.linesH + 2}px; font-family:var(--mono); font-size:18px; color:var(--ink-400); opacity:0; }
 #ct-play { top:${C.thumbs - 16}px; width:2px; height:${C.axis - C.thumbs + 16}px; background:var(--ink-100); opacity:0; }
 #ct-chip { top:${C.thumbs - 58}px; font-size:24px; font-weight:600; color:var(--screen); background:var(--ink-100); padding:4px 12px; border-radius:4px; white-space:nowrap; opacity:0; }
 .ct-axis { left:${C.x0}px; top:${C.axis}px; width:${C.x1 - C.x0}px; height:2px; background:var(--rule); }
@@ -162,14 +182,14 @@ export async function constraintPage(timing: PageTiming): Promise<string> {
 ${thumbs}
 <div class="a ct-row" style="top:${C.thumbs + 36}px"><p class="label">Picture</p></div>
 <div class="a ct-row" style="top:${C.dlg}px"><p class="label">Dialogue <span class="muted">${o.speechTotal.toFixed(2)} s</span></p><small>silence outlined: ${o.gapTotal.toFixed(2)} s</small></div>
-<div class="a ct-row" style="top:${C.lines - 4}px"><p class="label">Scene’s lines <span class="muted">${o.narrationTotal.toFixed(2)} s</span></p><small>voice inside its room</small></div>
+<div class="a ct-row" style="top:${C.lines - 4}px"><p class="label">Lines in the track <span class="muted">${o.narrationTotal.toFixed(2)} s</span></p><small>voice inside its room</small></div>
 <div class="lane a ct-lane" style="top:${C.dlg}px;height:${C.dlgH}px"></div>
 <div class="a ct-lane" id="ct-speech">${speech}</div>
 ${gaps}
-<div class="lane a ct-lane" style="top:${C.lines}px;height:${C.linesH}px">${lines}</div>
+<div class="lane a ct-lane" style="top:${C.lines}px;height:${C.linesH}px">${lines}</div>${editorTags}
 <div class="a ct-axis"></div>${ticks}<p class="a ct-t" style="left:${x(o.clip)}px">${o.clip} s</p>
 <div class="a" id="ct-play"></div><p class="a" id="ct-chip">Speech-to-Text · Chirp 3</p>
-<p class="a" id="ct-result"><b>${o.lines.length}</b> lines, <b>${o.narrationTotal.toFixed(2)}</b> seconds of voice, and no overlap with the recognized speech.</p>
+<p class="a" id="ct-result"><b>${o.lines.length}</b> lines, <b>${typed}</b> typed by an editor, <b>${o.narrationTotal.toFixed(2)}</b> seconds of voice, and no overlap with the recognized speech.</p>
 <p class="src">The sample’s final track. Speech timing from Chirp 3; a usable silence is at least 1.2 s and keeps 0.25 s clear of speech.</p>`;
   const render = `
 const S = D.S, L = D.L;
@@ -190,8 +210,14 @@ const mark = prog(t, S[1] + L[1] * 0.85, 0.5);
 $('.ct-gl.short span').style.opacity = mark;
 $('.ct-gl.short').style.transform = 'translateX(-50%) scale(' + (1 + 0.35 * mark) + ')';
 $('.ct-gap.short').style.boxShadow = 'inset 0 0 0 ' + (2 + 2 * mark) + 'px rgba(236,233,227,' + (0.55 + 0.45 * mark) + ')';
+// A push-in on the shortest silence while it is named, back out as the lines arrive.
+const zoom = prog(t, S[1] + L[1] * 0.85, 0.9) * (1 - prog(t, S[2], 0.8));
+const stage = $('.stage');
+stage.style.transformOrigin = '${x((shortest.start + shortest.end) / 2)}px ${C.dlg}px';
+stage.style.transform = 'scale(' + (1 + ${(SHORTEST_ZOOM - 1).toFixed(2)} * zoom) + ')';
 $$('.ct-room').forEach((el, i) => { el.style.opacity = prog(t, S[2] + i * 0.12, 0.4); });
 $$('.ct-bar').forEach((el, i) => { el.style.width = Number(el.dataset.w) * prog(t, S[2] + 0.3 + i * 0.18, 0.7) + 'px'; });
+$$('.ct-typed').forEach((el) => { el.style.opacity = prog(t, S[2] + 1.2, 0.5); });
 reveal($('#ct-result'), prog(t, S[2] + 1.4, 0.6));`;
   return pageHtml({ css, body, render, data: timing });
 }

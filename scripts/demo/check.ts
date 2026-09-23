@@ -1,13 +1,15 @@
 /**
  * Writes scene-demo-<lang>_check.md next to the film: length, picture, loudness, the pacing limits
  * (longest frozen stretch, presenter words per minute, caption line length), what the recording
- * captured, and the presenter's text-to-speech spend. Also writes the contact sheet (one frame every
- * four seconds). Unchecked boxes are limits the film does not meet.
+ * captured, the presenter's text-to-speech spend, and whether the cloud page still shows the
+ * development Gemini access label. Also writes the contact sheet (one frame every four seconds).
+ * Unchecked boxes are limits the film does not meet.
  */
 import { existsSync } from "node:fs";
 import { readFile, stat, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { readCallRecords } from "../../src/lib/llm/ledger";
+import { GEMINI_ACCESS_LABEL } from "../../src/lib/models";
 import { integratedLufs } from "../../src/lib/media/mix";
 import { probeDurationSeconds, probeMedia, runFfmpeg } from "../../src/lib/media/ffmpeg";
 import type { Language } from "../../src/lib/pipeline/schemas";
@@ -136,6 +138,8 @@ export async function writeCheck(input: {
     estimated
       ? `- [ ] **presenter NOT VOICED**: sentence lengths are estimates (npm run demo -- ${lang} voice --estimate); the film has no presenter sound. Synthesize with \`npm run demo -- ${lang} voice\`, then record and build again.`
       : `- [x] presenter: ${voiced.length} sentences, voice ${[...new Set(voiced.map((v) => v.voice))].join(", ")}`,
+    // Same open item as the deck's (scripts/deck/build-deck.ts): the cloud page prints this label.
+    `- ${box(!/openrouter/i.test(GEMINI_ACCESS_LABEL))} Gemini access on the cloud page: "${GEMINI_ACCESS_LABEL}"${/openrouter/i.test(GEMINI_ACCESS_LABEL) ? " — the development label; switch to the Gemini API (Google AI Studio), change GEMINI_ACCESS_LABEL and build again before submission" : ""}`,
     `- ${box(spent <= TTS_BUDGET_USD)} presenter text-to-speech spend so far: $${spent.toFixed(4)} of $${TTS_BUDGET_USD.toFixed(2)} (${spend.map((s) => `${s.lang} ${s.chars} characters $${s.usd.toFixed(4)}`).join(", ") || "no calls"})`,
     `- [x] recording (2880×1440 frames):`,
     ...beatRows,

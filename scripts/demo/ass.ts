@@ -24,6 +24,7 @@ export interface AssEvent {
 
 /** Caption line limits in characters (broadcast practice: about 42 for English, fewer for Korean). */
 export const CAPTION_CHARS = { en: 42, ko: 22 } as const;
+export type CaptionLanguage = keyof typeof CAPTION_CHARS;
 const CAPTION_LINES = 2;
 /** How many characters of imbalance a break after a comma, or after a full stop, is worth. */
 const CLAUSE_BONUS = 15;
@@ -31,8 +32,34 @@ const SENTENCE_BONUS = 16;
 /** A caption run may pass its share of the sentence by this factor, or close early at a clause end past this share. */
 const EVEN_SLACK = 1.15;
 const EVEN_EARLY = 0.75;
-/** A number stays on the line of the word it counts. */
-const NUMBER = /^[$₩]?[\d.,]+$/;
+const CLAUSE_END = /[,.:;?!]$/;
+/** A number stays on the line of the word it counts (3 months, two lines, 14 million won). */
+const NUMBER =
+  /^([$₩]?[\d.,]+|one|two|three|four|five|six|seven|eight|nine|ten|hundred|thousand|million|billion)$/i;
+/**
+ * Words that lead into the next one, so a line never ends with them: an English article, determiner,
+ * preposition or conjunction (the, those, about, and), an English possessive (reviewer's), a Korean
+ * determiner (이, 모든, 한) or a Korean genitive (씬의).
+ */
+const LEADS = [
+  /^(a|an|the|this|that|these|those|its|our|your|their|each|every|of|to|in|on|at|by|for|from|with|into|about|against|and|or|when|if|because|while)$/i,
+  /['’]s$/,
+  /^(이|그|저|모든|각|첫|한|두|세|네|몇|여러)$/u,
+  /\p{Script=Hangul}의$/u,
+];
+/** A Korean number with its counter (8가지로, 3사가) stays with the noun it counts. */
+const KO_COUNTED = /^[\d.,]+\p{Script=Hangul}/u;
+/**
+ * Korean bound words, with a particle, that lean on the word before them (20문장 중, 장면 대신,
+ * 침묵 안에서만, 상영한 것을, 옮길 수, 그중 하나에, 화면해설과 함께): a line never starts with one.
+ */
+const KO_BOUND =
+  /^(중|대신|안|동안|전|없이|것|수|하나|함께)(에|에서|에서만|은|는|이|을|를|도|만)?[,.]?$/u;
+/** Two capitalised words in a row are one name (Supreme Court, Cloud Run). */
+const CAPITALISED = /^\p{Lu}/u;
+/** Characters a written number takes when spoken: "14" as fourteen, "2.3" as two point three; 이십, 이 점 삼. */
+const SPOKEN_DIGIT: Record<CaptionLanguage, number> = { en: 4, ko: 1.5 };
+const SPOKEN_POINT: Record<CaptionLanguage, number> = { en: 7, ko: 1 };
 const BAND_CENTRE_Y = CONTENT_HEIGHT + (HEIGHT - CONTENT_HEIGHT) / 2;
 
 /** #rrggbb as ASS &HBBGGRR (alpha set separately). */
@@ -89,20 +116,43 @@ export function assDocument(events: AssEvent[]): string {
   ].join("\n");
 }
 
+/** Whether a caption line may end with `before` and the next start with `after`. */
+function breakable(before: string, after: string): boolean {
+  if (NUMBER.test(before) || LEADS.some((r) => r.test(before)) || KO_BOUND.test(after))
+    return false;
+  if (CLAUSE_END.test(before)) return true;
+  return !KO_COUNTED.test(after) && !(CAPITALISED.test(before) && CAPITALISED.test(after));
+}
+
+/**
+ * A sentence as the pieces a line may break between: words, with a name, a counted number or a
+ * Korean bound word kept on the word it belongs to. Only a plain space separates words, so a
+ * no-break space in the storyboard holds too.
+ */
+function chunksOf(text: string): string[] {
+  const words = text.split(/ +/);
+  const chunks = [words[0]];
+  for (let i = 1; i < words.length; i++) {
+    if (breakable(words[i - 1], words[i])) chunks.push(words[i]);
+    else chunks[chunks.length - 1] += ` ${words[i]}`;
+  }
+  return chunks;
+}
+
 /** Breaks a sentence into caption lines of at most `limit` characters, preferring clause ends. */
 export function captionLines(text: string, limit: number): string[] {
   const lines: string[] = [];
   let line = "";
-  for (const word of text.split(/\s+/)) {
-    const next = line ? `${line} ${word}` : word;
+  for (const chunk of chunksOf(text)) {
+    const next = line ? `${line} ${chunk}` : chunk;
     if (next.length > limit && line) {
       lines.push(line);
-      line = word;
+      line = chunk;
       continue;
     }
     line = next;
     // Close a line early at a clause end once it is reasonably full.
-    if (/[,.:;?!]$/.test(word) && line.length >= limit * 0.55) {
+    if (CLAUSE_END.test(chunk) && line.length >= limit * 0.55) {
       lines.push(line);
       line = "";
     }
@@ -121,13 +171,13 @@ export interface Caption {
 
 /** Splits a two-line caption where both halves are closest in length, preferring a clause end. */
 function balance(text: string, limit: number): string[] {
-  const words = text.split(" ");
+  const chunks = chunksOf(text);
   let best: string[] = [text];
   let score = Infinity;
-  for (let i = 1; i < words.length; i++) {
-    const a = words.slice(0, i).join(" ");
-    const b = words.slice(i).join(" ");
-    if (a.length > limit || b.length > limit || NUMBER.test(words[i - 1])) continue;
+  for (let i = 1; i < chunks.length; i++) {
+    const a = chunks.slice(0, i).join(" ");
+    const b = chunks.slice(i).join(" ");
+    if (a.length > limit || b.length > limit) continue;
     const bonus = /[.?!]$/.test(a) ? SENTENCE_BONUS : /[,:;]$/.test(a) ? CLAUSE_BONUS : 0;
     const s = Math.abs(a.length - b.length) - bonus;
     if (s < score) {
@@ -141,57 +191,100 @@ function balance(text: string, limit: number): string[] {
 /**
  * Words split into `count` runs of about equal length, closing a run early at a clause end, so a
  * sentence of three lines becomes two captions of a line and a half instead of two lines and one.
+ * A clause end that still fits on two lines closes the run even past its even share: the caption
+ * changes after "silences," rather than before it.
  */
-function evenRuns(text: string, count: number): string[] {
+function evenRuns(text: string, count: number, limit: number): string[] {
   const target = text.length / count;
   const runs: string[] = [];
   let run = "";
-  let last = "";
-  for (const word of text.split(" ")) {
-    const next = run ? `${run} ${word}` : word;
-    const full =
-      next.length > target * EVEN_SLACK && run && runs.length < count - 1 && !NUMBER.test(last);
-    if (full) {
+  for (const chunk of chunksOf(text)) {
+    const next = run ? `${run} ${chunk}` : chunk;
+    const open = runs.length < count - 1;
+    if (
+      open &&
+      CLAUSE_END.test(chunk) &&
+      next.length >= target * EVEN_EARLY &&
+      next.length <= limit * CAPTION_LINES
+    ) {
+      runs.push(next);
+      run = "";
+      continue;
+    }
+    if (open && run && next.length > target * EVEN_SLACK) {
       runs.push(run);
-      run = word;
+      run = chunk;
       continue;
     }
     run = next;
-    last = word;
-    if (/[,.:;?!]$/.test(word) && run.length >= target * EVEN_EARLY && runs.length < count - 1) {
-      runs.push(run);
-      run = "";
-    }
   }
   if (run) runs.push(run);
   return runs;
 }
 
-/** One sentence as caption events of up to two lines, timed by their share of the characters. */
+/** Length of `text` as heard: characters, with written numbers counted as spoken. */
+function spokenLength(text: string, lang: CaptionLanguage): number {
+  const said = text.replace(/(?<=\d),(?=\d)/g, "");
+  const digits = said.match(/\d/g)?.length ?? 0;
+  const points = said.match(/(?<=\d)\.(?=\d)/g)?.length ?? 0;
+  return said.length - digits - points + digits * SPOKEN_DIGIT[lang] + points * SPOKEN_POINT[lang];
+}
+
+/** When a sentence's captions are on screen, and when its words are heard (the same clock). */
+export interface CaptionTiming {
+  show: number;
+  hide: number;
+  speechFrom: number;
+  speechTo: number;
+}
+
+/** Caption groups set by hand for one sentence, checked against its text and the line limits. */
+function givenGroups(text: string, limit: number, groups: string[][]): string[][] {
+  if (groups.map((g) => g.join(" ")).join(" ") !== text)
+    throw new Error(`caption groups do not read as the sentence: ${text}`);
+  const bad = groups.find((g) => g.length > CAPTION_LINES || g.some((l) => l.length > limit));
+  if (bad) throw new Error(`caption group over ${CAPTION_LINES}×${limit}: ${bad.join(" / ")}`);
+  return groups;
+}
+
+/**
+ * One sentence as caption events of up to two lines. The first shows at `show` and the last hides at
+ * `hide`; in between, a caption changes when its first words are due, by its share of the spoken
+ * length across the heard span. `given` sets the groups instead of the break rules.
+ */
 export function sentenceCaptions(
   text: string,
-  start: number,
-  end: number,
-  limit: number,
+  lang: CaptionLanguage,
+  timing: CaptionTiming,
+  given?: string[][],
 ): Caption[] {
+  const limit = CAPTION_CHARS[lang];
   const greedy = captionLines(text, limit);
   const count = Math.ceil(greedy.length / CAPTION_LINES);
-  let groups = evenRuns(text, count).map((run) =>
-    run.length <= limit ? [run] : balance(run, limit),
-  );
-  if (groups.some((g) => g.some((line) => line.length > limit))) {
+  let groups = given
+    ? givenGroups(text, limit, given)
+    : evenRuns(text, count, limit).map((run) =>
+        run.length <= limit ? [run] : balance(run, limit),
+      );
+  if (!given && groups.some((g) => g.some((line) => line.length > limit))) {
     groups = [];
     for (let i = 0; i < greedy.length; i += CAPTION_LINES)
       groups.push(greedy.slice(i, i + CAPTION_LINES));
   }
-  const total = groups.reduce((n, g) => n + g.join(" ").length, 0);
-  let at = start;
-  return groups.map((g) => {
-    const next = at + ((end - start) * g.join(" ").length) / total;
-    const caption = { start: at, end: next, lines: g };
-    at = next;
-    return caption;
-  });
+  const weights = groups.map((g) => spokenLength(g.join(" "), lang));
+  const total = weights.reduce((n, w) => n + w, 0);
+  const heard = timing.speechTo - timing.speechFrom;
+  let said = 0;
+  const due = [timing.show];
+  for (const w of weights.slice(0, -1)) {
+    said += w;
+    due.push(timing.speechFrom + (heard * said) / total);
+  }
+  return groups.map((lines, k) => ({
+    start: due[k],
+    end: k === groups.length - 1 ? timing.hide : due[k + 1],
+    lines,
+  }));
 }
 
 export const sayEvent = (c: Caption): AssEvent => ({

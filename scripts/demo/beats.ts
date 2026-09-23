@@ -11,6 +11,7 @@ import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
 import type { Page } from "playwright-core";
 import { dictionary } from "../../src/i18n";
+import { MOVE_SECONDS } from "./camera";
 import {
   BASE_URL,
   CACHE_DIR,
@@ -29,6 +30,7 @@ import {
   moveCursor,
   rectOf,
   scrollInspectorTo,
+  toOutput,
   unionRect,
 } from "./recorder-kit";
 import { LISTEN, TIME_LABELS, type Beat } from "./storyboard";
@@ -46,6 +48,14 @@ const FIT_ZOOM = 2.4;
 const BOUND_ZOOM = 2.3;
 /** Replay ends this long before the scene does, so its finished timeline is seen. */
 const REPLAY_TAIL_S = 1.2;
+/** The earliest the replay is pressed, after the scene has opened on the finished run. */
+const REPLAY_PRESS_S = 0.2;
+const REPLAY_TIMEOUT_MS = 90_000;
+/** Inspector scrolls start this long before their sentence; the final check's page scroll earlier. */
+const SCROLL_LEAD_S = 0.7;
+const FINAL_SCROLL_LEAD_S = 0.9;
+/** A spotlight ends, its fade included, this long before the page under it moves. */
+const SPOTLIGHT_CLEAR_S = 0.1;
 const STAGE_SERVICES: Record<string, string> = {
   [t.stages.hear]: "Speech-to-Text · Chirp 3",
   [t.stages.watch]: GEMINI_NAME,
@@ -80,6 +90,59 @@ async function openRun(page: Page, runId: string): Promise<void> {
   }, runId);
 }
 
+/** The pinned run with its timeline's foot at the bottom of the viewport, as the replay shows it. */
+async function openReplayView(page: Page): Promise<void> {
+  await openRun(page, ORIGINAL_RUN);
+  const bottom = await page
+    .locator(".timeline")
+    .evaluate((el) => el.getBoundingClientRect().bottom);
+  await page.evaluate((y) => window.scrollTo({ top: y }), bottom + 24 - VIEWPORT.height);
+  await page.waitForTimeout(300);
+}
+
+const replayButton = (page: Page) => page.getByRole("button", { name: t.workspace.replay });
+const reviewRunning = (page: Page) =>
+  page.locator(".stages li.running", { hasText: t.stages.review });
+
+/**
+ * Wall seconds from starting to press Replay until Review runs, measured on a replay before the scene
+ * is recorded (the replay runs in the page and calls nothing).
+ */
+const replayTiming = { toReview: 0 };
+
+/** How long a page's video may take to paint its first frame before the recording gives up. */
+const VIDEO_FRAME_TIMEOUT_MS = 15_000;
+
+/**
+ * Seeks a video to where it already is (or to `to`) and waits until that frame is painted. A video
+ * reloaded with its page can stay black until it is seeked (the landing hero once did for a whole
+ * take), and a seek out of the poster paints black until the frame decodes.
+ */
+async function paintFrame(page: Page, selector: string, to?: number): Promise<void> {
+  const video = page.locator(selector);
+  await page.waitForFunction(
+    (sel) => {
+      const v = document.querySelector<HTMLVideoElement>(sel);
+      return !!v && v.readyState >= 2;
+    },
+    selector,
+    { timeout: VIDEO_FRAME_TIMEOUT_MS },
+  );
+  await video.evaluate(
+    (v: HTMLVideoElement, at) =>
+      new Promise<void>((done) => {
+        // Two animation frames after 'seeked': the decoded frame has been composited.
+        v.addEventListener(
+          "seeked",
+          () => requestAnimationFrame(() => requestAnimationFrame(() => done())),
+          { once: true },
+        );
+        v.currentTime = at ?? v.currentTime;
+      }),
+    to,
+  );
+}
+
 /** Selects Line 5 (cue L4) without the cursor, before a scene starts. */
 async function selectLine(page: Page): Promise<void> {
   await page.locator(`[data-cue-id="${film.line.cueId}"]`).first().click();
@@ -99,21 +162,35 @@ const upload: BeatScript = async (page, clock, plan) => {
   const card = page.locator(".upload-card");
   const cardRect = await rectOf(card);
   clock.shot(cardRect, 1.5);
-  clock.overlay({
-    kind: "spotlight",
-    at: clock.now() + 0.8,
-    until: plan.seconds - 2.6,
-    rect: cardRect,
-  });
+  const lit = clock.now() + 0.8;
   const [chooser] = await Promise.all([
     page.waitForEvent("filechooser"),
     clickLike(page, card.getByRole("button")),
   ]);
   await chooser.setFiles(await uploadCopy());
-  await clock.squeeze(UPLOAD_SQUEEZE_S, TIME_LABELS.upload, async () => {
-    await page.waitForURL("**/p/u-*", { timeout: 180_000 });
-    await page.locator(".ws-main").waitFor();
-    await page.waitForLoadState("networkidle");
+  let left = 0;
+  // No label tail: it would sit over the new page's header while the camera pulls back.
+  await clock.squeeze(
+    [
+      {
+        by: clock.now() + UPLOAD_SQUEEZE_S,
+        wait: async () => {
+          await page.waitForURL("**/p/u-*", { timeout: 180_000, waitUntil: "commit" });
+          left = Date.now() / 1000;
+          await page.locator(".ws-main").waitFor();
+          await page.waitForLoadState("networkidle");
+        },
+      },
+    ],
+    TIME_LABELS.upload,
+    0,
+  );
+  // The card stays lit while it prepares the clip, and goes before the workspace replaces it.
+  clock.overlay({
+    kind: "spotlight",
+    at: lit,
+    until: toOutput(clock.rec, left) - SPOTLIGHT_CLEAR_S,
+    rect: cardRect,
   });
   clock.shot(null);
   await moveCursor(page, REST.x, REST.y);
@@ -121,33 +198,43 @@ const upload: BeatScript = async (page, clock, plan) => {
 };
 
 const replay: BeatScript = async (page, clock, plan) => {
-  const [, , s2] = plan.sentenceStarts;
-  const s1 = plan.sentenceStarts[1];
+  const [, s1, s2] = plan.sentenceStarts;
+  // The list stays in close-up through Review's sentence ("checks every line").
+  const listEnd = plan.seconds - PULL_BACK_S;
   clock.shot(null);
-  await clock.at(0.2, "start the replay");
-  await clickLike(page, page.getByRole("button", { name: t.workspace.replay }));
+  // Pressed so that Write runs through the sentence that says "writes" (in Korean the verb ends it),
+  // and Review starts with the one that says "checks".
+  await clock.at(Math.max(REPLAY_PRESS_S, s2 - replayTiming.toReview), "start the replay");
+  await clickLike(page, replayButton(page));
   await page.locator(".replay-badge").waitFor();
   await moveCursor(page, REST.x - 300, REST.y);
   // The stage list does not move during the replay: its box and rows are read now.
   const stages = await rectOf(page.locator(".stages"));
   clock.shot(stages, 1.8, s1);
-  clock.shot(null, undefined, s2);
-  clock.overlay({ kind: "spotlight", at: s1 + 0.4, until: s2, rect: stages });
+  clock.shot(null, undefined, listEnd);
+  clock.overlay({ kind: "spotlight", at: s1 + 0.4, until: listEnd, rect: stages });
   for (const row of await page.locator(".stages li").all()) {
     const service = STAGE_SERVICES[(await row.locator("span").first().innerText()).trim()];
     if (service)
       clock.overlay({
         kind: "chip",
         at: s1 + 0.7,
-        until: s2,
+        until: listEnd,
         text: service,
         rect: await rectOf(row),
       });
   }
+  // A trace too long to reach Review by s2 at replay speed is squeezed to reach it there.
   await clock.squeeze(
-    plan.seconds - clock.now() - REPLAY_TAIL_S,
+    [
+      { by: s2, wait: () => reviewRunning(page).waitFor({ timeout: REPLAY_TIMEOUT_MS }) },
+      {
+        by: plan.seconds - REPLAY_TAIL_S,
+        wait: () =>
+          page.locator(".replay-badge").waitFor({ state: "detached", timeout: REPLAY_TIMEOUT_MS }),
+      },
+    ],
     () => TIME_LABELS.replay,
-    () => page.locator(".replay-badge").waitFor({ state: "detached", timeout: 90_000 }),
   );
   await clock.at(plan.seconds, "end of replay");
 };
@@ -164,10 +251,11 @@ const review: BeatScript = async (page, clock, plan) => {
     await rectOf(page.locator(".verdict-chip")),
   ]);
   clock.shot(head, 2);
+  // Each spotlight is gone before the inspector scrolls the next rejection under it.
   clock.overlay({
     kind: "spotlight",
     at: s0 + 0.7,
-    until: s1,
+    until: s1 - SCROLL_LEAD_S - SPOTLIGHT_CLEAR_S,
     rect: await rectOf(page.locator(".verdict-chip")),
   });
   await moveCursor(page, REST.x - 300, REST.y);
@@ -176,13 +264,19 @@ const review: BeatScript = async (page, clock, plan) => {
     [0, s1],
     [1, s2],
   ] as const) {
-    await clock.at(at - 0.7, `rejection ${k + 1}`);
+    await clock.at(at - SCROLL_LEAD_S, `rejection ${k + 1}`);
     await scrollInspectorTo(page, rejections.nth(k), 60);
     const card = await rectOf(rejections.nth(k).locator("li").first());
     clock.shot(card, 2);
-    clock.overlay({ kind: "spotlight", at: clock.now() + 0.7, until: k ? s3 : s2, rect: card });
+    const moves = k ? s3 - FINAL_SCROLL_LEAD_S : s2 - SCROLL_LEAD_S;
+    clock.overlay({
+      kind: "spotlight",
+      at: clock.now() + 0.7,
+      until: moves - SPOTLIGHT_CLEAR_S,
+      rect: card,
+    });
   }
-  await clock.at(s3 - 0.9, "final check");
+  await clock.at(s3 - FINAL_SCROLL_LEAD_S, "final check");
   const flagged = page.locator(".quality-note li").filter({ hasText: /0:54\.2/ });
   await flagged.evaluate((el) => {
     const r = el.getBoundingClientRect();
@@ -240,12 +334,18 @@ const edit: BeatScript = async (page, clock, plan) => {
 const result: BeatScript = async (page, clock, plan) => {
   const [, s1] = plan.sentenceStarts;
   const listenAt = plan.parts.find((p) => "pause" in p.part)!.start;
-  clock.overlay({ kind: "tag", at: 0, until: s1, text: TIME_LABELS.result });
   const top = unionRect([
     await rectOf(page.locator(".line-head")),
     await rectOf(page.locator(".fit")),
   ]);
   clock.shot(top, 2);
+  // The label waits for the pull-in: on the wide first frames it would sit over the app header.
+  clock.overlay({
+    kind: "tag",
+    at: clock.now() + MOVE_SECONDS,
+    until: s1,
+    text: TIME_LABELS.result,
+  });
   clock.overlay({
     kind: "spotlight",
     at: 0.8,
@@ -280,26 +380,33 @@ export const SCRIPTS: Record<Beat, { before: (page: Page) => Promise<void>; run:
     before: async (page) => {
       await page.goto(BASE_URL, { waitUntil: "networkidle" });
       await page.evaluate(() => document.fonts.ready);
+      await paintFrame(page, ".seven video");
     },
     run: upload,
   },
   replay: {
     before: async (page) => {
-      await openRun(page, ORIGINAL_RUN);
-      const bottom = await page
-        .locator(".timeline")
-        .evaluate((el) => el.getBoundingClientRect().bottom);
-      await page.evaluate((y) => window.scrollTo({ top: y }), bottom + 24 - VIEWPORT.height);
-      await page.waitForTimeout(300);
+      await openReplayView(page);
+      const pressed = Date.now() / 1000;
+      await clickLike(page, replayButton(page));
+      await reviewRunning(page).waitFor({ timeout: REPLAY_TIMEOUT_MS });
+      replayTiming.toReview = Date.now() / 1000 - pressed;
+      await openReplayView(page);
     },
     run: replay,
   },
-  review: { before: async () => {}, run: review },
+  review: {
+    // Line 5's frame is decoded before the scene picks the line, so the pick does not flash black.
+    before: (page) => paintFrame(page, "video", film.line.start),
+    run: review,
+  },
   edit: {
     before: async (page) => {
       await openRun(page, EDIT_PARENT_RUN);
       await selectLine(page);
       await scrollInspectorTo(page, page.locator(FIX), 140);
+      // The new page draws the cursor at its default spot, which the close-up puts on the fix.
+      await moveCursor(page, REST.x - 300, REST.y);
     },
     run: edit,
   },

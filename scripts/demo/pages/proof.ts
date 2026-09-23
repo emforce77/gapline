@@ -207,7 +207,7 @@ export function evidencePage(timing: PageTiming): string {
 <h2 class="a h2" id="ev-head">Scene reports what a track still misses.</h2>
 <div class="a ev-col" id="ev-a" style="left:${M}px">
   <p class="ev-big">${l.voiced} of ${l.written}</p>
-  <p class="body">lines made it into the film in the default reviewer’s ${l.runs} finished test runs, none over the recognized speech.</p>
+  <p class="body">lines made it into the finished tracks in the default reviewer’s ${l.runs} finished test runs, none over the recognized speech.</p>
   <div class="ev-bars">${bars}</div>
 </div>
 <div class="a ev-col" id="ev-b" style="left:1020px">

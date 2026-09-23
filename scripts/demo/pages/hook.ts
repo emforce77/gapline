@@ -128,7 +128,7 @@ export async function sevenPage(timing: PageTiming): Promise<string> {
   const css = `
 .sv-shot { top:${SEVEN.strip}px; height:${SEVEN.stripH}px; overflow:hidden; opacity:0; }
 .sv-shot img { width:100%; height:100%; object-fit:cover; transform-origin:50% 50%; }
-.sv-sub { top:${SEVEN.sub}px; font-size:36px; line-height:1.25; opacity:0; }
+.sv-sub { top:${SEVEN.sub}px; font-size:36px; line-height:1.25; opacity:0; text-shadow:0 0 3px #000, 0 1px 4px #000, 0 2px 18px rgba(0,0,0,.85); }
 .sv-sub .gloss { font-size:25px; }
 .sv-edge { top:${SEVEN.edge}px; font-family:var(--mono); font-size:24px; color:var(--ink-100); opacity:0; }
 .sv-dlg { display:block; padding:0 12px; font-size:24px; font-weight:500; line-height:${SEVEN.dlgH}px; color:#f4f4f5; white-space:nowrap; }

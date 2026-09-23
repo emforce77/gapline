@@ -51,12 +51,20 @@ cd .next-verify/standalone && DATA_DIR=$PWD/../../runtime PORT=21961 HOSTNAME=12
 Repeat for `ko`. Recording and building are free; voice costs about $0.05 per language per full
 script (Chirp 3 HD, $30 per 1M characters) and is capped at $0.50 in the check note. The record step
 must follow any voice change, because each app scene is timed by its sentences. The check note says
-which server the app scenes came from. A human voice-over replaces a sentence when `runtime/demo-v3/<lang>/takes/<scene>-<n>.wav`
-exists.
+which server the app scenes came from. A human voice-over replaces a sentence when
+`runtime/demo-v3/<lang>/takes/<scene>-<n>.wav` exists.
+
+Voice files are `voice/<scene>-<n>@<rate>.wav`. A sentence whose text and voice are unchanged is
+reused at whatever rate it was kept, so a re-run pays only for changed sentences; a kept or returned
+file whose first or last 20 ms is above -40 dBFS (a clipped word) is requested again at rate ±0.01.
+Each sentence is mixed at its own gain toward -16 LUFS (within ±3 dB of the whole track's), with a
+5 ms fade-in and 30 ms fade-out, and its captions follow its measured speech onset and offset.
 
 The check note fails (unchecked box) on: length 180 s or more, a frozen stretch over 4 s in the
 picture area, a presenter sentence over 150 words per minute, a caption line over 42 characters
-(22 for Korean), an estimated (unvoiced) presenter, and TTS spend over $0.50. It never ticks the human watch-through.
+(22 for Korean), an estimated (unvoiced) presenter, TTS spend over $0.50, and the development Gemini
+label (`GEMINI_ACCESS_LABEL` naming OpenRouter) on the cloud page. It never ticks the human
+watch-through.
 
 ## Debug log
 
@@ -72,11 +80,38 @@ picture area, a presenter sentence over 150 words per minute, a caption line ove
 - [2026-09-23] Chirp 3 HD Aoede (en) speaks short sentences fast: at the lowest presenter rate (0.85)
   ten English sentences still measure 152–203 words/min on trimmed audio, while the whole script is
   141 words/min (125 with the pauses). Korean stays under 135. Left for the owner to judge by ear.
+- [2026-09-23] A watch-through QA (6 agents; findings with evidence kept outside the repo) confirmed 25
+  problems in the first voiced films. Root causes worth keeping:
+  - voice.ts wrote the rate-1.0 attempt and the slower retry to the same file, and cached by rate, so
+    a re-run re-requested every slowed sentence and could leave a slow entry pointing at fast audio.
+    Now files carry their rate and kept sentences are reused whatever their rate.
+  - Chirp 3 HD returned "Now, with Scene." cut off mid-word (last 20 ms at -26 dBFS, a click in the
+    mix). The edge guard re-requests such files; the fades stop any click.
+  - The result playback's sound was laid from the video's 'playing' event, about 0.1–0.2 s before its
+    first frame reached the screen. It is now laid from requestVideoFrameCallback frames; about 0.06 s
+    of lead remains (screen recording delay, not corrected).
+  - The saved trace spends half its time in Review, so one linear squeeze put Review under "writes".
+    The replay now times one silent replay in the page first and presses so that Review starts with
+    the sentence that names it.
+  - freezedetect compares against the frame where a still stretch began, so change accumulates:
+    small dots and a slowly drawn line add almost nothing, a large text block counts. The stakes page
+    reveals the ruling's date and text at two points of its long sentence; the constraint page pushes
+    in on the shortest silence while it is named.
+- [2026-09-23] A second QA round found three more: the re-voiced "Supreme Court" sentence came back
+  with 0.2 s of full-scale noise before the words (1,168 samples at 0.99 or more, silent edges, so the
+  edge guard passed it); the landing hero's video stayed black for a whole take after the page
+  reload; and picking Line 5 flashed the player black while it left its poster. Files with more than
+  1 ms at full scale are now requested again, and the upload and review scenes seek their video and
+  wait for the frame before recording. Caption groups can be set per sentence (`captions` on say())
+  where a list defeats the break rules.
 
 ## Status
 
-Films of 2026-09-23 (EN 170.9 s, KO 169.8 s, both -16.3 LUFS) are voiced with Chirp 3 HD ($0.0986
-TTS in total) and recorded from the local production server (127.0.0.1:21961), after the owner took
-the Cloud Run service down. Each `_check.md` ticks every limit except, for English, the presenter
-pace (see the debug log) and the human watch-through. The close page prints the Cloud Run URL, which
-answers again only after a redeploy under the same service name.
+Films of 2026-09-23 after two QA rounds (EN 172.4 s, KO 177.3 s; -16.4 and -16.3 LUFS), voiced with
+Chirp 3 HD and recorded from the local production server (127.0.0.1:21961) after the owner took the
+Cloud Run service down. Each `_check.md` ticks every limit except, for English, the presenter pace
+(short sentences; see the debug log), the development Gemini label (until the switch to Google AI
+Studio) and the human watch-through. The close page prints the Cloud Run URL, which answers again
+only after a redeploy under the same service name. Tests: `tests/demo-captions.test.ts` (caption
+breaks, given groups, timing) and `tests/demo-voice.media.ts` (clipped edges, full-scale bursts,
+voice reuse).
