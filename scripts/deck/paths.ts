@@ -19,11 +19,6 @@ export const DECK_PDF = join(OUT, "scene-deck.pdf");
 export const CONTACT_SHEET = join(OUT, "contact-sheet.png");
 export const CHECK_NOTE = join(OUT, "scene-deck_check.md");
 
-/**
- * The sample the app shows (runtime/showcase.json): its Korean run is the finished track. The deck
- * walks that run's parents back to the automatic run, so a new pin changes every slide that uses it.
- */
-export const SHOWCASE_PIN = join(REPO, "runtime/showcase.json");
 export const PROJECTS = join(REPO, "runtime/projects");
 /** The clip Scene heard for the sample (the opening, film 0–65 s). */
 export const SHOWCASE_CLIP = join(PROJECTS, "tos-opening/clip.mp4");

@@ -113,12 +113,6 @@ export const SecondAsrSchema = z.object({
   ),
 });
 
-/** runtime/showcase.json: the run the app shows as the sample, per narration language. */
-export const ShowcasePinSchema = z.object({
-  projectId: z.string(),
-  runs: z.object({ ko: z.string() }),
-});
-
 const TimedWord = Span.extend({ word: z.string(), probability: z.number() });
 /** runtime/deck/evidence/slice-asr.json, written by scripts/deck/probe/slice_asr.py. */
 export const SliceAsrSchema = z.object({

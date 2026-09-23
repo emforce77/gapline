@@ -1,14 +1,17 @@
 /**
- * The sample track the app shows: the Korean run pinned in runtime/showcase.json, walked back through
- * its parents to the automatic run. Each run in between is one editor session. Helpers shared by the
- * data modules that read these runs live here too.
+ * The sample track the deck tells: a finished Korean track walked back through its parents to the
+ * automatic run, each run in between one editor session. Helpers shared by the data modules that read
+ * these runs live here too.
+ *
+ * The deck keeps the track as it was finished on 22–23 Sep 2026 (DECK_TRACK). On 23 Sep 2026 the app's
+ * own pin (runtime/showcase.json) moved to a later automatic run made with the final-check fix stage;
+ * the deck follows it once its slides are rewritten for a track with no editor session.
  */
 import { join } from "node:path";
-import { PROJECTS, SHOWCASE_PIN } from "../paths";
+import { PROJECTS } from "../paths";
 import {
   readJsonFile,
   ScriptSchema,
-  ShowcasePinSchema,
   type HumanEditRecord,
   type RunCue,
   type Script,
@@ -32,7 +35,8 @@ export function agree(label: string, computed: number, recorded: number): void {
     throw new Error(`${label}: computed ${computed} but the run records ${recorded}`);
 }
 
-export const pin = readJsonFile(SHOWCASE_PIN, ShowcasePinSchema);
+const DECK_TRACK = "edit-b05218880c3fdbfea4819303528ec4f2f57b9902";
+export const pin = { projectId: "tos-opening", runs: { ko: DECK_TRACK } };
 const runFile = (runId: string) => join(PROJECTS, pin.projectId, "runs", runId, "script.json");
 export const runDir = (runId: string) => join(PROJECTS, pin.projectId, "runs", runId);
 
