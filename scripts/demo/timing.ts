@@ -18,9 +18,9 @@ export const READING_CPS: Record<Language, number> = { en: 17, ko: 10 };
 const READ_BASE_S = 0.5;
 export const MIN_CAPTION_S = 1.8;
 /** Blank before the first caption of a scene, between two sentences, and around film sound. */
-const LEAD_IN_S = 0.3;
-const BETWEEN_S = 0.2;
-const AROUND_FILM_S = 0.5;
+const LEAD_IN_S = 0.2;
+const BETWEEN_S = 0.1;
+const AROUND_FILM_S = 0.4;
 
 /** One caption of a sentence, in seconds from the start of its scene. */
 export interface TimedCaption {

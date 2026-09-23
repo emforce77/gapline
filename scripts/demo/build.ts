@@ -16,18 +16,31 @@ import { CHROME_PATH, FPS, MAX_SECONDS } from "./config";
 import { mixSound, type Placed } from "./mix";
 import { preparePageAssets } from "./pages/shell";
 import type { BeatRecord, Frame } from "./recorder-kit";
-import { renderSegment } from "./segments";
+import { playbackExcerpt, renderSegment } from "./segments";
 import type { Scene } from "./storyboard";
 import { planScene } from "./timing";
 
 /** Segments rendered at once: each is one Chrome page or one FFmpeg encode. */
 const CONCURRENCY = 3;
+/** A scene that plays the film holds its paused picture at least this long after the film ends. */
+const PLAYBACK_TAIL_S = 0.3;
 const toFrames = (s: number) => Math.round(s * FPS) / FPS;
 
 function srtTime(v: number): string {
   const ms = Math.round(v * 1000);
   const pad = (n: number, w = 2) => String(n).padStart(w, "0");
   return `${pad(Math.floor(ms / 3600000))}:${pad(Math.floor(ms / 60000) % 60)}:${pad(Math.floor(ms / 1000) % 60)},${pad(ms % 1000, 3)}`;
+}
+
+/**
+ * How long a recorded scene runs in the film: as recorded, except that a scene playing the film ends
+ * with its plan once the film laid over the player is done (a page that stalled during playback
+ * reached its end late, and those extra seconds would only hold the paused picture).
+ */
+function recordedSeconds(rec: BeatRecord, planned: number): number {
+  if (!rec.playback) return rec.seconds;
+  const play = playbackExcerpt(rec, rec.seconds)!;
+  return Math.min(rec.seconds, Math.max(planned, play.at + play.seconds + PLAYBACK_TAIL_S));
 }
 
 export interface SrtCue {
@@ -78,7 +91,7 @@ export async function buildFilm(input: {
         : undefined;
     if ("beat" in scene.show && !rec)
       throw new Error(`no recording for ${scene.id}; run the record step`);
-    const seconds = toFrames(rec ? rec.seconds : plan.seconds);
+    const seconds = toFrames(rec ? recordedSeconds(rec, plan.seconds) : plan.seconds);
     const p = { scene, plan, start: cursor, seconds, rec };
     cursor += seconds;
     return p;
@@ -156,7 +169,7 @@ export async function buildFilm(input: {
       .map((c, i) => `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`)
       .join("\n"),
   );
-  const note = await writeCheck({
+  const { note, failures } = await writeCheck({
     lang,
     out,
     outDir,
@@ -164,9 +177,12 @@ export async function buildFilm(input: {
     total,
     captions: captions.srt,
     frames,
+    sounds: sound.sounds,
     soundNotes: sound.notes,
     recDir,
   });
   console.log(`check: ${note}`);
+  if (failures.length)
+    throw new Error(`the film's sound is out of place (see ${note}):\n${failures.join("\n")}`);
   return out;
 }

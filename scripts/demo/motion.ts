@@ -1,8 +1,8 @@
 /**
  * Renders a motion page frame by frame in headless Chrome: for each frame, render(t) sets the page to
  * that instant and a screenshot is piped straight into FFmpeg, so no frame folder is written. The page
- * fills the 1920×960 picture area; the caption band below it and the captions come from the scene's
- * subtitle file, burned in during the same encode.
+ * fills the 1920×880 picture area (CONTENT_HEIGHT); the caption band below it and the captions come
+ * from the scene's subtitle file, burned in during the same encode.
  */
 import { spawn } from "node:child_process";
 import { writeFile } from "node:fs/promises";

@@ -20,6 +20,12 @@ export interface AssEvent {
   style: "Say" | "Sub" | "Dlg" | "Tag" | "Chip" | "Shape";
   text: string;
   layer?: number;
+  /**
+   * A caption's lines as whole Dialogue texts, written one Dialogue line each in place of `text`
+   * (which then holds the caption's words, for reading): the pitch between them is set here, not by
+   * the font's line height.
+   */
+  rows?: string[];
 }
 
 /** Caption line limits in characters (broadcast practice: about 42 for English, fewer for Korean). */
@@ -62,14 +68,22 @@ const KO_BOUND =
   /^(중|대신|안|동안|전|없이|것|수|하나|함께)(에|에서|에서만|은|는|이|을|를|도|만)?[,.]?$/u;
 /** Two capitalised words in a row are one name (Supreme Court, Cloud Run). */
 const CAPITALISED = /^\p{Lu}/u;
-const BAND_CENTRE_Y = CONTENT_HEIGHT + (HEIGHT - CONTENT_HEIGHT) / 2;
 /**
- * The captions carry the story, so they are set larger than a subtitle (two lines still fit the
- * 120 px band), in Pretendard Medium, and fade rather than cut.
+ * The captions carry the story, so they are set larger than a subtitle, in Pretendard SemiBold, and
+ * fade rather than cut. libass sizes Pretendard by ascent plus descent, so 50 px gives a cap height
+ * of about 28 px (measured). Each line is its own event, 60 px apart (1.2 of the size), and the
+ * last line sits on the title-safe line: libass puts the ink's foot 2 px above an \an2 position
+ * (measured), so descenders end 56 px above the frame's foot. Two lines use 920–1024 of the band
+ * (880–1080); a one-line caption takes the lower line, where the eye already is.
  */
-const CAPTION_PX = 41;
-const CAPTION_WEIGHT = 500;
+const CAPTION_PX = 50;
+const CAPTION_WEIGHT = 600;
+const CAPTION_PITCH = 60;
+const TITLE_SAFE_PX = Math.round(HEIGHT * 0.05);
+const CAPTION_FOOT_Y = HEIGHT - TITLE_SAFE_PX;
 const CAPTION_FADE_MS = { in: 160, out: 120 };
+if (CAPTION_FOOT_Y - CAPTION_PITCH - CAPTION_PX < CONTENT_HEIGHT)
+  throw new Error("two caption lines no longer fit the band under the picture");
 
 /** #rrggbb as ASS &HBBGGRR (alpha set separately). */
 const bgr = (hex: string): string => {
@@ -117,9 +131,11 @@ export function assDocument(events: AssEvent[]): string {
     "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
     ...events
       .filter((e) => e.end > e.start)
-      .map(
-        (e) =>
-          `Dialogue: ${e.layer ?? 0},${assTime(e.start)},${assTime(e.end)},${e.style},,0,0,0,,${e.text}`,
+      .flatMap((e) =>
+        (e.rows ?? [e.text]).map(
+          (text) =>
+            `Dialogue: ${e.layer ?? 0},${assTime(e.start)},${assTime(e.end)},${e.style},,0,0,0,,${text}`,
+        ),
       ),
     "",
   ].join("\n");
@@ -269,14 +285,22 @@ export function captionGroups(text: string, lang: CaptionLanguage, given?: strin
   return fallback;
 }
 
+/** A caption in the band: its lines stacked up from the title-safe line, fading together. */
 export const sayEvent = (c: Caption): AssEvent => ({
   start: c.start,
   end: c.end,
   style: "Say",
-  text: `{\\pos(${WIDTH / 2},${BAND_CENTRE_Y})\\b${CAPTION_WEIGHT}\\fad(${CAPTION_FADE_MS.in},${CAPTION_FADE_MS.out})}${c.lines.map(assText).join("\\N")}`,
+  text: c.lines.join("\n"),
+  rows: c.lines.map((line, i) => {
+    const y = CAPTION_FOOT_Y - (c.lines.length - 1 - i) * CAPTION_PITCH;
+    return `{\\an2\\pos(${WIDTH / 2},${y})\\b${CAPTION_WEIGHT}\\fad(${CAPTION_FADE_MS.in},${CAPTION_FADE_MS.out})}${assText(line)}`;
+  }),
 });
 
-/** Scene's line over the film: Korean in amber, our English gloss under it in ink. */
+/**
+ * Scene's line over the film: Korean in amber, our English gloss under it in ink. An empty gloss
+ * (the Korean film) writes no second line, so the line sits on `y` itself.
+ */
 export const subEvent = (
   start: number,
   end: number,
@@ -287,7 +311,7 @@ export const subEvent = (
   start,
   end,
   style: "Sub",
-  text: `{\\pos(${WIDTH / 2},${y})\\b600\\fad(120,180)}${assText(line)}\\N{\\fs32\\b400\\c${INK}}${assText(gloss)}`,
+  text: `{\\pos(${WIDTH / 2},${y})\\b600\\fad(120,180)}${assText(line)}${gloss ? `\\N{\\fs32\\b400\\c${INK}}${assText(gloss)}` : ""}`,
 });
 
 export const dialogueEvent = (start: number, end: number, text: string, y: number): AssEvent => ({

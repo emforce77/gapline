@@ -4,9 +4,12 @@
  * plays. There is no presenter voice. Every number in a caption comes from facts.ts. A scene's
  * captions are split into sentences where the picture should change, because the recorder and the
  * motion pages key their moves to sentence starts; timing.ts times each by its reading length.
+ *
+ * The story states the default with confidence (one press of Generate runs every step) and names the
+ * optional edit once, as an offer. The words drawn over the app live in labels.ts.
  */
 import type { Language } from "../../src/lib/pipeline/schemas";
-import { dayLabel, film, minutesSeconds } from "./facts";
+import { film, minutesSeconds } from "./facts";
 
 export type Beat = "upload" | "replay" | "review" | "edit" | "result";
 export type PageId = "dark" | "seven" | "stakes" | "constraint" | "cloud" | "evidence" | "close";
@@ -37,53 +40,100 @@ const pause = (seconds: number): Part => ({ pause: seconds });
 
 /** The film cuts to the next shot 0.33 s before this line's window ends (measured on described.mp4). */
 const WINDOW_END_CLEARANCE_S = 0.45;
+/** The listen starts at least this long after the voice of the line before it has ended. */
+const PREVIOUS_VOICE_CLEARANCE_S = 0.15;
+/** The line heard before the listened one, whose voice must not reach into the listen. */
+const previousLine = film.opening.lines.filter((l) => l.start < film.line.start).at(-1);
 /**
- * "Play from here" starts a second before the line; the recording stops just after it, and clear of
- * the line's window end: the next shot and, at the end, the next line's caption.
+ * "Play from here" starts up to a second before the line, never in the voice of the line before
+ * it; the recording stops just after the line, and clear of its window end: the next shot and, at
+ * the end, the next line's caption. `lineAt` is where the line starts, in seconds into the listen.
  */
+const listenFrom = Math.max(
+  film.line.start - 1,
+  previousLine ? previousLine.start + previousLine.voiced + PREVIOUS_VOICE_CLEARANCE_S : 0,
+);
 export const LISTEN = {
-  from: film.line.start - 1,
+  from: listenFrom,
   to: Math.min(
     film.line.start + film.line.voiced + 0.5,
     film.line.windowEnd - WINDOW_END_CLEARANCE_S,
   ),
+  lineAt: film.line.start - listenFrom,
 };
 const LISTEN_SLOT_S = LISTEN.to - LISTEN.from + 0.6;
 /** "Close your eyes." is the dark page's own words, before the film's sound starts. */
-const CLOSE_YOUR_EYES_S = 2.2;
+const CLOSE_YOUR_EYES_S = 1.8;
+/** The upload preparing its clip, and the editor opening, between the scenes' two sentences. */
+const UPLOAD_WAIT_S = 3.1;
+const EDIT_TYPING_S = 1.4;
+/** The review opens on the line being picked, before its first sentence. */
+const REVIEW_PICK_S = 1.6;
+
+/** Hangul syllables with a final consonant other than ㄹ take 으로; the rest take 로. */
+const HANGUL_FIRST = 0xac00;
+const HANGUL_LAST = 0xd7a3;
+const FINALS = 28;
+const RIEUL_FINAL = 8;
+function euro(word: string): string {
+  const last = [...word].reverse().find((c) => {
+    const code = c.codePointAt(0)!;
+    return code >= HANGUL_FIRST && code <= HANGUL_LAST;
+  });
+  if (!last) throw new Error(`no Hangul to attach a particle to: ${word}`);
+  const final = (last.codePointAt(0)! - HANGUL_FIRST) % FINALS;
+  return final === 0 || final === RIEUL_FINAL ? "로" : "으로";
+}
 
 export function buildStoryboard(): Scene[] {
-  const h = film.hook;
-  const month = film.court.date.toLocaleDateString("en-GB", { month: "long", timeZone: "UTC" });
-  const monthKo = film.court.date.getUTCMonth() + 1;
-  const won = film.handMade.wonMillions;
+  const court = film.court.date;
+  const courtEn = court.toLocaleDateString("en-GB", {
+    month: "long",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const courtKo = `${court.getUTCFullYear()}년 ${court.getUTCMonth() + 1}월`;
+  const hand = film.handMade;
+  const silence = film.hook.silence.toFixed(1);
+  const wonKo = `${(hand.wonMillions * 100).toLocaleString("en-US")}만 원`;
+  const gaps = film.opening.gaps.length;
   const shortest = film.opening.shortest.toFixed(1);
   const clip = film.original.clipSeconds;
   const voiced = film.line.voiced.toFixed(1);
   const room = film.line.room.toFixed(1);
+  const rewrite = film.line.rewrite.text;
+  /** The rewrite quoted inside a sentence: its closing full stop would come before the particle. */
+  const rewriteWords = rewrite.replace(/\.$/, "");
   const l = film.loops;
+  const sample = film.original;
   return [
     {
       id: "dark",
       show: { page: "dark" },
       parts: [
         pause(CLOSE_YOUR_EYES_S),
-        { film: { track: "original", from: h.from, to: h.to } },
+        { film: { track: "original", from: film.hook.from, to: film.hook.to } },
         cap(
-          "Seven seconds with no words: a blind viewer hears only a hum and music.",
-          "7초 동안 대사가 없습니다. 시각장애인 관객에게는 소음과 음악만 들립니다.",
+          "Seven seconds without a word. A blind viewer hears only a hum.",
+          `${silence}초 동안 대사가 없습니다. 시각장애인 관객에겐 웅웅거리는 소리만 들립니다.`,
+          {
+            ko: [
+              [
+                `${silence}초 동안 대사가 없습니다.`,
+                "시각장애인 관객에겐 웅웅거리는 소리만 들립니다.",
+              ],
+            ],
+          },
         ),
-        cap(
-          "Now the same seconds, with the description Scene wrote.",
-          "이번에는 씬이 쓴 화면해설과 함께 들어 보세요.",
-        ),
+        // Short: "Open your eyes." is up with it, and the reveal's label says the rest (in Korean).
+        cap("This time, with Scene's description.", "이번에는 씬의 화면해설과 함께."),
       ],
-      hold: 0.3,
+      hold: 0.2,
     },
     {
       id: "reveal",
-      show: { film: { from: h.from, to: h.to } },
-      parts: [{ film: { track: "described", from: h.from, to: h.to } }],
+      show: { film: { from: film.hook.from, to: film.hook.to } },
+      parts: [{ film: { track: "described", from: film.hook.from, to: film.hook.to } }],
       hold: 0,
     },
     {
@@ -92,15 +142,21 @@ export function buildStoryboard(): Scene[] {
       chapter: true,
       parts: [
         cap(
-          "Scene wrote two lines for that silence; each voice is measured and ends before the next word.",
-          "씬은 이 침묵에 두 문장을 썼고, 둘 다 다음 대사 전에 끝납니다.",
+          "Scene fit two lines into that silence, each measured to end before the next word.",
+          "씬은 이 침묵에 두 문장을 넣고, 실제 낭독 길이를 재서 둘 다 다음 대사 전에 끝냈습니다.",
+          {
+            ko: [
+              ["씬은 이 침묵에 두 문장을 넣고,"],
+              ["실제 낭독 길이를 재서", "둘 다 다음 대사 전에 끝냈습니다."],
+            ],
+          },
         ),
         cap(
-          "No one edited them. One automatic run made the whole track.",
-          "사람은 손대지 않았습니다. 자동 실행 한 번이 트랙 전체를 만들었습니다.",
+          "One press of Generate runs all of it: writing, checking and voicing.",
+          "생성하기 한 번이면 쓰기, 검수, 낭독까지 모두 자동으로 진행됩니다.",
         ),
       ],
-      hold: 0.6,
+      hold: 0.4,
     },
     {
       id: "stakes",
@@ -108,40 +164,62 @@ export function buildStoryboard(): Scene[] {
       chapter: true,
       parts: [
         cap(
-          `In ${month}, Korea's Supreme Court ruled that the big cinema chains discriminate by showing films without description or captions.`,
-          `지난 ${monthKo}월 대법원은 대형 영화관 3사가 화면해설과 자막 없이 영화를 상영한 것을 차별로 판단했습니다.`,
+          `In ${courtEn}, Korea's Supreme Court ruled against the big cinema chains: showing films without description or captions is discrimination.`,
+          `${courtKo} 대법원은 대형 영화관 3사가 화면해설과 자막 없이 영화를 상영한 것을 차별로 판단했습니다.`,
           {
+            // The ruling, then what it found: two captions, each a whole clause.
+            en: [
+              [`In ${courtEn}, Korea's Supreme Court`, "ruled against the big cinema chains:"],
+              ["showing films without description", "or captions is discrimination."],
+            ],
             ko: [
-              [`지난 ${monthKo}월 대법원은`, "대형 영화관 3사가"],
+              [`${courtKo} 대법원은`, "대형 영화관 3사가"],
               ["화면해설과 자막 없이 영화를", "상영한 것을 차별로 판단했습니다."],
             ],
           },
         ),
         cap(
-          `Yet an accessible film still takes about ${film.handMade.months} months and ₩${won} million by hand.`,
-          `하지만 배리어프리 영화 한 편을 손으로 만들려면 여전히 약 ${film.handMade.months}개월, ${(won * 100).toLocaleString("en-US")}만 원이 듭니다.`,
+          `Yet one accessible film still takes about ${hand.months} months and ₩${hand.wonMillions} million (US$${hand.usdThousands}k) by hand.`,
+          `하지만 배리어프리 영화 한 편을 손으로 만들려면 여전히 약 ${hand.months}개월, ${wonKo}이 듭니다.`,
+          {
+            // One caption: "about" ends the first line rather than split the sentence in two.
+            en: [
+              [
+                "Yet one accessible film still takes about",
+                `${hand.months} months and ₩${hand.wonMillions} million (US$${hand.usdThousands}k) by hand.`,
+              ],
+            ],
+          },
         ),
       ],
-      hold: 0.8,
+      hold: 0.4,
     },
     {
       id: "constraint",
       show: { page: "constraint" },
       parts: [
         cap(
-          "Description may only speak where no one else does, so Speech-to-Text times every word.",
-          "해설은 대사가 없는 곳에서만 말할 수 있어, 음성 인식으로 모든 단어의 시각을 잽니다.",
+          "Description must never talk over dialogue, so Scene first times every spoken word.",
+          "해설은 대사와 겹치면 안 되기에, 씬은 먼저 말소리가 나오는 시점을 모두 잽니다.",
         ),
         cap(
-          `This ${clip}-second clip has ${film.opening.gaps.length} usable silences; the shortest is only ${shortest} seconds.`,
-          `${clip}초 클립에 쓸 수 있는 침묵은 ${film.opening.gaps.length}곳, 가장 짧은 곳은 ${shortest}초입니다.`,
+          `This ${clip}-second clip has ${gaps} usable silences; the shortest is ${shortest} seconds.`,
+          `${clip}초 클립에서 해설이 들어갈 수 있는 침묵은 ${gaps}곳, 가장 짧은 곳은 ${shortest}초입니다.`,
+          {
+            en: [
+              [
+                `This ${clip}-second clip has ${gaps} usable silences;`,
+                `the shortest is ${shortest} seconds.`,
+              ],
+            ],
+          },
         ),
         cap(
           "Every line is written, voiced and measured to fit one of them.",
-          "모든 문장은 그중 한 곳에 맞게 쓰고, 읽고, 잽니다.",
+          "모든 문장은 그중 한 곳에 들어가도록 쓰고, 낭독하고, 길이를 잽니다.",
         ),
       ],
-      hold: 0.7,
+      hold: 0.4,
     },
     {
       id: "upload",
@@ -149,13 +227,13 @@ export function buildStoryboard(): Scene[] {
       chapter: true,
       parts: [
         cap(
-          `You upload a clip of up to ${film.maxClipSeconds} seconds.`,
+          `Upload a clip of up to ${film.maxClipSeconds} seconds.`,
           `${film.maxClipSeconds}초 이하의 클립을 올립니다.`,
         ),
-        pause(2.6),
+        pause(UPLOAD_WAIT_S),
         cap(
-          "One press of Generate runs the rest, end to end.",
-          "나머지는 Generate 한 번으로 끝까지 자동으로 진행됩니다.",
+          "Then one press of Generate does the rest, end to end.",
+          "그다음 생성하기를 한 번 누르면, 나머지는 끝까지 자동입니다.",
         ),
       ],
       hold: 0.4,
@@ -166,58 +244,85 @@ export function buildStoryboard(): Scene[] {
       parts: [
         pause(0.6),
         cap(
-          "Chirp 3 times the dialogue. Gemini watches the picture and writes a line for each silence.",
-          "Chirp 3가 대사 시각을 재고, 제미나이가 화면을 보며 침묵마다 한 문장씩 씁니다.",
+          "Gemini writes each line from the picture, sized to fit its silence.",
+          "제미나이가 화면을 보고, 침묵 길이에 맞춰 문장을 씁니다.",
           {
+            en: [["Gemini writes each line from the picture,", "sized to fit its silence."]],
+            ko: [["제미나이가 화면을 보고,", "침묵 길이에 맞춰 문장을 씁니다."]],
+          },
+        ),
+        cap(
+          `A second Gemini checks every line against ${film.rules} rules from Korea's and Netflix's guides.`,
+          `두 번째 제미나이가 모든 문장을 한국·넷플릭스 해설 규칙 ${film.rules}가지로 검수합니다.`,
+          {
+            // "화면해설 규칙" would take the second line one character past the Korean limit.
             ko: [
-              ["Chirp 3가 대사 시각을 재고,"],
-              ["제미나이가 화면을 보며", "침묵마다 한 문장씩 씁니다."],
+              [
+                "두 번째 제미나이가 모든 문장을",
+                `한국·넷플릭스 해설 규칙 ${film.rules}가지로 검수합니다.`,
+              ],
             ],
             en: [
-              ["Chirp 3 times the dialogue."],
-              ["Gemini watches the picture", "and writes a line for each silence."],
+              [
+                "A second Gemini checks every line against",
+                `${film.rules} rules from Korea's and Netflix's guides.`,
+              ],
             ],
           },
         ),
         cap(
-          `A second Gemini reviews every line against ${film.rules} rules from Korea's guideline.`,
-          `검수는 또 하나의 제미나이가 맡아, 가이드라인 규칙 ${film.rules}가지로 모든 문장을 봅니다.`,
-        ),
-        cap(
-          "Each line is voiced and measured; a final check reviews the whole track.",
-          "문장마다 읽어서 길이를 재고, 믹스 전에 트랙 전체를 마지막으로 점검합니다.",
+          "Each line is voiced and measured; the final check sends back what fails.",
+          "문장마다 낭독해 길이를 재고, 최종 점검에서 걸린 문장은 다시 씁니다.",
+          {
+            en: [["Each line is voiced and measured;", "the final check sends back what fails."]],
+            ko: [["문장마다 낭독해 길이를 재고,", "최종 점검에서 걸린 문장은 다시 씁니다."]],
+          },
         ),
       ],
-      hold: 0.8,
+      hold: 0.6,
     },
     {
       id: "review",
       show: { beat: "review" },
       parts: [
-        pause(2.0),
+        pause(REVIEW_PICK_S),
         cap(
-          "When a check rejects a line, it cites the rule and the guideline page.",
-          "문장이 반려되면 어긴 규칙과 가이드라인 쪽수가 함께 적힙니다.",
+          "Here the final check sent a line back, citing the rule and the guideline page.",
+          "여기서는 최종 점검이 문장 하나를 돌려보냈습니다. 어긴 규칙과 가이드라인의 해당 쪽이 함께 적힙니다.",
+          {
+            ko: [
+              ["여기서는 최종 점검이", "문장 하나를 돌려보냈습니다."],
+              ["어긴 규칙과", "가이드라인의 해당 쪽이 함께 적힙니다."],
+            ],
+          },
         ),
         cap(
-          "Scene rewrites it from the reviewer's fix and reviews it again.",
-          "씬은 검수 의견대로 문장을 다시 쓰고 다시 검수합니다.",
+          "Scene rewrote it as the check suggested: it now reads the title on screen.",
+          `씬은 점검 의견대로, 화면 속 영문 글자를 우리말로 옮긴 ‘${rewriteWords}’${euro(rewrite)} 다시 썼습니다.`,
+          {
+            en: [["Scene rewrote it as the check suggested:", "it now reads the title on screen."]],
+            ko: [
+              ["씬은 점검 의견대로,", "화면 속 영문 글자를 우리말로 옮긴"],
+              [`‘${rewriteWords}’${euro(rewrite)} 다시 썼습니다.`],
+            ],
+          },
         ),
         cap(
-          "This rewrite passed and was voiced. No one stepped in.",
-          "다시 쓴 문장은 통과해 녹음됐고, 사람은 나서지 않았습니다.",
+          "The new line passed, was voiced and went into the mix, in the same run.",
+          "새 문장은 검수를 통과해 낭독되고, 같은 실행 안에서 믹스까지 이어졌습니다.",
         ),
       ],
-      hold: 1.0,
+      hold: 0.6,
     },
     {
       id: "result",
       show: { beat: "result" },
       parts: [
         cap(
-          `Each line shows its measured voice inside its room: ${voiced} seconds in ${room}.`,
-          `문장마다 자리와 실제 음성 길이가 보입니다. ${room}초 침묵에 ${voiced}초입니다.`,
+          `Measured, not estimated: ${voiced} seconds of voice in ${room} seconds of room.`,
+          `추정이 아니라 실측입니다. 자리 ${room}초에 낭독 ${voiced}초.`,
         ),
+        cap("Listen to it in the film.", "영화 속에서 들어 보세요."),
         pause(LISTEN_SLOT_S),
       ],
       hold: 0.3,
@@ -227,13 +332,17 @@ export function buildStoryboard(): Scene[] {
       show: { beat: "edit" },
       parts: [
         cap(
-          "An editor can still change any line, if they want to.",
-          "그래도 원하면, 편집자가 어떤 문장이든 고칠 수 있습니다.",
+          "Want different words? You can still edit any line yourself.",
+          "다른 표현을 원하면, 어떤 문장이든 직접 고칠 수 있습니다.",
         ),
-        pause(1.4),
+        pause(EDIT_TYPING_S),
         cap(
-          "Scene then re-voices and re-checks only that line.",
-          "그러면 씬은 그 문장만 다시 읽고 다시 검수합니다.",
+          "Scene re-voices just that line and checks the whole track again.",
+          "그러면 씬은 그 문장만 다시 낭독하고, 트랙 전체를 다시 점검합니다.",
+          {
+            en: [["Scene re-voices just that line", "and checks the whole track again."]],
+            ko: [["그러면 씬은 그 문장만 다시 낭독하고,", "트랙 전체를 다시 점검합니다."]],
+          },
         ),
       ],
       hold: 0.3,
@@ -243,42 +352,54 @@ export function buildStoryboard(): Scene[] {
       show: { page: "cloud" },
       chapter: true,
       parts: [
-        cap("It all runs on one Cloud Run service.", "모두 Cloud Run 하나에서 돌아갑니다."),
         cap(
-          "Speech-to-Text times the words, Gemini watches, writes and reviews, and Text-to-Speech voices each line.",
-          "음성 인식이 단어의 시각을 재고, 제미나이가 보고 쓰고 검수하고, 음성 합성이 문장을 읽습니다.",
+          "All of it runs on one Cloud Run service.",
+          "이 모든 과정이 Cloud Run 서비스 하나에서 돌아갑니다.",
+          { ko: [["이 모든 과정이", "Cloud Run 서비스 하나에서 돌아갑니다."]] },
+        ),
+        cap(
+          "Speech-to-Text times the words, Gemini watches, writes and checks, and Text-to-Speech voices each line.",
+          "음성 인식이 단어마다 시점을 재고, 제미나이가 보고 쓰고 검수하며, 음성 합성이 문장마다 낭독합니다.",
           {
             en: [
-              ["Speech-to-Text times the words,", "Gemini watches, writes and reviews,"],
+              ["Speech-to-Text times the words,", "Gemini watches, writes and checks,"],
               ["and Text-to-Speech voices each line."],
             ],
             ko: [
-              ["음성 인식이 단어의 시각을 재고,", "제미나이가 보고 쓰고 검수하고,"],
-              ["음성 합성이 문장을 읽습니다."],
+              ["음성 인식이 단어마다 시점을 재고,", "제미나이가 보고 쓰고 검수하며,"],
+              ["음성 합성이 문장마다 낭독합니다."],
             ],
           },
         ),
         cap(
-          "Cloud Storage holds every version, and progress streams live.",
-          "클라우드 스토리지가 모든 버전을 보관하고, 진행 상황은 실시간으로 전해집니다.",
+          "Cloud Storage keeps every version, and progress streams to the browser live.",
+          "Cloud Storage가 모든 버전을 보관하고, 진행 상황은 브라우저에 실시간으로 전해집니다.",
         ),
       ],
-      hold: 0.7,
+      hold: 0.4,
     },
     {
       id: "evidence",
       show: { page: "evidence" },
       parts: [
         cap(
-          `In our test runs, ${l.voiced} of ${l.written} lines reached the finished tracks, none over speech.`,
-          `시험 실행에서 ${l.written}문장 중 ${l.voiced}문장이 완성 트랙에 들어갔고, 대사와 겹친 문장은 없었습니다.`,
+          `In ${l.runs} finished test runs, ${l.voiced} of ${l.written} lines made it into the track.`,
+          `끝까지 마친 시험 실행 ${l.runs}회에서 ${l.written}문장 중 ${l.voiced}문장이 완성 트랙에 들어갔습니다.`,
+          {
+            ko: [
+              [
+                `끝까지 마친 시험 실행 ${l.runs}회에서 ${l.written}문장 중`,
+                `${l.voiced}문장이 완성 트랙에 들어갔습니다.`,
+              ],
+            ],
+          },
         ),
         cap(
-          `With no one in the loop, the sample took ${minutesSeconds(film.original.seconds, "en")} and cost $${film.original.costUsd.toFixed(2)}.`,
-          `샘플은 사람 개입 없이 ${minutesSeconds(film.original.seconds, "ko")}, API 비용 ${film.original.costUsd.toFixed(2)}달러가 들었습니다.`,
+          `The sample: ${sample.lines} lines in ${minutesSeconds(sample.seconds, "en")}, for $${sample.costUsd.toFixed(2)} in API fees.`,
+          `샘플은 ${sample.lines}문장, ${minutesSeconds(sample.seconds, "ko")}, API 비용 ${sample.costUsd.toFixed(2)}달러였습니다.`,
         ),
       ],
-      hold: 1.0,
+      hold: 0.5,
     },
     {
       id: "close",
@@ -294,14 +415,7 @@ export function buildStoryboard(): Scene[] {
         ),
         cap("Try the sample with your eyes closed.", "눈을 감고 샘플을 들어 보세요."),
       ],
-      hold: 1.8,
+      hold: 1.4,
     },
   ];
 }
-
-/** Honest labels for time the film does not show at its real length (English on both films). */
-export const TIME_LABELS = {
-  replay: `Saved run: ${minutesSeconds(film.original.seconds, "en")} of processing, sped up`,
-  upload: (seconds: number) => `Preparing: ${Math.round(seconds)} s, shortened`,
-  day: dayLabel(film.original.day),
-};

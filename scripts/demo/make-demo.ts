@@ -5,9 +5,12 @@
  *
  * The film has no presenter voice: captions tell the story, and every scene is timed by how long its
  * captions take to read (timing.ts), so both steps work from the storyboard alone.
- * record: drives the app in Chrome at DEMO_BASE_URL (default: the local production server). It never starts
- *   a paid run or edit: those requests are blocked and the recording fails if one is attempted.
+ * record: drives the app in Chrome at DEMO_BASE_URL (default: the local production server), in the film's
+ *   language. It never starts a paid run or edit: those requests are blocked and the recording fails if
+ *   one is attempted.
  * build: renders the motion scenes, cuts the recording and film, mixes the sound, writes the check note.
+ *   It exits non-zero when a film excerpt is heard more than 40 ms from its place or the sound ends
+ *   before the picture (measured on the finished file, check.ts).
  */
 import { join } from "node:path";
 import type { Language } from "../../src/lib/pipeline/schemas";

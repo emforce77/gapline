@@ -1,10 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { CAPTION_CHARS, captionGroups } from "../scripts/demo/ass";
-import type { Scene } from "../scripts/demo/storyboard";
+import { SPEC } from "../scripts/deck/data/deploy";
+import { assDocument, CAPTION_CHARS, captionGroups, sayEvent } from "../scripts/demo/ass";
+import { HEIGHT, MAX_SECONDS } from "../scripts/demo/config";
+import { film, GEMINI_NAME } from "../scripts/demo/facts";
+import { labels } from "../scripts/demo/labels";
+import { PAGES } from "../scripts/demo/pages/index";
+import { buildStoryboard, LISTEN, type PageId, type Scene } from "../scripts/demo/storyboard";
 import { MIN_CAPTION_S, planScene, READING_CPS, readingSeconds } from "../scripts/demo/timing";
 
 const lines = (text: string, lang: "en" | "ko") => captionGroups(text, lang).flat();
+const LANGS = ["en", "ko"] as const;
 
 describe("captionGroups", () => {
   it("keeps a two-word name on one line and never ends a line on an article", () => {
@@ -53,6 +59,24 @@ describe("captionGroups", () => {
   });
 });
 
+describe("caption geometry", () => {
+  const TITLE_SAFE_PX = Math.round(HEIGHT * 0.05);
+  const positions = (rows: string[]) => rows.map((r) => Number(/\\pos\(\d+,(\d+)\)/.exec(r)?.[1]));
+
+  it("writes each line as its own event, 60 px apart, the last on the title-safe line", () => {
+    const two = sayEvent({ start: 1, end: 3, lines: ["First line", "second line."] });
+    assert.deepEqual(positions(two.rows!), [HEIGHT - TITLE_SAFE_PX - 60, HEIGHT - TITLE_SAFE_PX]);
+    assert.ok(two.rows!.every((r) => r.includes("\\b600") && r.includes("\\an2")));
+    const one = sayEvent({ start: 3, end: 5, lines: ["One line."] });
+    assert.deepEqual(positions(one.rows!), [HEIGHT - TITLE_SAFE_PX]);
+    const dialogues = assDocument([two, one])
+      .split("\n")
+      .filter((l) => l.startsWith("Dialogue:"));
+    assert.equal(dialogues.length, 3);
+    assert.match(assDocument([two]), /Style: Say,Pretendard,50,/);
+  });
+});
+
 describe("caption timing", () => {
   const scene: Scene = {
     id: "test",
@@ -91,4 +115,131 @@ describe("caption timing", () => {
     assert.equal(plan.seconds, last.start + last.seconds + scene.hold);
     assert.equal(readingSeconds(["해 보세요."], "ko"), MIN_CAPTION_S);
   });
+});
+
+describe("the film's storyboard", () => {
+  const scenes = buildStoryboard();
+  const sentences = (lang: (typeof LANGS)[number]) =>
+    scenes.flatMap((s) => s.parts.flatMap((p) => ("caption" in p ? [p.caption[lang]] : [])));
+
+  for (const lang of LANGS)
+    it(`fits every ${lang} caption to its lines and pace, and the film under ${MAX_SECONDS} s`, () => {
+      let total = 0;
+      for (const scene of scenes) {
+        const plan = planScene(scene, lang);
+        total += plan.seconds;
+        for (const c of plan.parts.flatMap((p) => p.captions ?? [])) {
+          assert.ok(c.lines.length <= 2, c.lines.join(" / "));
+          assert.ok(
+            c.lines.every((l) => l.length <= CAPTION_CHARS[lang]),
+            c.lines.join(" / "),
+          );
+          assert.ok(c.lines.join(" ").length / (c.end - c.start) <= READING_CPS[lang] + 1e-9);
+        }
+      }
+      assert.ok(total < MAX_SECONDS, `planned ${total.toFixed(1)} s`);
+    });
+
+  it("gives each app scene the sentences its recording keys to", () => {
+    const shape = (id: string) =>
+      scenes
+        .find((s) => s.id === id)!
+        .parts.map((p) => ("caption" in p ? "c" : "pause" in p ? "p" : "f"))
+        .join("");
+    assert.equal(shape("upload"), "cpc");
+    assert.equal(shape("replay"), "pccc");
+    assert.equal(shape("review"), "pccc");
+    assert.equal(shape("result"), "ccp");
+    assert.equal(shape("edit"), "cpc");
+  });
+
+  it("states the default and offers the edit once, with no defensive negatives", () => {
+    const en = sentences("en");
+    const ko = sentences("ko");
+    const negatives =
+      /no one|no edits|0 edits|unattended|without an editor|in the loop|사람은|개입 없이|편집자/i;
+    assert.deepEqual(
+      [...en, ...ko].filter((s) => negatives.test(s)),
+      [],
+    );
+    assert.equal(en.filter((s) => /\bedit\b/i.test(s)).length, 1);
+    assert.equal(ko.filter((s) => s.includes("직접 고칠")).length, 1);
+    assert.ok(en.some((s) => s.startsWith("One press of Generate")));
+  });
+
+  it("claims no more than the sample shows (2026-09-23 verification)", () => {
+    // The sample has 2 or 3 lines in some silences, its final check added no line, an edit reviews
+    // the whole track, and the screen shows the title in English, not the line's gloss.
+    const overclaims =
+      /one line for each silence|fixes what it finds|re-checks just that line|words on screen|침묵마다 한 문장|스스로 고칩니다/i;
+    assert.deepEqual(
+      [...sentences("en"), ...sentences("ko")].filter((s) => overclaims.test(s)),
+      [],
+    );
+  });
+
+  it("names each thing one way in Korean: 낭독 for voicing, 최종 점검 for the final check", () => {
+    // 음성 stays only in the service names (음성 인식, 음성 합성).
+    const retired = /음성(?! 인식| 합성)|재합성|녹음|최종 내용 확인|보완/;
+    assert.deepEqual(
+      sentences("ko").filter((s) => retired.test(s)),
+      [],
+    );
+  });
+
+  it("starts the listen after the voice of the line before it", () => {
+    const before = film.opening.lines.filter((l) => l.start < film.line.start).at(-1)!;
+    assert.ok(LISTEN.from >= before.start + before.voiced, `listen from ${LISTEN.from}`);
+    assert.ok(LISTEN.from <= film.line.start && LISTEN.to > film.line.start + film.line.voiced);
+    assert.equal(LISTEN.lineAt, film.line.start - LISTEN.from);
+  });
+});
+
+describe("motion pages in the Korean film", () => {
+  // Pages that cut no stills (the seven and constraint pages call FFmpeg for theirs).
+  const PAGE_IDS: PageId[] = ["dark", "stakes", "cloud", "evidence", "close"];
+  const words = (s: string) => s.match(/[A-Za-z][\w.\-/()&']*/g) ?? [];
+  const hook = film.hook;
+  const allowed = new Set(
+    words(
+      [
+        "Tears of Steel Scene Cloud Run Storage Gemini Speech-to-Text v2 Text-to-Speech Chirp HD",
+        "FFmpeg Next.js Secret Manager Build deploy/cloud-run.sh vCPU API AI Builder Cup",
+        GEMINI_NAME,
+        film.geminiAccess,
+        film.credit,
+        film.theme,
+        film.category,
+        new URL(film.service).host,
+        Object.values(SPEC).join(" "),
+        hook.locked.text,
+        hook.freaky.text,
+      ].join(" "),
+    ).map((w) => w.replace(/[.,]$/, "")),
+  );
+
+  for (const id of PAGE_IDS)
+    it(`draws the ${id} page's words in Korean, keeping only names and the film's dialogue`, async () => {
+      const scene = buildStoryboard().find((s) => "page" in s.show && s.show.page === id)!;
+      const plan = planScene(scene, "ko");
+      const says = plan.parts.filter((p) => p.captions);
+      const html = await PAGES[id]({
+        T: plan.seconds,
+        S: says.map((p) => p.start),
+        L: says.map((p) => p.seconds),
+        film: plan.parts.find((p) => "film" in p.part)?.start,
+        lang: "ko",
+      });
+      assert.match(html, /<html lang="ko">/);
+      const visible = html
+        .replace(/<style>[\s\S]*?<\/style>|<script>[\s\S]*?<\/script>/g, " ")
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&amp;/g, "&");
+      const english = words(visible)
+        .map((w) => w.replace(/[.,:;]$/, ""))
+        .filter((w) => !allowed.has(w));
+      assert.deepEqual(english, []);
+      const dialogue = labels("ko").dialogueKo!;
+      if (id === "dark" || id === "close") assert.ok(visible.includes(dialogue.freaky));
+    });
 });

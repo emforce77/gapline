@@ -7,36 +7,71 @@
  * Settings come from deploy/cloud-run.sh (via the deck's data/deploy.ts); the Gemini access wording is
  * GEMINI_ACCESS_LABEL (src/lib/models.ts), the one place it may change.
  */
+import type { Language } from "../../../src/lib/pipeline/schemas";
 import { SPEC } from "../../deck/data/deploy";
 import { film, GEMINI_NAME } from "../facts";
-import { esc, pageHtml, STAGE, type PageTiming } from "./shell";
+import { esc, note, pageHtml, pick, STAGE, type PageTiming } from "./shell";
 
 const M = STAGE.margin;
-const BOX = { x: 470, y: 190, w: STAGE.w - M - 470, h: 500, r: 14 };
-const LINE_Y = 440;
-const BROWSER = { x: M, y: LINE_Y - 62, w: 206, h: 112 };
+/**
+ * The service box on the 880 px stage: its settings take the top 100 px, the loop over the stage
+ * names 160 px above the line, the services and the loop under them 170 px below it, and the model
+ * row the box's last 60 px.
+ */
+const BOX = { x: 470, y: 150, w: STAGE.w - M - 470, h: 490, r: 14 };
+const LINE_Y = BOX.y + 260;
+/** The browser lists what a viewer does there, one word a line. */
+const BROWSER = { x: M, y: LINE_Y - 84, w: 206, h: 168 };
 /** Loops leave a stage and come back to an earlier one: over the names, or under the services. */
 const LOOP_GAP = { over: 58, under: 60 };
 const LOOP_DEPTH = 50;
 const NODE_X0 = BOX.x + 96;
 const NODE_X1 = BOX.x + BOX.w - 96;
-const SHELF = { x: BOX.x, y: 760, w: BOX.w, h: 84 };
+const SHELF = { x: BOX.x, y: BOX.y + BOX.h + 36, w: BOX.w, h: 80 };
 /** The whole page drifts this much closer over the scene. */
 const DRIFT = 0.022;
 /** Share of the services sentence the line takes to cross every stage. */
 const CROSS_SHARE = 0.8;
 
 type Service = "stt" | "gemini" | "tts" | "ffmpeg";
-const STAGES: { name: string; service: Service }[] = [
-  { name: "Hear", service: "stt" },
-  { name: "Watch", service: "gemini" },
-  { name: "Write", service: "gemini" },
-  { name: "Review", service: "gemini" },
-  { name: "Voice", service: "tts" },
-  { name: "Check", service: "gemini" },
-  { name: "Fix", service: "gemini" },
-  { name: "Mix", service: "ffmpeg" },
+type StageId = "hear" | "watch" | "write" | "review" | "voice" | "check" | "fix" | "mix";
+/** The run's stages in code order (the final check, then the fix of what it found, then the mix). */
+const STAGES: { id: StageId; service: Service }[] = [
+  { id: "hear", service: "stt" },
+  { id: "watch", service: "gemini" },
+  { id: "write", service: "gemini" },
+  { id: "review", service: "gemini" },
+  { id: "voice", service: "tts" },
+  { id: "check", service: "gemini" },
+  { id: "fix", service: "gemini" },
+  { id: "mix", service: "ffmpeg" },
 ];
+/**
+ * Short stage names, the captions' words in Korean (낭독 for voicing and 최종 점검 for the final
+ * check, as the app and the captions say).
+ */
+const STAGE_NAMES: Record<Language, Record<StageId, string>> = {
+  en: {
+    hear: "Hear",
+    watch: "Watch",
+    write: "Write",
+    review: "Review",
+    voice: "Voice",
+    check: "Check",
+    fix: "Fix",
+    mix: "Mix",
+  },
+  ko: {
+    hear: "듣기",
+    watch: "보기",
+    write: "쓰기",
+    review: "검수",
+    voice: "낭독",
+    check: "최종 점검",
+    fix: "반영",
+    mix: "믹스",
+  },
+};
 const SERVICE_TAG: Record<Service, string> = {
   stt: "Speech-to-Text",
   gemini: "Gemini",
@@ -44,18 +79,32 @@ const SERVICE_TAG: Record<Service, string> = {
   ffmpeg: "FFmpeg",
 };
 /** The two loops, as on the deck's pipeline slide: [from stage, back to stage, label, side]. */
-const LOOPS: [string, string, string, "over" | "under"][] = [
-  ["Review", "Write", "rejected: rewritten from the fix", "over"],
-  ["Voice", "Review", "too long: faster, or shortened and reviewed again", "under"],
+const LOOPS: [StageId, StageId, Record<Language, string>, "over" | "under"][] = [
+  [
+    "review",
+    "write",
+    { en: "rejected: rewritten from the fix", ko: "반려: 의견대로 다시 씀" },
+    "over",
+  ],
+  [
+    "voice",
+    "review",
+    {
+      en: "too long: faster, or shortened and checked again",
+      ko: "너무 김: 빠르게, 또는 줄여서 다시 검수",
+    },
+    "under",
+  ],
 ];
 
 /** An arrowhead drawn at the moving end of a line, pointing along it. */
 const TIP = "M-10 -5.5 L0 0 L-10 5.5 Z";
 
 const nodeX = (i: number) => NODE_X0 + (i * (NODE_X1 - NODE_X0)) / (STAGES.length - 1);
-const xOf = (name: string) => nodeX(STAGES.findIndex((s) => s.name === name));
+const xOf = (id: StageId) => nodeX(STAGES.findIndex((s) => s.id === id));
 
 export function cloudPage(timing: PageTiming): string {
+  const lang = timing.lang;
   const box = `M${BOX.x + BOX.r} ${BOX.y} H${BOX.x + BOX.w - BOX.r} A${BOX.r} ${BOX.r} 0 0 1 ${BOX.x + BOX.w} ${BOX.y + BOX.r} V${BOX.y + BOX.h - BOX.r} A${BOX.r} ${BOX.r} 0 0 1 ${BOX.x + BOX.w - BOX.r} ${BOX.y + BOX.h} H${BOX.x + BOX.r} A${BOX.r} ${BOX.r} 0 0 1 ${BOX.x} ${BOX.y + BOX.h - BOX.r} V${BOX.y + BOX.r} A${BOX.r} ${BOX.r} 0 0 1 ${BOX.x + BOX.r} ${BOX.y} Z`;
   const loops = LOOPS.map(([from, to, label, side]) => {
     const a = xOf(from);
@@ -65,11 +114,11 @@ export function cloudPage(timing: PageTiming): string {
     const far = start + dir * LOOP_DEPTH;
     const r = 14;
     const d = `M${a} ${start} V${far - dir * r} Q${a} ${far} ${a - r} ${far} H${b + r} Q${b} ${far} ${b} ${far - dir * r} V${start - dir * 4}`;
-    const at = STAGES.findIndex((s) => s.name === from);
+    const at = STAGES.findIndex((s) => s.id === from);
     const textY = side === "over" ? far - 14 : far + 32;
     return (
       `<path class="cz-loop" id="cz-loop-${at}" data-at="${at}" d="${d}"/><path class="cz-tip" data-for="cz-loop-${at}" d="${TIP}"/>` +
-      `<text class="cz-loopl" data-at="${at}" x="${(a + b) / 2}" y="${textY}">${esc(label)}</text>`
+      `<text class="cz-loopl" data-at="${at}" x="${(a + b) / 2}" y="${textY}">${esc(label[lang])}</text>`
     );
   }).join("");
   const dots = STAGES.map(
@@ -77,11 +126,11 @@ export function cloudPage(timing: PageTiming): string {
   ).join("");
   const names = STAGES.map(
     (s, i) =>
-      `<p class="a cz-name" data-i="${i}" style="left:${nodeX(i)}px;top:${LINE_Y - 50}px">${s.name}</p>` +
+      `<p class="a cz-name" data-i="${i}" style="left:${nodeX(i)}px;top:${LINE_Y - 52}px">${STAGE_NAMES[lang][s.id]}</p>` +
       `<p class="a cz-svc" data-i="${i}" style="left:${nodeX(i)}px;top:${LINE_Y + 18}px">${SERVICE_TAG[s.service]}</p>`,
   ).join("");
-  const drops = ["Hear", "Voice", "Mix"]
-    .map((name) => `<path class="cz-drop" d="M${xOf(name)} ${BOX.y + BOX.h} V${SHELF.y}"/>`)
+  const drops = (["hear", "voice", "mix"] as const)
+    .map((id) => `<path class="cz-drop" d="M${xOf(id)} ${BOX.y + BOX.h} V${SHELF.y}"/>`)
     .join("");
   const data = { ...timing, x: STAGES.map((_, i) => nodeX(i)), x0: NODE_X0, x1: NODE_X1 };
   const css = `
@@ -93,27 +142,30 @@ svg { position:absolute; left:0; top:0; overflow:visible; }
 .cz-dot { fill:var(--screen); stroke:var(--ink-400); stroke-width:2; }
 .cz-dot.on { fill:var(--ink-100); stroke:var(--ink-100); }
 .cz-loop { fill:none; stroke:var(--ink-400); stroke-width:1.5; }
-.cz-loopl { font-family:var(--sans); font-size:22px; fill:var(--ink-300); text-anchor:middle; opacity:0; paint-order:stroke; stroke:var(--screen); stroke-width:10px; }
+.cz-loopl { font-family:var(--sans); font-size:24px; fill:var(--ink-300); text-anchor:middle; opacity:0; paint-order:stroke; stroke:var(--screen); stroke-width:10px; }
 .cz-tip { fill:var(--ink-300); opacity:0; }
 .cz-link { fill:none; stroke:var(--ink-300); stroke-width:1.5; }
 .cz-drop { fill:none; stroke:var(--tick); stroke-width:1.5; stroke-dasharray:4 6; }
-.cz-spec { left:${BOX.x + 32}px; top:${BOX.y + 26}px; font-family:var(--mono); font-size:22px; color:var(--ink-300); opacity:0; white-space:nowrap; }
+.cz-spec { left:${BOX.x + 32}px; top:${BOX.y + 24}px; font-family:var(--mono); font-size:24px; color:var(--ink-300); opacity:0; white-space:nowrap; }
 .cz-spec b { font-family:var(--sans); font-size:30px; font-weight:600; color:var(--ink-100); margin-right:18px; }
-.cz-sub { left:${BOX.x + 32}px; top:${BOX.y + 70}px; font-size:22px; color:var(--ink-400); opacity:0; }
+.cz-sub { left:${BOX.x + 32}px; top:${BOX.y + 66}px; font-size:24px; color:var(--ink-400); opacity:0; }
 .cz-name { transform:translateX(-50%); font-size:28px; font-weight:600; color:var(--ink-100); white-space:nowrap; opacity:0; }
-.cz-svc { transform:translateX(-50%); font-size:22px; color:var(--ink-400); white-space:nowrap; opacity:0; }
-.cz-models { left:${BOX.x + 32}px; top:${BOX.y + BOX.h - 58}px; width:${BOX.w - 64}px; display:flex; gap:44px; font-size:22px; color:var(--ink-400); opacity:0; white-space:nowrap; }
+.cz-svc { transform:translateX(-50%); font-size:24px; color:var(--ink-400); white-space:nowrap; opacity:0; }
+.cz-models { left:${BOX.x + 32}px; top:${BOX.y + BOX.h - 56}px; width:${BOX.w - 64}px; display:flex; gap:40px; font-size:24px; color:var(--ink-400); opacity:0; white-space:nowrap; }
 .cz-models b { font-weight:600; color:var(--ink-100); margin-right:8px; }
 .cz-browser { left:${BROWSER.x}px; top:${BROWSER.y}px; width:${BROWSER.w}px; height:${BROWSER.h}px; border:1.5px solid var(--ink-300); border-radius:10px; padding:18px 20px; opacity:0; }
 .cz-browser p:first-child { font-size:28px; font-weight:600; color:var(--ink-100); }
-.cz-browser p + p { margin-top:4px; font-size:22px; color:var(--ink-400); }
-.cz-arrowl { font-size:22px; color:var(--ink-300); white-space:nowrap; opacity:0; }
+.cz-browser p + p { margin-top:6px; font-size:24px; line-height:1.25; color:var(--ink-400); }
+.cz-arrowl { font-size:24px; color:var(--ink-300); white-space:nowrap; opacity:0; }
 .cz-shelf { left:${SHELF.x}px; top:${SHELF.y}px; height:${SHELF.h}px; width:0; background:var(--lane); border-radius:10px; overflow:hidden; }
-.cz-shelf p { position:absolute; left:32px; top:24px; font-size:22px; color:var(--ink-300); white-space:nowrap; opacity:0; }
+.cz-shelf p { position:absolute; left:32px; top:22px; font-size:24px; color:var(--ink-300); white-space:nowrap; opacity:0; }
 .cz-shelf b { font-size:28px; font-weight:600; color:var(--ink-100); margin-right:22px; }`;
-  const arrowY = { up: BROWSER.y + 38, down: BROWSER.y + 78 };
+  const arrowY = { up: LINE_Y - 22, down: LINE_Y + 18 };
   const body = `
-<h2 class="a h2" id="cz-head">One Cloud Run service, from clip to finished track.</h2>
+<h2 class="a h2" id="cz-head">${pick(lang, {
+    en: "One Cloud Run service, from clip to finished track.",
+    ko: "Cloud Run 서비스 하나로, 클립에서 완성 트랙까지.",
+  })}</h2>
 <svg width="${STAGE.w}" height="${STAGE.h}" viewBox="0 0 ${STAGE.w} ${STAGE.h}">
   <path class="cz-box" d="${box}"/>
   <line class="cz-rail" x1="${NODE_X0}" y1="${LINE_Y}" x2="${NODE_X1}" y2="${LINE_Y}" opacity="0"/>
@@ -124,19 +176,39 @@ svg { position:absolute; left:0; top:0; overflow:visible; }
   <path class="cz-link" id="cz-down" d="M${BOX.x - 10} ${arrowY.down} H${BROWSER.x + BROWSER.w + 12}"/><path class="cz-tip" data-for="cz-down" d="${TIP}"/>
   ${drops}
 </svg>
-<p class="a cz-spec"><b>Cloud Run</b>${esc(SPEC.region ?? "")} · ${esc(SPEC.env)} · ${esc(SPEC.cpu)} vCPU · ${esc(SPEC.memory)} · ${esc(SPEC.min)}–${esc(SPEC.max)} instances</p>
-<p class="a cz-sub">One container: the Next.js app and FFmpeg. A run is one request.</p>
+<p class="a cz-spec"><b>Cloud Run</b>${esc(SPEC.region ?? "")} · ${esc(SPEC.env)} · ${esc(SPEC.cpu)} vCPU · ${esc(SPEC.memory)} · ${pick(
+    lang,
+    {
+      en: `${esc(SPEC.min)}–${esc(SPEC.max)} instances`,
+      ko: `인스턴스 ${esc(SPEC.min)}–${esc(SPEC.max)}개`,
+    },
+  )}</p>
+<p class="a cz-sub">${pick(lang, {
+    en: "One container: the Next.js app and FFmpeg. A run is one request.",
+    ko: "컨테이너 하나에 Next.js 앱과 FFmpeg. 실행 한 번이 요청 하나입니다.",
+  })}</p>
 ${names}
 <div class="a cz-models">
   <span><b>Speech-to-Text v2</b>Chirp 3</span>
   <span><b>${esc(GEMINI_NAME)}</b>${esc(film.geminiAccess)}</span>
   <span><b>Text-to-Speech</b>Chirp 3 HD</span>
 </div>
-<div class="a cz-browser"><p>Browser</p><p>viewer or editor</p></div>
-<p class="a cz-arrowl" id="cz-upl" style="left:${BROWSER.x + BROWSER.w + 14}px;top:${arrowY.up - 34}px">clip</p>
-<p class="a cz-arrowl" id="cz-downl" style="left:${BROWSER.x + BROWSER.w + 14}px;top:${arrowY.down + 8}px">live progress</p>
-<div class="a cz-shelf"><p><b>Cloud Storage</b>every clip, run and version · voice clips · finished tracks · mounted as a volume</p></div>
-<p class="src">Settings from deploy/cloud-run.sh. The model key comes from Secret Manager; Cloud Build builds the container into Artifact Registry.</p>`;
+<div class="a cz-browser"><p>${pick(lang, { en: "Browser", ko: "브라우저" })}</p><p>${pick(lang, {
+    en: ["upload", "watch", "listen"],
+    ko: ["올리기", "보기", "듣기"],
+  }).join("<br>")}</p></div>
+<p class="a cz-arrowl" id="cz-upl" style="left:${BROWSER.x + BROWSER.w + 14}px;top:${arrowY.up - 36}px">${pick(lang, { en: "clip", ko: "클립" })}</p>
+<p class="a cz-arrowl" id="cz-downl" style="left:${BROWSER.x + BROWSER.w + 14}px;top:${arrowY.down + 8}px">${pick(lang, { en: "live progress", ko: "실시간 진행" })}</p>
+<div class="a cz-shelf"><p><b>Cloud Storage</b>${pick(lang, {
+    en: "every clip, run and version · voice clips · finished tracks · mounted as a volume",
+    ko: "클립·실행·버전 전부 · 음성 파일 · 완성 트랙 · 볼륨으로 연결",
+  })}</p></div>
+${note(
+  pick(lang, {
+    en: "Settings from deploy/cloud-run.sh · model key in Secret Manager · built by Cloud Build",
+    ko: "설정: deploy/cloud-run.sh · 모델 키는 Secret Manager · 빌드는 Cloud Build",
+  }),
+)}`;
   const render = `
 const S = D.S, L = D.L;
 // Draws a path up to share p, with its arrowhead riding the drawn end.
@@ -171,7 +243,11 @@ $('.cz-line').setAttribute('x2', head);
 const reached = D.x.map((x) => head >= x - 0.5);
 $$('.cz-dot').forEach((el, i) => el.classList.toggle('on', reached[i]));
 const litAt = (i) => S[1] + 0.2 + L[1] * ${CROSS_SHARE} * (i / (D.x.length - 1));
-$$('.cz-name').forEach((el) => reveal(el, reached[el.dataset.i] ? prog(t, litAt(Number(el.dataset.i)), 0.45) : 0, 10));
+// Names are centred on their node, so the rise keeps the centring transform.
+$$('.cz-name').forEach((el) => {
+  const p = reached[el.dataset.i] ? prog(t, litAt(Number(el.dataset.i)), 0.45) : 0;
+  el.style.opacity = p; el.style.transform = 'translate(-50%, ' + ((1 - p) * 10) + 'px)';
+});
 $$('.cz-svc').forEach((el) => { el.style.opacity = reached[el.dataset.i] ? prog(t, litAt(Number(el.dataset.i)) + 0.15, 0.5) : 0; });
 $$('.cz-loop').forEach((el) => draw(el, prog(t, litAt(Number(el.dataset.at)) + 0.3, 0.9)));
 $$('.cz-loopl').forEach((el) => { el.style.opacity = prog(t, litAt(Number(el.dataset.at)) + 0.9, 0.5); });
@@ -182,5 +258,5 @@ $('.cz-shelf p').style.opacity = prog(t, S[2] + 0.8, 0.6);
 $$('.cz-drop').forEach((el, i) => { el.style.opacity = prog(t, S[2] + 0.9 + i * 0.2, 0.5); });
 draw($('#cz-down'), prog(t, S[2] + L[2] * 0.55, 0.8));
 $('#cz-downl').style.opacity = prog(t, S[2] + L[2] * 0.55 + 0.4, 0.5);`;
-  return pageHtml({ css, body, render, data });
+  return pageHtml({ lang, css, body, render, data });
 }
