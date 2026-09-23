@@ -6,9 +6,11 @@
 import { readFileSync } from "node:fs";
 import { MAX_UPLOAD_SECONDS } from "../../src/lib/api-contract";
 import { GEMINI_ACCESS_LABEL, MODELS } from "../../src/lib/models";
-import { editSession, finalRun, lineHistory, opening, originalRun, seven } from "../deck/data/demo";
+import { editSession, lineHistory, opening, originalRun, seven } from "../deck/data/demo";
 import { evaluationFacts } from "../deck/data/evaluation";
 import { loopCounts } from "../deck/data/loops";
+import type { RunCue } from "../deck/data/schema";
+import { lastVersion, sessions } from "../deck/data/showcase";
 import { CATEGORY, FILM_CREDIT, HAND_MADE, LAWSUIT, THEME } from "../deck/facts";
 import { EDIT_CHILD_RUN, EDIT_PARENT_RUN, ORIGINAL_RUN, REPO, runFile } from "./config";
 
@@ -20,12 +22,28 @@ export const GEMINI_NAME = "Gemini 3.8 Flash";
 if (!MODELS.flash.endsWith("gemini-3.8-flash"))
   throw new Error(`the film names ${GEMINI_NAME} but the app uses ${MODELS.flash}`);
 
-if (originalRun.runId !== ORIGINAL_RUN || finalRun.runId !== EDIT_CHILD_RUN)
-  throw new Error("the deck's pinned runs are not the runs the film records");
-const childSummary = JSON.parse(readFileSync(runFile(EDIT_CHILD_RUN, "script.json"), "utf8"))
-  .summary as { parentRunId?: string };
-if (childSummary.parentRunId !== EDIT_PARENT_RUN)
+/**
+ * The film shows the result of the Line 5 edit. The pinned sample track (the deck's finalRun) may be
+ * a later edit of that result, such as the removal of a line over dialogue on 23 Sep 2026, so the
+ * film's result must be in the track's history and keep the numbers the film takes from the track:
+ * the typed line and every line of the seven seconds.
+ */
+if (originalRun.runId !== ORIGINAL_RUN || !sessions.some((s) => s.runId === EDIT_CHILD_RUN))
+  throw new Error("the film's runs are not in the deck's pinned sample track");
+const child = JSON.parse(readFileSync(runFile(EDIT_CHILD_RUN, "script.json"), "utf8")) as {
+  summary: { parentRunId?: string };
+  cues: RunCue[];
+};
+if (child.summary.parentRunId !== EDIT_PARENT_RUN)
   throw new Error(`${EDIT_CHILD_RUN} was not made from ${EDIT_PARENT_RUN}`);
+for (const line of [
+  { id: lineHistory.id, text: lineHistory.typed.text, start: lineHistory.start },
+  ...seven.lines,
+]) {
+  const cue = child.cues.find((c) => c.id === line.id && c.status === "fits");
+  if (!cue || cue.start !== line.start || lastVersion(cue).text !== line.text)
+    throw new Error(`${EDIT_CHILD_RUN} does not show ${line.id} as the pinned track has it`);
+}
 
 /** The day the recorded edit ran, from its own call ledger. */
 const firstCall = readFileSync(runFile(EDIT_CHILD_RUN, "ledger.jsonl"), "utf8").split("\n")[0];

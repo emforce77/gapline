@@ -12,7 +12,7 @@ import { integratedLufs } from "../../src/lib/media/mix";
 import { probeDurationSeconds, probeMedia, runFfmpeg } from "../../src/lib/media/ffmpeg";
 import type { Language } from "../../src/lib/pipeline/schemas";
 import { CAPTION_CHARS } from "./ass";
-import { CONTENT_HEIGHT, DEPLOYED_URL, MAX_SECONDS, OUT, WIDTH } from "./config";
+import { CONTENT_HEIGHT, MAX_SECONDS, OUT, WIDTH } from "./config";
 import type { Placed } from "./mix";
 import type { Frame } from "./recorder-kit";
 import { MAX_WPM, type VoicedSentence } from "./voice";
@@ -122,7 +122,7 @@ export async function writeCheck(input: {
   const lines = [
     `# scene-demo-${lang}.mp4 — check (${new Date().toLocaleDateString("en-CA")})`,
     "",
-    `Built by \`npm run demo -- ${lang} build\` (scripts/demo/build.ts). App scenes recorded from ${source.baseUrl} at ${source.recordedAt}${source.baseUrl === DEPLOYED_URL ? " (the deployed service)" : " — NOT the deployed service: record again with the default DEMO_BASE_URL before submission"}.`,
+    `Built by \`npm run demo -- ${lang} build\` (scripts/demo/build.ts). App scenes recorded from ${source.baseUrl} at ${source.recordedAt}.`,
     "",
     `- ${box(duration < MAX_SECONDS)} length: ${r1(duration)} s (strictly below ${MAX_SECONDS} s; planned ${r1(input.total)} s)`,
     `- ${box(media.width === 1920 && media.height === 1080)} picture: ${media.width}×${media.height} H.264, ${r1(size / 1e6)} MB`,

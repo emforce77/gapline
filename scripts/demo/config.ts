@@ -14,11 +14,12 @@ export const PAGES_DIR = join(OUT, "pages");
 export const CACHE_DIR = join(OUT, "cache");
 
 /**
- * The service the app scenes are recorded from. Drafts use the local dev server (same code, same
- * pinned sample runs); the submission film is recorded from the deployed service.
+ * The server the app scenes are recorded from: a production build of this repo run locally, reading
+ * the same runtime/ data (pinned sample runs) as the dev server. The owner took the Cloud Run service
+ * down on 2026-09-23 and chose local recording.
  */
-export const DEPLOYED_URL = "https://scene-ad-958994530029.asia-northeast3.run.app";
-export const BASE_URL = (process.env.DEMO_BASE_URL || DEPLOYED_URL).replace(/\/$/, "");
+export const LOCAL_URL = "http://127.0.0.1:21961";
+export const BASE_URL = (process.env.DEMO_BASE_URL || LOCAL_URL).replace(/\/$/, "");
 
 export const PROJECT_ID = "tos-opening";
 const RUNS_DIR = join(REPO, "runtime/projects", PROJECT_ID, "runs");

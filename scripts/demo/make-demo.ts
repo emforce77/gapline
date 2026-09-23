@@ -5,7 +5,7 @@
  *
  * voice: Google Cloud TTS for the presenter (paid, cached per sentence). With --estimate, no audio:
  *   sentence lengths are estimated, and the film is built silent and marked as not voiced.
- * record: drives the app in Chrome at DEMO_BASE_URL (default: the deployed service). It never starts
+ * record: drives the app in Chrome at DEMO_BASE_URL (default: the local production server). It never starts
  *   a paid run or edit: those requests are blocked and the recording fails if one is attempted.
  * build: renders the motion scenes, cuts the recording and film, mixes the sound, writes the check note.
  */

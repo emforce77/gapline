@@ -33,21 +33,30 @@ evidence, close.
 ```sh
 npm run demo -- en voice            # Google Cloud TTS, cached per sentence (needs gcloud auth)
 npm run demo -- en voice --estimate # no audio: estimated lengths, film built silent and marked
-npm run demo -- en record           # DEMO_BASE_URL=http://127.0.0.1:21960 for a local draft
+npm run demo -- en record           # from the local production server (below)
 npm run demo -- en build            # about 4 minutes
+```
+
+The app scenes are recorded from a production build of this repo on 127.0.0.1:21961 (`LOCAL_URL`),
+reading the same `runtime/` data as the dev server:
+
+```sh
+NEXT_DIST_DIR=.next-verify npm run build
+cp -r .next-verify/static .next-verify/standalone/.next-verify/static
+cp -r public .next-verify/standalone/public
+cd .next-verify/standalone && DATA_DIR=$PWD/../../runtime PORT=21961 HOSTNAME=127.0.0.1 \
+  FFMPEG_PATH=<the FFMPEG_PATH of .env.local> node server.js
 ```
 
 Repeat for `ko`. Recording and building are free; voice costs about $0.05 per language per full
 script (Chirp 3 HD, $30 per 1M characters) and is capped at $0.50 in the check note. The record step
-must follow any voice change, because each app scene is timed by its sentences. For the submission,
-record from the deployed service (default `DEMO_BASE_URL`); the check note says which server the app
-scenes came from. A human voice-over replaces a sentence when `runtime/demo-v3/<lang>/takes/<scene>-<n>.wav`
+must follow any voice change, because each app scene is timed by its sentences. The check note says
+which server the app scenes came from. A human voice-over replaces a sentence when `runtime/demo-v3/<lang>/takes/<scene>-<n>.wav`
 exists.
 
 The check note fails (unchecked box) on: length 180 s or more, a frozen stretch over 4 s in the
 picture area, a presenter sentence over 150 words per minute, a caption line over 42 characters
-(22 for Korean), an estimated (unvoiced) presenter, recording from a server other than the deployed
-one, and TTS spend over $0.50. It never ticks the human watch-through.
+(22 for Korean), an estimated (unvoiced) presenter, and TTS spend over $0.50. It never ticks the human watch-through.
 
 ## Debug log
 
@@ -57,10 +66,17 @@ one, and TTS spend over $0.50. It never ticks the human watch-through.
   built with `--estimate` (no presenter audio) and $0 spent.
 - [2026-09-23] freezedetect (n=0.001) counts a slowly growing line or a ticking counter as frozen;
   motion pages reveal something at least every few seconds so no stretch passes 4 s.
+- [2026-09-23] facts.ts required the deck's pinned track to be the film's result run; pinning the
+  later removal of a line over dialogue (a child of that result) broke it. The guard now requires the
+  result run to be in the pinned track's history and to hold the same Line 5 and seven-second lines.
+- [2026-09-23] Chirp 3 HD Aoede (en) speaks short sentences fast: at the lowest presenter rate (0.85)
+  ten English sentences still measure 152–203 words/min on trimmed audio, while the whole script is
+  141 words/min (125 with the pauses). Korean stays under 135. Left for the owner to judge by ear.
 
 ## Status
 
-Draft films of 2026-09-23 (EN 174.0 s, KO 173.1 s) were recorded from the local dev server with
-estimated narration timing and no presenter audio; their frames and build files were deleted after
-the build, so the next build needs `voice` and `record` first. Each `_check.md` lists what the
-drafts still fail (presenter not voiced, not recorded from the deployed service, not watched).
+Films of 2026-09-23 (EN 170.9 s, KO 169.8 s, both -16.3 LUFS) are voiced with Chirp 3 HD ($0.0986
+TTS in total) and recorded from the local production server (127.0.0.1:21961), after the owner took
+the Cloud Run service down. Each `_check.md` ticks every limit except, for English, the presenter
+pace (see the debug log) and the human watch-through. The close page prints the Cloud Run URL, which
+answers again only after a redeploy under the same service name.
