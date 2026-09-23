@@ -1,37 +1,66 @@
-# Demo production, version 2
+# scripts/demo — the submission film
 
-Outputs are written under `runtime/demo-v2/`, preserving the earlier `runtime/demo/` films. English is the submission draft; Korean is the review copy. Both target 175 seconds. The builder throws before encoding or after probing if duration is **180 seconds or longer**.
+## Direction
 
-Pin `runtime/demo-v2/selection.json` to the project, generation run, edit parent, and recorded children. Nothing selects “the latest run” implicitly. The opening uses the edited Korean sample at 54–60.4 seconds, first as original sound, then with description. Both films contain English burned-in captions and an English SRT.
+Builds the under-3-minute English submission film and a Korean review copy (same picture, Korean
+presenter and captions) into `runtime/demo-v3/<lang>/`: `scene-demo-<lang>.mp4`, `_check.md`,
+`_contact.jpg` and `.srt`. The story follows the deck (`scripts/deck`, direction "Screening room"):
+hook with eyes closed, the same seconds with Scene, why now, the constraint, the product in the app
+(upload, replay, a rule-cited rejection, the editor's fix, the measured fit, playback), Google Cloud,
+evidence, close.
 
-```json
-{
-  "projectId": "tos-opening",
-  "generationRunId": "completed-generation-id",
-  "editBaseRunId": "completed-parent-id",
-  "editedRuns": {},
-  "edit": { "cueId": "L4", "text": "시뮬레이션 준비 완료.", "start": 54.2 }
-}
-```
+- Numbers come from run records through the deck's data modules (`scripts/deck/data`, `facts.ts`),
+  read by `facts.ts` here; nothing on screen or in a sentence is typed by hand. The Gemini access
+  wording is `GEMINI_ACCESS_LABEL` (src/lib/models.ts).
+- Motion scenes are HTML pages in the deck's theme, rendered frame by frame in headless Chrome and
+  piped into FFmpeg (`motion.ts`, `pages/`). Their moves are keyed to sentence starts.
+- App scenes are recorded at device scale 2 (2880×1440 frames, 1440×720 CSS viewport). The recorder
+  logs element boxes, camera shots and overlays in film time (`recorder-kit.ts`); `camera.ts` turns
+  them into eased scale+crop filters; overlays (spotlight, service chips, labels) are ASS drawings,
+  because this FFmpeg has no drawtext.
+- Waits (upload preparation, the saved run's replay) are squeezed, and every squeezed stretch carries
+  a label with its real length. Film playback in the app stays at 1×; its sound is laid from the
+  page's own media log.
+- The edit is never submitted: the recorder types the reviewer's fix into the parent result and
+  hovers "Review and re-voice", then the next scene opens the result that same edit produced on
+  22 Sep 2026, labelled as such. Requests that could start a paid run or edit are aborted, and the
+  recording fails if one was attempted.
+- The hook's picture is cut from Blender's 1080p master (`master.ts`, same checksum as the deck),
+  checked frame by frame against the repo clip; only the 10 MB cut is kept.
 
-Run production steps serially:
+## Production
 
 ```sh
-npm run demo -- en voice
-npm run demo -- ko voice
-npm run demo -- en record
-npm run demo -- en build
-npm run demo -- ko record
-npm run demo -- ko build
-node --env-file=.env.local --import tsx scripts/demo/presentation.ts
+npm run demo -- en voice            # Google Cloud TTS, cached per sentence (needs gcloud auth)
+npm run demo -- en voice --estimate # no audio: estimated lengths, film built silent and marked
+npm run demo -- en record           # DEMO_BASE_URL=http://127.0.0.1:21960 for a local draft
+npm run demo -- en build            # about 4 minutes
 ```
 
-Voice requests use Google Cloud TTS and cache unchanged text/voice/rate. **Recording performs a paid sentence edit against the deployed service.** It records a real private upload, replays the pinned generation's saved trace, displays a genuinely changed rejected line, edits one dropped sentence, listens, and downloads VTT. The uploaded project and the replayed sample are distinct; narration explicitly says it is a saved trace for the same sample. No new full generation is claimed in the recording.
+Repeat for `ko`. Recording and building are free; voice costs about $0.05 per language per full
+script (Chirp 3 HD, $30 per 1M characters) and is capped at $0.50 in the check note. The record step
+must follow any voice change, because each app scene is timed by its sentences. For the submission,
+record from the deployed service (default `DEMO_BASE_URL`); the check note says which server the app
+scenes came from. A human voice-over replaces a sentence when `runtime/demo-v3/<lang>/takes/<scene>-<n>.wav`
+exists.
 
-The edit writes a child run and records its exact ID. Do not rerun recording simply to repeat an already-successful paid mutation. The recorded cursor is an overlay on actual browser interaction. Time-compressed sections carry the speed and original run/edit processing time; listening remains at normal speed. Frame/media timestamps align the described soundtrack to recorded playback. Every source is loudness-adjusted, and an output limiter prevents digital over-levels.
+The check note fails (unchecked box) on: length 180 s or more, a frozen stretch over 4 s in the
+picture area, a presenter sentence over 150 words per minute, a caption line over 42 characters
+(22 for Korean), an estimated (unvoiced) presenter, recording from a server other than the deployed
+one, and TTS spend over $0.50. It never ticks the human watch-through.
 
-The September delivery uses one actual English-interface edit recording for both narration languages. Cards and presenter speech are localized; the listening beat starts film sound at ten seconds to keep both presenters clear of it. The first recording stopped while locating the download link after the paid edit had succeeded. Its edit frames were preserved and recovered using file write timestamps, then combined with a new CDP-timed upload/replay/listening/download recording. `DEMO_EDIT_CAPTURE` explicitly points to that preserved capture and checks the child run ID; it never simulates or repeats the edit. The recorder now checkpoints each beat so a later failure cannot discard completed paid evidence.
+## Debug log
 
-Each film has a technical check note. Full decode, video dimensions/codecs, duration, audio loudness/peaks, frame samples, caption placement and voice/film separation can be checked automatically. These checks do **not** substitute for a human listening to both complete films before submission. No claim of participant impact or certified zero real speech/sound intrusion is made.
+- [2026-09-23] CDP screencast frames were 1440×720 in v2 whatever deviceScaleFactor was set; Chrome's
+  `--force-device-scale-factor=2` gives 2880×1440 (the recorder checks the first frame's size).
+- [2026-09-23] Google Cloud auth for TTS needed an interactive `gcloud auth login`; the drafts were
+  built with `--estimate` (no presenter audio) and $0 spent.
+- [2026-09-23] freezedetect (n=0.001) counts a slowly growing line or a ticking counter as frozen;
+  motion pages reveal something at least every few seconds so no stretch passes 4 s.
 
-Source: _Tears of Steel_, Blender Foundation, CC BY 3.0. The presentation also attributes the Korean Wikitongues evaluation source. Browser session files, owner tokens, raw recordings and media stay ignored. Neither this script nor deployment publishes GitHub or submits to the contest.
+## Status
+
+Draft films of 2026-09-23 (EN 174.0 s, KO 173.1 s) were recorded from the local dev server with
+estimated narration timing and no presenter audio; their frames and build files were deleted after
+the build, so the next build needs `voice` and `record` first. Each `_check.md` lists what the
+drafts still fail (presenter not voiced, not recorded from the deployed service, not watched).

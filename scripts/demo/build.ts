@@ -1,368 +1,115 @@
 /**
- * Assembles the demo video from the cards, the app recording, the presenter's voice and the film.
+ * Assembles the film: places every scene on the timeline (app scenes take the length they were
+ * recorded at), renders one segment per scene, joins them without re-encoding, mixes the sound and
+ * writes the check note, the contact sheet and an SRT of the presenter's captions.
  *
- * Picture: one H.264 segment per scene (1920×960 content over a 120 px caption bar, captions burned
- * in with libass and Pretendard), joined without re-encoding. Long recorded interactions are
- * compressed to the storyboard duration with visible speed and original processing-time labels.
- * Listening stays at normal speed so the film and its sound remain synchronized.
- * Sound: presenter sentences at their planned times, the bare film under the cold open, and the
- * described film exactly where the recording shows it playing. Each source is brought to -16 LUFS.
- *
- * Output: runtime/demo-v2/<lang>/scene-demo-<lang>.mp4 and scene-demo-<lang>_check.md
+ * Output: runtime/demo-v3/<lang>/scene-demo-<lang>.mp4, _check.md, _contact.jpg, .srt
  */
-import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { integratedLufs } from "../../src/lib/media/mix";
-import { probeDurationSeconds, runFfmpeg } from "../../src/lib/media/ffmpeg";
-import { readCallRecords } from "../../src/lib/llm/ledger";
+import { chromium } from "playwright-core";
+import { runFfmpeg } from "../../src/lib/media/ffmpeg";
 import type { Language } from "../../src/lib/pipeline/schemas";
-import type { DemoData } from "./demo-data";
-import type { Frame, Mark, MediaEvent } from "./record";
-import { buildStoryboard, type CardId, type Scene } from "./storyboard";
+import { CAPTION_CHARS, sayEvent, sentenceCaptions, type AssEvent } from "./ass";
+import { writeCheck } from "./check";
+import { CHROME_PATH, FPS, MAX_SECONDS } from "./config";
+import { mixSound, type Placed } from "./mix";
+import { preparePageAssets } from "./pages/shell";
+import type { BeatRecord, Frame } from "./recorder-kit";
+import { renderSegment } from "./segments";
+import type { Scene } from "./storyboard";
 import { planScene, type VoicedSentence } from "./voice";
 
-const FPS = 30;
-const WIDTH = 1920;
-const HEIGHT = 1080;
-const CONTENT_HEIGHT = 960;
-const TARGET_LUFS = -16;
-const MAX_SECONDS = 180;
-const CAPTION_TAIL_SECONDS = 0.25;
-const FONTS_DIR = join(process.cwd(), "node_modules/pretendard/dist/public/static");
+/** Segments rendered at once: each is one Chrome page or one FFmpeg encode. */
+const CONCURRENCY = 3;
+const CAPTION_TAIL_S = 0.25;
+const toFrames = (s: number) => Math.round(s * FPS) / FPS;
 
-interface Placed {
-  scene: Scene;
-  start: number;
-  seconds: number;
+function srtTime(v: number): string {
+  const ms = Math.round(v * 1000);
+  const pad = (n: number, w = 2) => String(n).padStart(w, "0");
+  return `${pad(Math.floor(ms / 3600000))}:${pad(Math.floor(ms / 60000) % 60)}:${pad(Math.floor(ms / 1000) % 60)},${pad(ms % 1000, 3)}`;
 }
 
-const round = (n: number, places = 2) => Math.round(n * 10 ** places) / 10 ** places;
-const toFrames = (seconds: number) => Math.round(seconds * FPS) / FPS;
-
-function assTime(seconds: number): string {
-  const cs = Math.max(0, Math.round(seconds * 100));
-  const h = Math.floor(cs / 360000);
-  const m = Math.floor((cs % 360000) / 6000);
-  const s = Math.floor((cs % 6000) / 100);
-  return `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}.${String(cs % 100).padStart(2, "0")}`;
-}
-
-function sceneAss(
-  captions: { start: number; end: number; style: "Say" | "Film" | "Context"; text: string }[],
-): string {
-  const lines = captions.map(
-    (c) =>
-      `Dialogue: 0,${assTime(c.start)},${assTime(c.end)},${c.style},,0,0,0,,${c.text.replace(/[{}\\]/g, "")}`,
-  );
-  return [
-    "[Script Info]",
-    "ScriptType: v4.00+",
-    `PlayResX: ${WIDTH}`,
-    `PlayResY: ${HEIGHT}`,
-    "WrapStyle: 0",
-    "ScaledBorderAndShadow: yes",
-    "",
-    "[V4+ Styles]",
-    "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-    "Style: Say,Pretendard,38,&H00FFFFFF,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,2,150,150,24,1",
-    "Style: Film,Pretendard,34,&H0098908A,&H00FFFFFF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,0,0,2,150,150,40,1",
-    "Style: Context,Pretendard,25,&H00FFFFFF,&H00FFFFFF,&H00171513,&H00171513,0,0,0,0,100,100,0,0,3,8,0,7,24,24,12,1",
-    "",
-    "[Events]",
-    "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-    ...lines,
-    "",
-  ].join("\n");
-}
-
-/** The recorded frames that were on screen during [start, end), as ffconcat entries. */
-function beatConcat(frames: Frame[], mark: Mark, seconds: number): string {
-  let first = frames.findLastIndex((f) => f.t <= mark.start);
-  if (first < 0 || mark.start - frames[first].t > 2)
-    first = Math.max(
-      0,
-      frames.findIndex((f) => f.t >= mark.start),
-    );
-  const entries: string[] = ["ffconcat version 1.0"];
-  for (let i = first; i < frames.length && frames[i].t < mark.end; i++) {
-    const from = Math.max(frames[i].t, mark.start);
-    const to = Math.min(frames[i + 1]?.t ?? mark.end, mark.end);
-    if (to <= from) continue;
-    entries.push(
-      `file '${frames[i].file}'`,
-      `duration ${(((to - from) * seconds) / (mark.end - mark.start)).toFixed(4)}`,
-    );
-  }
-  entries.push(entries[entries.length - 2]);
-  return entries.join("\n") + "\n";
-}
-
-async function extractLufs(
-  source: string,
-  from: number,
-  seconds: number,
-  out: string,
-): Promise<number> {
-  await runFfmpeg([
-    "-y",
-    "-ss",
-    String(from),
-    "-t",
-    String(seconds),
-    "-i",
-    source,
-    "-vn",
-    "-ac",
-    "2",
-    "-ar",
-    "48000",
-    out,
-  ]);
-  return integratedLufs(out);
-}
-
-export async function buildDemo(input: {
+export async function buildFilm(input: {
   lang: Language;
-  data: DemoData;
   scenes: Scene[];
   voiced: VoicedSentence[];
-  cards: Record<CardId | "black", string>;
   recDir: string;
   outDir: string;
 }): Promise<string> {
-  const { lang, data, scenes, voiced, cards, recDir, outDir } = input;
+  const { lang, scenes, voiced, recDir, outDir } = input;
   const workDir = join(outDir, "build");
+  await rm(workDir, { recursive: true, force: true });
   await mkdir(workDir, { recursive: true });
-  const frames = JSON.parse(await readFile(join(recDir, "frames.json"), "utf8")) as Frame[];
-  const marks = JSON.parse(await readFile(join(recDir, "marks.json"), "utf8")) as Mark[];
-  const media = JSON.parse(await readFile(join(recDir, "media.json"), "utf8")) as MediaEvent[];
+  const beats: BeatRecord[] = JSON.parse(await readFile(join(recDir, "beats.json"), "utf8"));
+  const frames: Frame[] = JSON.parse(await readFile(join(recDir, "frames.json"), "utf8"));
 
-  // Where each scene sits on the final timeline.
-  const placed: Placed[] = [];
-  const english = buildStoryboard("en", data);
-  const subtitles: { start: number; end: number; text: string }[] = [];
   let cursor = 0;
-  for (const scene of scenes) {
+  const placed: Placed[] = scenes.map((scene) => {
     const plan = planScene(scene, voiced);
-    const mark =
+    const rec =
       "beat" in scene.show
-        ? marks.find((m) => m.beat === (scene.show as { beat: string }).beat)
-        : null;
-    if ("beat" in scene.show && !mark) throw new Error(`No recording for beat ${scene.show.beat}`);
-    const seconds = toFrames(mark?.beat === "listen" ? mark.end - mark.start : plan.minSeconds);
-    placed.push({ scene, start: cursor, seconds });
+        ? beats.find((b) => b.beat === (scene.show as { beat: string }).beat)
+        : undefined;
+    if ("beat" in scene.show && !rec)
+      throw new Error(`no recording for ${scene.id}; run the record step`);
+    const seconds = toFrames(rec ? rec.seconds : plan.seconds);
+    const p = { scene, plan, start: cursor, seconds, rec };
     cursor += seconds;
-  }
-  const total = cursor;
+    return p;
+  });
+  const total = toFrames(cursor);
   if (total >= MAX_SECONDS)
-    throw new Error(`Demo exceeds strict duration limit: ${total.toFixed(2)} s`);
+    throw new Error(`film would run ${total.toFixed(2)} s; the limit is under ${MAX_SECONDS}`);
 
-  // Picture: one segment per scene.
-  const segments: string[] = [];
-  const beatStats: string[] = [];
-  for (const [i, p] of placed.entries()) {
-    const plan = planScene(p.scene, voiced);
-    const captions: {
-      start: number;
-      end: number;
-      style: "Say" | "Film" | "Context";
-      text: string;
-    }[] = [];
-    for (const [k, s] of plan.speech.entries()) {
-      const text = english.find((e) => e.id === p.scene.id)!.say[k].text;
-      const chunks: string[] = [];
-      for (const word of text.split(/\s+/)) {
-        if (chunks.length && chunks.at(-1)!.length + word.length < 94)
-          chunks[chunks.length - 1] += ` ${word}`;
-        else chunks.push(word);
-      }
-      let at = s.start;
-      const length = chunks.reduce((n, c) => n + c.length, 0);
-      const end = Math.min(
-        s.start + s.seconds + CAPTION_TAIL_SECONDS,
-        plan.speech[k + 1]?.start ?? p.seconds,
-      );
-      for (const chunk of chunks) {
-        const next = at + ((end - s.start) * chunk.length) / length;
-        captions.push({ start: at, end: next, style: "Say", text: chunk });
-        subtitles.push({ start: p.start + at, end: p.start + next, text: chunk });
-        at = next;
-      }
-    }
-    if (plan.film && p.scene.film) {
-      captions.push({
-        start: plan.film.start,
-        end: plan.film.start + plan.film.seconds,
-        style: "Film",
-        text: english.find((e) => e.id === p.scene.id)!.film!.caption,
+  const captionLines: string[] = [];
+  const srt: { start: number; end: number; text: string }[] = [];
+  const captionsOf = (p: Placed): AssEvent[] => {
+    const says = p.plan.parts.filter((x) => x.sentence);
+    return says.flatMap((s, k) => {
+      const end = Math.min(s.start + s.seconds + CAPTION_TAIL_S, says[k + 1]?.start ?? p.seconds);
+      return sentenceCaptions(s.sentence!.text, s.start, end, CAPTION_CHARS[lang]).map((c) => {
+        captionLines.push(...c.lines);
+        srt.push({ start: p.start + c.start, end: p.start + c.end, text: c.lines.join("\n") });
+        return sayEvent(c);
       });
-      subtitles.push({
-        start: p.start + plan.film.start,
-        end: p.start + plan.film.start + plan.film.seconds,
-        text: english.find((e) => e.id === p.scene.id)!.film!.caption,
-      });
-    }
-    if ("beat" in p.scene.show) {
-      const beat = p.scene.show.beat;
-      const mark = marks.find((m) => m.beat === beat)!;
-      const speed = (mark.end - mark.start) / p.seconds;
-      const text =
-        beat === "replay"
-          ? `Saved run trace replay · original ${Math.round(data.standard.summary.wallSeconds)} s processing · recording ${speed.toFixed(1)}×`
-          : beat === "edit"
-            ? `Recorded edit ${speed.toFixed(1)}× · actual API processing ${Math.round(mark.processingSeconds ?? 0)} s`
-            : beat === "detail"
-              ? "Translation · Before: ‘The caption says forty years later.’ → After: ‘Forty years later.’"
-              : beat === "open"
-                ? `Recorded upload ${speed.toFixed(1)}×`
-                : "";
-      if (text) captions.push({ start: 0, end: p.seconds, style: "Context", text });
-    }
-    const assFile = join(workDir, `${p.scene.id}.ass`);
-    await writeFile(assFile, sceneAss(captions));
-    const listFile = join(workDir, `${p.scene.id}.ffconcat`);
-    const show = p.scene.show;
-    if ("beat" in show) {
-      const mark = marks.find((m) => m.beat === show.beat)!;
-      const inBeat = frames.filter((f) => f.t >= mark.start && f.t < mark.end).length;
-      beatStats.push(
-        `${show.beat}: ${inBeat} frames in ${round(mark.end - mark.start, 1)} s (${round(inBeat / (mark.end - mark.start), 1)} fps captured)`,
-      );
-      await writeFile(listFile, beatConcat(frames, mark, p.seconds));
-    } else {
-      const image = "card" in show ? cards[show.card] : cards.black;
-      await writeFile(
-        listFile,
-        `ffconcat version 1.0\nfile '${image}'\nduration ${p.seconds}\nfile '${image}'\n`,
-      );
-    }
-    const bar = "black" in show ? "black" : "0x0c0d0f";
-    const segment = join(workDir, `seg-${String(i).padStart(2, "0")}.mp4`);
-    await runFfmpeg([
-      "-y",
-      "-f",
-      "concat",
-      "-safe",
-      "0",
-      "-i",
-      listFile,
-      "-vf",
-      `scale=${WIDTH}:${CONTENT_HEIGHT}:flags=lanczos,fps=${FPS},pad=${WIDTH}:${HEIGHT}:0:0:color=${bar},` +
-        `subtitles=filename='${assFile}':fontsdir='${FONTS_DIR}',format=yuv420p`,
-      "-t",
-      String(p.seconds),
-      "-c:v",
-      "libx264",
-      "-threads",
-      "4",
-      "-preset",
-      "medium",
-      "-crf",
-      "17",
-      "-profile:v",
-      "high",
-      "-g",
-      String(FPS * 2),
-      "-an",
-      segment,
-    ]);
-    segments.push(segment);
-  }
-  const segList = join(workDir, "segments.ffconcat");
-  await writeFile(
-    segList,
-    `ffconcat version 1.0\n${segments.map((s) => `file '${s}'`).join("\n")}\n`,
-  );
-
-  // Sound: presenter and film, each brought to the same loudness.
-  const presenterList = join(workDir, "presenter.ffconcat");
-  await writeFile(
-    presenterList,
-    `ffconcat version 1.0\n${voiced.map((v) => `file '${v.file}'`).join("\n")}\n`,
-  );
-  const presenterAll = join(workDir, "presenter-all.wav");
-  await runFfmpeg(["-y", "-f", "concat", "-safe", "0", "-i", presenterList, presenterAll]);
-  const presenterGain = TARGET_LUFS - (await integratedLufs(presenterAll));
-
-  const inputs: string[] = [];
-  const chains: string[] = [];
-  const addSound = (
-    file: string,
-    at: number,
-    gainDb: number,
-    trim?: { from: number; seconds: number },
-  ) => {
-    const k = inputs.length / 2;
-    inputs.push("-i", file);
-    const cut = trim
-      ? `atrim=start=${trim.from}:duration=${trim.seconds},asetpts=PTS-STARTPTS,afade=t=in:d=0.05,afade=t=out:st=${Math.max(0, trim.seconds - 0.4)}:d=0.4,`
-      : "";
-    chains.push(
-      `[${k}:a]${cut}aresample=48000,aformat=channel_layouts=stereo,volume=${gainDb.toFixed(2)}dB,adelay=${Math.round(at * 1000)}:all=1[a${k}]`,
-    );
+    });
   };
-  const filmNotes: string[] = [];
-  for (const p of placed) {
-    const plan = planScene(p.scene, voiced);
-    for (const s of plan.speech) addSound(s.file, p.start + s.start, presenterGain);
-    if (!plan.film || !p.scene.film) continue;
-    const film = p.scene.film;
-    if ("black" in p.scene.show) {
-      const source = film.track === "original" ? data.clipFile : data.edited.describedFile;
-      const lufs = await extractLufs(
-        source,
-        film.from,
-        plan.film.seconds,
-        join(workDir, `${p.scene.id}-film.wav`),
-      );
-      addSound(source, p.start + plan.film.start, TARGET_LUFS - lufs, {
-        from: film.from,
-        seconds: plan.film.seconds,
-      });
-      filmNotes.push(
-        `${p.scene.id}: ${film.track} ${film.from}–${film.to} s at ${round(p.start + plan.film.start)} s (source ${lufs} LUFS)`,
-      );
-    } else {
-      const mark = marks.find((m) => m.beat === (p.scene.show as { beat: string }).beat)!;
-      const playing = media.find(
-        (e) => e.type === "playing" && e.wall >= mark.start && e.wall < mark.end,
-      );
-      if (!playing) throw new Error(`The recording never shows the film playing in ${p.scene.id}`);
-      const paused = media.find((e) => e.type === "pause" && e.wall > playing.wall);
-      const seconds = Math.min(paused?.wall ?? mark.end, mark.end) - playing.wall;
-      const source = film.track === "described" ? data.edited.describedFile : data.clipFile;
-      const lufs = await extractLufs(
-        source,
-        playing.media,
-        seconds,
-        join(workDir, `${p.scene.id}-film.wav`),
-      );
-      addSound(source, p.start + (playing.wall - mark.start), TARGET_LUFS - lufs, {
-        from: playing.media,
-        seconds,
-      });
-      filmNotes.push(
-        `${p.scene.id}: ${film.track} from ${round(playing.media)} s for ${round(seconds)} s at ${round(p.start + playing.wall - mark.start)} s, as the recording plays it (source ${lufs} LUFS)`,
-      );
-    }
-  }
-  const mixed = chains.map((_, k) => `[a${k}]`).join("");
-  const graph = `${chains.join(";\n")};\n${mixed}amix=inputs=${chains.length}:normalize=0:dropout_transition=0,apad=whole_dur=${total},atrim=0:${total},alimiter=limit=0.89:level=false[out]`;
-  const graphFile = join(workDir, "audio.filter");
-  await writeFile(graphFile, graph);
-  const audio = join(workDir, "audio.wav");
-  await runFfmpeg([
-    "-y",
-    ...inputs,
-    "-filter_complex_script",
-    graphFile,
-    "-map",
-    "[out]",
-    "-c:a",
-    "pcm_s16le",
-    audio,
-  ]);
 
+  await preparePageAssets();
+  const browser = await chromium.launch({ executablePath: CHROME_PATH });
+  const segments = placed.map((_, i) => join(workDir, `seg-${String(i).padStart(2, "0")}.mp4`));
+  try {
+    const queue = placed.map((p, i) => ({ p, i }));
+    const work = async () => {
+      for (let job = queue.shift(); job; job = queue.shift()) {
+        const started = Date.now();
+        await renderSegment({
+          scene: job.p.scene,
+          plan: job.p.plan,
+          seconds: job.p.seconds,
+          captions: captionsOf(job.p),
+          workDir,
+          out: segments[job.i],
+          browser,
+          rec: job.p.rec,
+          frames,
+          lang,
+        });
+        console.log(
+          `segment ${job.p.scene.id}: ${job.p.seconds.toFixed(1)} s in ${((Date.now() - started) / 1000).toFixed(0)} s`,
+        );
+      }
+    };
+    await Promise.all(Array.from({ length: CONCURRENCY }, work));
+  } finally {
+    await browser.close();
+  }
+
+  const list = join(workDir, "segments.ffconcat");
+  await writeFile(list, `ffconcat version 1.0\n${segments.map((s) => `file '${s}'`).join("\n")}\n`);
+  const sound = await mixSound(placed, total, workDir);
   const out = join(outDir, `scene-demo-${lang}.mp4`);
   await runFfmpeg([
     "-y",
@@ -371,9 +118,9 @@ export async function buildDemo(input: {
     "-safe",
     "0",
     "-i",
-    segList,
+    list,
     "-i",
-    audio,
+    sound.audio,
     "-map",
     "0:v",
     "-map",
@@ -385,56 +132,30 @@ export async function buildDemo(input: {
     "-b:a",
     "192k",
     "-t",
-    String(total),
+    total.toFixed(3),
     "-movflags",
     "+faststart",
     out,
   ]);
-
-  // Check note next to the video.
-  const duration = await probeDurationSeconds(out);
-  if (duration >= MAX_SECONDS) throw new Error(`Encoded demo violates strict limit: ${duration} s`);
-  const loudness = await integratedLufs(out);
-  const size = (await stat(out)).size;
-  const tts = await readCallRecords(join(outDir, "voice", "ledger.jsonl"));
-  const ttsChars = tts.filter((r) => r.ok).reduce((n, r) => n + (r.characters ?? 0), 0);
-  const ttsCost = tts.reduce((n, r) => n + r.costUsd, 0);
-  const run = data.standard;
-  const check = [
-    `# scene-demo-${lang}.mp4 — check (${new Date().toISOString().slice(0, 10)})`,
-    "",
-    `- [${duration < MAX_SECONDS ? "x" : " "}] length: ${round(duration, 1)} s (strictly below ${MAX_SECONDS} s, planned ${round(total, 1)} s)`,
-    `- [x] picture: ${WIDTH}×${HEIGHT} H.264 ${FPS} fps, ${round(size / 1e6, 1)} MB`,
-    `- [${Math.abs(loudness - TARGET_LUFS) <= 1.5 ? "x" : " "}] loudness: ${loudness} LUFS integrated (target ${TARGET_LUFS})`,
-    `- [x] presenter: ${voiced.length} sentences, ${ttsChars} characters synthesized this build set, $${ttsCost.toFixed(4)} (Chirp 3 HD ${voiced[0]?.voice})`,
-    `- [x] deployed runs: ${run.runId} (generation), ${data.editBase.runId} (edit parent), ${data.edited.runId} (recorded human edit)`,
-    `- [x] generation measurements: ${run.summary.cuesShipped} shipped lines; $${run.summary.costUsd.toFixed(4)} API cost; ${run.summary.wallSeconds} s. STT overlap is not a listening-quality certificate.`,
-    `- [x] English captions burned in for both narration languages; external English SRT also saved.`,
-    `- [ ] Human full-length listening acceptance remains required; automated media checks and sampled visual review cannot establish subjective listening quality.`,
-    ...beatStats.map((b) => `- [x] recording ${b}`),
-    ...filmNotes.map((f) => `- [x] film sound ${f}`),
-    "",
-    "| scene | start (s) | length (s) | shows |",
-    "| --- | ---: | ---: | --- |",
-    ...placed.map((p) => {
-      const show = p.scene.show;
-      const what =
-        "card" in show ? `card ${show.card}` : "beat" in show ? `app ${show.beat}` : "black";
-      return `| ${p.scene.id} | ${round(p.start, 1)} | ${round(p.seconds, 1)} | ${what} |`;
-    }),
-    "",
-  ].join("\n");
-  await writeFile(join(outDir, `scene-demo-${lang}_check.md`), check);
-  const srtTime = (v: number) => {
-    const ms = Math.round(v * 1000);
-    return `${String(Math.floor(ms / 3600000)).padStart(2, "0")}:${String(Math.floor(ms / 60000) % 60).padStart(2, "0")}:${String(Math.floor(ms / 1000) % 60).padStart(2, "0")},${String(ms % 1000).padStart(3, "0")}`;
-  };
   await writeFile(
-    join(outDir, `scene-demo-${lang}.en.srt`),
-    subtitles
+    join(outDir, `scene-demo-${lang}.${lang}.srt`),
+    srt
       .sort((a, b) => a.start - b.start)
-      .map((s, i) => `${i + 1}\n${srtTime(s.start)} --> ${srtTime(s.end)}\n${s.text}\n`)
+      .map((c, i) => `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`)
       .join("\n"),
   );
+  const note = await writeCheck({
+    lang,
+    out,
+    outDir,
+    placed,
+    total,
+    voiced,
+    captionLines,
+    frames,
+    soundNotes: sound.notes,
+    recDir,
+  });
+  console.log(`check: ${note}`);
   return out;
 }

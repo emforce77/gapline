@@ -1,44 +1,58 @@
 /**
- * Makes the demo video for one language, step by step or all at once.
+ * Makes the demo film for one language, step by step or all at once.
  *
- *   npm run demo -- <ko|en> [cards|voice|record|build|all]
+ *   npm run demo -- <en|ko> [voice|record|build|all] [--estimate]
  *
- * voice calls Google Cloud TTS; record performs a real paid edit on the deployed service.
- * Both are serial production steps. record/build read the measured voice plan.
+ * voice: Google Cloud TTS for the presenter (paid, cached per sentence). With --estimate, no audio:
+ *   sentence lengths are estimated, and the film is built silent and marked as not voiced.
+ * record: drives the app in Chrome at DEMO_BASE_URL (default: the deployed service). It never starts
+ *   a paid run or edit: those requests are blocked and the recording fails if one is attempted.
+ * build: renders the motion scenes, cuts the recording and film, mixes the sound, writes the check note.
  */
 import { join } from "node:path";
 import type { Language } from "../../src/lib/pipeline/schemas";
-import { buildDemo } from "./build";
-import { renderCards } from "./cards";
-import { DEMO_DIR, loadDemoData } from "./demo-data";
-import { recordApp } from "./record";
+import { OUT } from "./config";
 import { buildStoryboard } from "./storyboard";
-import { readVoiceManifest, voiceStoryboard } from "./voice";
 
-const STEPS = ["cards", "voice", "record", "build"] as const;
+const STEPS = ["voice", "record", "build"] as const;
 type Step = (typeof STEPS)[number];
 
 async function main(): Promise<void> {
   const lang = process.argv[2] as Language;
-  const step = (process.argv[3] ?? "all") as Step | "all";
-  if (lang !== "ko" && lang !== "en") throw new Error("usage: make-demo <ko|en> [step]");
+  const step = (process.argv.slice(3).find((a) => !a.startsWith("--")) ?? "all") as Step | "all";
+  if (lang !== "ko" && lang !== "en") throw new Error("usage: make-demo <en|ko> [step]");
   if (step !== "all" && !STEPS.includes(step)) throw new Error(`unknown step ${step}`);
   const run = (s: Step) => step === "all" || step === s;
-
-  const outDir = join(DEMO_DIR, lang);
-  const data = await loadDemoData(lang);
-  const scenes = buildStoryboard(lang, data);
-  const cardsDir = join(outDir, "cards");
+  const outDir = join(OUT, lang);
   const voiceDir = join(outDir, "voice");
   const recDir = join(outDir, "rec");
-
+  const scenes = buildStoryboard();
   const started = Date.now();
-  const cards = run("cards") || run("build") ? await renderCards(lang, data, cardsDir) : null;
-  if (run("voice")) await voiceStoryboard(lang, scenes, voiceDir);
-  const voiced = run("record") || run("build") ? await readVoiceManifest(voiceDir) : [];
-  if (run("record")) await recordApp({ lang, data, scenes, voiced, outDir: recDir });
+
+  if (run("voice")) {
+    const { estimateStoryboard, voiceStoryboard } = await import("./voice");
+    const estimate = process.argv.includes("--estimate");
+    const voiced = await (estimate ? estimateStoryboard : voiceStoryboard)(lang, scenes, voiceDir);
+    for (const v of voiced)
+      console.log(
+        `${v.scene}-${v.index}: ${v.seconds.toFixed(2)} s, ${v.wpm.toFixed(0)} wpm @${v.rate}`,
+      );
+  }
+  if (run("record")) {
+    const { recordApp } = await import("./record");
+    const { readVoiceManifest } = await import("./voice");
+    await recordApp({ scenes, voiced: await readVoiceManifest(voiceDir), outDir: recDir });
+  }
   if (run("build")) {
-    const out = await buildDemo({ lang, data, scenes, voiced, cards: cards!, recDir, outDir });
+    const { buildFilm } = await import("./build");
+    const { readVoiceManifest } = await import("./voice");
+    const out = await buildFilm({
+      lang,
+      scenes,
+      voiced: await readVoiceManifest(voiceDir),
+      recDir,
+      outDir,
+    });
     console.log(`demo: ${out}`);
   }
   console.log(`demo ${lang} ${step}: ${((Date.now() - started) / 1000).toFixed(1)} s`);
