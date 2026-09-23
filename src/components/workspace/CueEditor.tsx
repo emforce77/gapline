@@ -1,6 +1,7 @@
 "use client";
 import { useRef, useState } from "react";
 import { useI18n } from "@/i18n/client";
+import { fill } from "@/i18n";
 import { runErrorMessage } from "@/lib/client/api-errors";
 import type { Cue, Gap, Language } from "@/lib/pipeline/schemas";
 import { editErrorMessage, type EditFailureText } from "./edit-errors";
@@ -156,8 +157,8 @@ function CueEditor({
           onChange={(e) => setStart(e.target.value)}
         />
       </label>
-      <p className="label mono">
-        {min.toFixed(2)} ≤ t &lt; {max.toFixed(2)}
+      <p className="label">
+        {fill(t.editor.startRange, { min: min.toFixed(2), max: max.toFixed(2) })}
       </p>
       <p className="label">{t.editor.hint}</p>
       <button

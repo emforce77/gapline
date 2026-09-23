@@ -5,18 +5,18 @@ export const ko: Dictionary = {
   meta: {
     title: "씬 — 대사와 대사 사이에 맞춘 화면해설",
     description:
-      "씬은 대사와 대사 사이에 꼭 맞는 영화 화면해설을 만듭니다. 생성하기를 한 번 누르면 침묵에 맞춰 문장을 쓰고, 한국의 공개 가이드라인으로 검수하고, 목소리로 읽어 길이를 잰 뒤, 최종 점검에서 돌아온 문장을 다시 써서 믹스까지 마칩니다. 어떤 문장이든 직접 고칠 수도 있습니다.",
+      "씬은 대사와 대사 사이에 꼭 맞는 영화 화면해설을 만듭니다. 생성하기를 한 번 누르면 침묵에 맞춰 문장을 쓰고, 한국의 공개 가이드라인으로 검수하고, 낭독해 길이를 잰 뒤, 최종 점검에서 돌아온 문장을 다시 써서 믹스까지 마칩니다. 어떤 문장이든 직접 고칠 수도 있습니다.",
     project: "{title} — 씬",
   },
   nav: { home: "씬", language: "English", skip: "본문으로 건너뛰기" },
   landing: {
     eyebrow: "시각장애인을 위한 화면해설",
     title: "대사와 대사 사이에 꼭 맞는 화면해설.",
-    lede: "생성하기를 한 번 누르면 모든 단계가 이어집니다. 씬은 실제 침묵에 맞춰 해설 문장을 쓰고, 한국의 공개 가이드라인으로 검수하고, 목소리로 읽어 길이를 잰 뒤, 최종 점검에서 돌아온 문장을 다시 써서 믹스합니다. 다른 표현을 원하면 어떤 문장이든 고칠 수 있고, 씬은 그 문장만 다시 낭독하고 트랙 전체를 다시 점검합니다.",
+    lede: "생성하기를 한 번 누르면 모든 단계가 이어집니다. 씬은 실제 침묵에 맞춰 해설 문장을 쓰고, 한국의 공개 가이드라인으로 검수하고, 낭독해 길이를 잰 뒤, 최종 점검에서 돌아온 문장을 다시 써서 믹스합니다. 다른 표현을 원하면 어떤 문장이든 고칠 수 있고, 씬은 그 문장만 다시 낭독하고 트랙 전체를 다시 점검합니다.",
     ctaSample: "샘플 열어 보기",
     ctaUpload: "내 영상으로 해 보기",
     seven: {
-      label: "Tears of Steel, 54–61초",
+      label: "Tears of Steel, 54–60초",
       title: "대사가 없는 7초",
       body: "“…locked.” 다음 7초 동안 아무도 말하지 않습니다. 시각장애인 관객에게는 말소리 없이 웅웅거리는 소리만 들리다가 “This is pretty freaky.”가 이어집니다. 두 버전을 들어 보세요.",
       original: "원래 소리",
@@ -35,7 +35,7 @@ export const ko: Dictionary = {
       picture: "화면",
       dialogue: "대사",
       dialogueStat: "{n}구간, {s}",
-      room: "해설 자리",
+      room: "해설 가능 침묵",
       roomStat: "침묵 {n}곳, {s}",
       narration: "해설",
       narrationStat: "{n}문장",
@@ -129,7 +129,7 @@ export const ko: Dictionary = {
       },
     ],
     uploadIntro:
-      "90초, 30MB 이하 영상을 받습니다. 영상 준비는 1분 안에 끝나고, 해설 생성은 10분 안팎 걸리며 유료 Google Cloud와 Gemini API를 호출합니다. 생성 한도는 모든 방문자가 하루 단위로 함께 씁니다. 올린 영상은 올린 브라우저에서만 열 수 있습니다.",
+      "90초, 30MB 이하 영상을 받습니다. 영상 준비는 1분 안에 끝나고, 해설 생성은 10분 안팎 걸리며 유료 Google Cloud와 Gemini API를 호출합니다. 생성 한도는 하루 단위이며 모든 방문자가 함께 씁니다. 올린 영상은 그 브라우저에서만 열 수 있습니다.",
     uploadTitle: "내 영상",
     uploadHint:
       "MP4, MOV, WebM, 30MB와 90초 이하. 파일을 여기에 끌어 놓거나 골라 주세요. 65초 샘플의 {language} 해설은 생성에 {time} 걸렸고, 비용은 {cost}입니다.",
@@ -165,7 +165,7 @@ export const ko: Dictionary = {
     },
     status: {
       budget_busy:
-        "지금 다른 방문자의 해설이 생성되고 있습니다. 영상은 지금 올릴 수 있지만, 생성은 몇 분 기다려야 할 수 있습니다.",
+        "지금 다른 방문자의 해설이 생성되고 있습니다. 영상은 지금 올릴 수 있고, 그 생성이 끝나면 새로 생성할 수 있습니다. 보통 10분 안팎이면 됩니다.",
       budget_daily:
         "오늘의 실시간 생성 한도를 다 썼습니다. 영상은 지금 올려 두고 한도가 다시 채워진 뒤 생성할 수 있으며, 샘플의 기록된 결과는 언제든 재생됩니다.",
     },
@@ -188,12 +188,12 @@ export const ko: Dictionary = {
       "이 영상에서 대사가 없는 구간은 {room}뿐입니다. 해설을 제대로 넣으려면 {needed} 이상이 필요합니다. 해설은 아무도 말하지 않는 곳에만 들어가므로, 대사나 내레이션이 계속되는 영상에는 해설이 거의 들어가지 않습니다. 말 사이에 쉼이 있는 장면이 더 잘 맞습니다.",
     status: {
       budget_busy:
-        "지금 다른 방문자의 해설이 생성되고 있습니다. 그 생성이 끝나면 새로 시작할 수 있으며, 보통 몇 분이면 됩니다.",
+        "지금 다른 방문자의 해설이 생성되고 있습니다. 그 생성이 끝나면 새로 시작할 수 있으며, 보통 10분 안팎이면 됩니다.",
       budget_daily: "오늘의 실시간 생성 한도를 다 썼습니다. 샘플의 결과는 계속 재생됩니다.",
     },
     errors: {
       budget_busy:
-        "다른 방문자의 해설이 생성되고 있고, 오늘 한도로는 한 번에 하나만 만들 수 있습니다. 몇 분 뒤 다시 시도해 주세요.",
+        "다른 방문자의 해설이 생성되고 있고, 오늘 한도로는 한 번에 하나만 만들 수 있습니다. 그 생성이 끝나면 다시 시도해 주세요. 보통 10분 안팎이면 됩니다.",
       budget_daily: "오늘의 실시간 생성 한도를 다 썼습니다. 샘플의 결과는 계속 재생됩니다.",
       run_allowance:
         "이번 생성이 비용 상한에 닿아 멈췄고, 결과는 저장되지 않았습니다. 더 짧은 영상은 비용이 덜 듭니다.",
@@ -221,7 +221,7 @@ export const ko: Dictionary = {
   notFound: {
     metaTitle: "페이지를 찾을 수 없음 — 씬",
     title: "이 페이지는 없습니다.",
-    body: "올린 영상은 올린 브라우저에서만 열립니다. 다른 기기에서 열거나 다른 사람에게 공유한 링크는 이 페이지로 옵니다.",
+    body: "올린 영상은 그 브라우저에서만 열립니다. 다른 기기에서 열거나 다른 사람에게 공유한 링크는 이 페이지로 옵니다.",
     sample: "샘플 열어 보기",
     home: "씬 처음으로",
   },
@@ -279,7 +279,7 @@ export const ko: Dictionary = {
   timeline: {
     picture: "화면",
     dialogue: "대사",
-    room: "해설 자리",
+    room: "해설 가능 침묵",
     narration: "해설",
     seconds: "{n}초",
     relistenSpeech: "다시 들어 찾은 대사, {from}부터 {to}까지: {text}",
@@ -288,7 +288,7 @@ export const ko: Dictionary = {
     hear: "듣기",
     relisten: "침묵 구간 다시 듣기",
     watch: "보기",
-    gaps: "자리 찾기",
+    gaps: "침묵 찾기",
     write: "쓰기",
     review: "검수",
     voice: "낭독",
@@ -301,7 +301,7 @@ export const ko: Dictionary = {
     done: "{seconds}초",
     doneState: "완료",
     runningState: "진행 중",
-    relistenFound: "침묵 {gaps}곳 · 들린 단어 {words}개 · 줄어든 자리 {blocked}",
+    relistenFound: "침묵 {gaps}곳 · 들린 단어 {words}개 · 줄어든 침묵 {blocked}",
     relistenQuiet: "침묵 {gaps}곳 · 들린 말 없음",
   },
   line: {
@@ -320,7 +320,7 @@ export const ko: Dictionary = {
     rate: "속도 {rate}배",
     fits: "침묵 안에 맞음",
     voiced: "낭독: {rate}배속으로 {seconds}",
-    tooLong: "해설 자리 {room}보다 김",
+    tooLong: "자리 {room}보다 김",
     history: "이 문장이 만들어진 과정",
     by: {
       write: "초안",
@@ -347,6 +347,7 @@ export const ko: Dictionary = {
       rejectedOnce: "한 번 반려",
       rejectedTwice: "두 번 반려",
       rejectedMany: "{n}번 반려",
+      sentBack: "최종 점검에서 반려된 뒤",
       byEditor: "편집자가 고쳐서 통과",
       sameWords: "같은 문장으로 다시 통과",
       rewritten: "다시 써서 통과",

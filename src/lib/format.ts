@@ -28,6 +28,15 @@ export function formatDuration(seconds: number, lang: UiLang): string {
   return m > 0 ? `${m} min ${s} s` : `${s} s`;
 }
 
+/**
+ * Rounds to 0.01 s, the precision run records keep a voiced length in. A raw length (a line's trimmed
+ * audio, 2.746 s) printed next to its recorded one (2.75 s) must round from the same value, or one
+ * reads 2.7 and the other 2.8.
+ */
+export function toRecordedSeconds(seconds: number): number {
+  return Math.round(seconds * 100) / 100;
+}
+
 export function formatSeconds(seconds: number, lang: UiLang): string {
   const n = new Intl.NumberFormat(LOCALE[lang], {
     maximumFractionDigits: 1,

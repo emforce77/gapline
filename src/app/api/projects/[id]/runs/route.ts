@@ -8,7 +8,7 @@ import { accessibleProject, ownerHash, sameOrigin, sessionToken } from "@/lib/st
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-/** A 90 s clip takes a few minutes end to end; equals RUN_TIME_LIMIT_SECONDS and Cloud Run's timeout. */
+/** A new track takes about 10 minutes end to end; equals RUN_TIME_LIMIT_SECONDS and Cloud Run's timeout. */
 export const maxDuration = 900;
 
 const HEARTBEAT_MS = 15_000;

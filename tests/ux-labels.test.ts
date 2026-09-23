@@ -212,7 +212,7 @@ describe("interface copy", () => {
    * edit re-voices one line but checks the whole track again.
    */
   const OVERCLAIM =
-    /a line for each|one line per silence|fixes what|re-checks and re-voices|침묵마다|침묵 하나에 한 문장|문제를 고쳐|문제를 고침|그 문장만 다시 검수/i;
+    /a line for each|one line per silence|fix(es)? what|re-checks and re-voices|침묵마다|침묵 하나에 한 문장|문제를 고쳐|문제를 고침|그 문장만 다시 검수/i;
 
   it("describes a run as the sample's records show it, in either language", () => {
     for (const catalog of [en, ko]) {
@@ -221,12 +221,50 @@ describe("interface copy", () => {
   });
 
   it("keeps one Korean word for voicing and calls Scene by its Korean name", () => {
-    for (const text of strings(ko)) assert.doesNotMatch(text, /녹음|재합성|재검수|Scene/, text);
+    for (const text of strings(ko)) {
+      assert.doesNotMatch(text, /녹음|재합성|재검수|목소리로 읽|Scene/, text);
+    }
+  });
+
+  it("keeps 자리 for one line's room and calls a stretch without speech a silence", () => {
+    assert.equal(ko.line.room, "자리");
+    assert.equal(ko.timeline.room, "해설 가능 침묵");
+    assert.equal(ko.landing.timelineRows.room, ko.timeline.room);
+    assert.equal(ko.stages.gaps, "침묵 찾기");
+    for (const text of strings([ko.timeline, ko.landing.timelineRows, ko.stages])) {
+      assert.doesNotMatch(text, /자리/, text);
+    }
+  });
+
+  it("gives one duration for a new track wherever a wait is mentioned", () => {
+    for (const catalog of [en, ko]) {
+      for (const text of strings(catalog)) {
+        assert.doesNotMatch(text, /few minutes|several minutes|몇 분/, text);
+      }
+    }
+    for (const status of [en.live.status, en.upload.status]) {
+      assert.match(status.budget_busy, /usually within 10 minutes\.$/);
+    }
+    assert.match(en.live.errors.budget_busy, /usually within 10 minutes\.$/);
+    for (const text of [
+      ko.live.status.budget_busy,
+      ko.upload.status.budget_busy,
+      ko.live.errors.budget_busy,
+    ]) {
+      assert.match(text, /보통 10분 안팎이면 됩니다\.$/);
+    }
+  });
+
+  it("names the landing's seven seconds by the window its player plays (54.0–60.4 s)", () => {
+    assert.equal(en.landing.seven.label, "Tears of Steel, 54–60 s");
+    assert.equal(ko.landing.seven.label, "Tears of Steel, 54–60초");
   });
 
   it("names the final check the same way in the stage list and the editor", () => {
     assert.equal(en.stages.verify, "Final check");
     assert.equal(ko.stages.verify, "최종 점검");
+    assert.equal(en.stages.fix, "Apply the check");
+    assert.equal(ko.stages.fix, "점검 결과 반영");
     assert.ok(ko.editor.checked.startsWith(ko.stages.verify), ko.editor.checked);
     assert.ok(en.editor.checked.startsWith(en.stages.verify), en.editor.checked);
   });

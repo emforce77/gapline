@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
-import { formatClock, formatSeconds } from "@/lib/format";
+import { sentBackByFinalCheck } from "@/components/landing/RejectionStory";
+import { formatClock, formatSeconds, toRecordedSeconds } from "@/lib/format";
 import type { RunView } from "@/lib/pipeline/reduce";
 import type { Cue, Language } from "@/lib/pipeline/schemas";
 import { Gloss } from "./glosses";
@@ -91,8 +92,10 @@ export function StageList({
 function FitMeter({ cue }: { cue: Cue }) {
   const { t, lang } = useI18n();
   const room = cue.windowEnd - cue.start;
-  const spoken = cue.seconds ?? cue.versions[cue.versions.length - 1].voice?.seconds;
-  if (spoken === undefined) return null;
+  const measured = cue.seconds ?? cue.versions[cue.versions.length - 1].voice?.seconds;
+  if (measured === undefined) return null;
+  // The version history prints the recorded length; the meter rounds from the same 0.01 s value.
+  const spoken = toRecordedSeconds(measured);
   const ratio = Math.min(1.2, spoken / room);
   return (
     <div className="fit">
@@ -144,7 +147,9 @@ function Verdict({ cue }: { cue: Cue }) {
     tone = "fixed";
     const head =
       rejected.length === 1
-        ? v.rejectedOnce
+        ? sentBackByFinalCheck(rejected[0])
+          ? v.sentBack
+          : v.rejectedOnce
         : rejected.length === 2
           ? v.rejectedTwice
           : fill(v.rejectedMany, { n: rejected.length });

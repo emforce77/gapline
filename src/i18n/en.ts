@@ -16,7 +16,7 @@ export const en = {
     ctaSample: "Open the sample",
     ctaUpload: "Try your own clip",
     seven: {
-      label: "Tears of Steel, 54–61 s",
+      label: "Tears of Steel, 54–60 s",
       title: "Seven seconds with no dialogue",
       body: "After “…locked.”, nobody speaks for seven seconds. A blind viewer hears no words, only a hum, then “This is pretty freaky.” Listen to both versions.",
       original: "Original sound",
@@ -30,7 +30,7 @@ export const en = {
     },
     timelineTitle: "Narration may only speak where nobody else does.",
     timelineLede:
-      "The sample's 65 seconds as Scene sees them. Every description is written for one silence, and its recorded voice has to end before the next line of dialogue.",
+      "The sample's 65 seconds as Scene sees them. Every description is written for one silence, and its measured voice has to end before the next line of dialogue.",
     timelineRows: {
       picture: "Picture",
       dialogue: "Dialogue",
@@ -170,7 +170,7 @@ export const en = {
     },
     status: {
       budget_busy:
-        "Another visitor's description is being made right now. You can upload now; generating may have to wait a few minutes.",
+        "Another visitor's description is being made right now. You can upload now; generating can start when it finishes, usually within 10 minutes.",
       budget_daily:
         "Today's live allowance is used up. You can upload now and generate after it renews; the sample's recorded results play any time.",
     },
@@ -194,12 +194,12 @@ export const en = {
       "This clip has {room} without speech; Scene needs at least {needed} to describe much. Descriptions only go where nobody speaks, so constant dialogue or voice-over leaves few or no lines. A scene with pauses works better.",
     status: {
       budget_busy:
-        "Another visitor's description is being made right now. A new one can start when it finishes, usually within a few minutes.",
+        "Another visitor's description is being made right now. A new one can start when it finishes, usually within 10 minutes.",
       budget_daily: "Today's live allowance is used up; the sample's finished results still play.",
     },
     errors: {
       budget_busy:
-        "Another visitor's description is being made, and today's allowance covers one at a time. Try again in a few minutes.",
+        "Another visitor's description is being made, and today's allowance covers one at a time. Try again when it finishes, usually within 10 minutes.",
       budget_daily: "Today's live allowance is used up; the sample's finished results still play.",
       run_allowance:
         "This run reached its spending cap and stopped, so nothing was saved. A shorter clip needs less.",
@@ -298,7 +298,7 @@ export const en = {
     review: "Review",
     voice: "Voice",
     verify: "Final check",
-    fix: "Fix what the check found",
+    fix: "Apply the check",
     mix: "Mix",
     waiting: "Waiting",
     reused: "reused from an earlier run of this clip",
@@ -352,6 +352,7 @@ export const en = {
       rejectedOnce: "Rejected once",
       rejectedTwice: "Rejected twice",
       rejectedMany: "Rejected {n} times",
+      sentBack: "Sent back by the final check",
       byEditor: "then fixed by an editor",
       sameWords: "then passed with the same words",
       rewritten: "then passed after a rewrite",
