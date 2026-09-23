@@ -10,6 +10,7 @@ export function LanguageToggle({ lang, label }: { lang: UiLang; label: string })
     <button
       type="button"
       className="button ghost"
+      lang={lang === "en" ? "ko" : "en"}
       onClick={() => {
         const next: UiLang = lang === "en" ? "ko" : "en";
         document.cookie = `${UI_LANG_COOKIE}=${next}; path=/; max-age=31536000; samesite=lax`;

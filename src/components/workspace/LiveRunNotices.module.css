@@ -1,0 +1,34 @@
+/* Status lines around a live run. Neutral by default; the low-room note borrows the room outline. */
+.notices {
+  display: grid;
+  gap: 8px;
+}
+
+.notice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin: 0;
+  padding: 10px 12px;
+  border-left: 2px solid var(--border-strong);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--surface-2);
+  font-size: var(--step--1);
+  line-height: 1.5;
+}
+
+.text {
+  flex: 1 1 16em;
+}
+
+.room {
+  border-left-color: var(--room-edge);
+}
+
+.quiet {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+}

@@ -1,0 +1,364 @@
+/* The annotated timeline */
+.annotated {
+  margin: 0;
+}
+
+.at-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+/* The whole clip always fits the width: the seven seconds near its end must stay in view. */
+.at-grid {
+  display: grid;
+  grid-template-columns: 176px minmax(0, 1fr);
+  gap: 16px;
+  padding: 18px 22px 40px;
+}
+
+.at-labels,
+.at-body {
+  display: grid;
+  grid-template-rows: 22px 64px 30px 56px;
+  row-gap: 10px;
+}
+
+.at-labels span {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  font-size: var(--step--1);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.at-labels small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+.at-body {
+  position: relative;
+}
+
+.at-ruler {
+  position: relative;
+  border-bottom: 1px solid var(--border);
+}
+
+.at-tick {
+  position: absolute;
+  bottom: 3px;
+  transform: translateX(-50%);
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.at-tick:first-child {
+  transform: none;
+}
+
+.at-tick:last-child {
+  transform: translateX(-100%);
+}
+
+.at-track {
+  position: relative;
+  border-radius: 4px;
+  background: var(--surface-2);
+}
+
+.at-picture {
+  background-size: 100% 100%;
+  background-repeat: no-repeat;
+}
+
+.at-dialogue {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  border-radius: 2px;
+  background: var(--dialogue);
+}
+
+.at-room {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border: 1.5px dashed var(--room-edge);
+  border-radius: 4px;
+  background: var(--room);
+}
+
+.at-line {
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+
+.at-note {
+  position: absolute;
+  top: calc(100% + 6px);
+  font-size: 12px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.at-highlight {
+  position: absolute;
+  top: 28px;
+  bottom: 0;
+  border: 1px solid var(--accent);
+  border-radius: 6px;
+  background: rgba(241, 181, 75, 0.05);
+  text-decoration: none;
+}
+
+.at-highlight span {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+/* A mark in the second half hangs its label leftwards, so it stays inside the figure. */
+.at-highlight.end span {
+  right: 0;
+  left: auto;
+}
+
+.annotated figcaption {
+  margin-top: 12px;
+}
+
+@media (max-width: 600px) {
+  /* About 3 px per second: the 65 s clip fits a phone without scrolling. */
+  .at-grid {
+    grid-template-columns: 112px minmax(0, 1fr);
+    gap: 10px;
+    padding: 14px 12px 62px;
+  }
+  /* Narrow label column: the counts wrap, so the rows grow to hold them. */
+  .at-labels,
+  .at-body {
+    grid-template-rows: 22px 56px 44px 78px;
+  }
+  .at-tick.minor {
+    display: none;
+  }
+  /* The two notes under the rows take separate lines, so they cannot run into each other. */
+  .at-note {
+    top: calc(100% + 26px);
+  }
+}
+
+/* How a line gets made: one row of steps on a rail, the two loops called out. */
+.flow-title {
+  margin: 48px 0 18px;
+  font-size: var(--step-1);
+  color: var(--text-strong);
+}
+
+.flow {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.flow li {
+  position: relative;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 18px 18px 0 0;
+  border-top: 2px solid var(--border-strong);
+  font-size: var(--step--1);
+}
+
+.flow li::before {
+  content: "";
+  position: absolute;
+  top: -6px;
+  left: 0;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--accent);
+}
+
+.flow strong {
+  font-size: var(--step-0);
+  color: var(--text-strong);
+}
+
+.flow-loop {
+  color: var(--accent);
+}
+
+.flow-loop::before {
+  content: "↺ ";
+}
+
+/* One rejection, start to finish */
+.rejection {
+  display: grid;
+  grid-template-columns: minmax(0, 0.85fr) minmax(0, 1.15fr);
+  gap: 56px;
+  align-items: start;
+}
+
+.rejection-copy {
+  position: sticky;
+  top: 24px;
+}
+
+.rules summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.rules ul {
+  display: grid;
+  gap: 10px;
+  margin: 14px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rules li {
+  display: grid;
+  gap: 1px;
+  font-size: var(--step--1);
+}
+
+.rules strong {
+  color: var(--text-strong);
+}
+
+.story {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  border-left: 2px solid var(--border-strong);
+}
+
+.story-step {
+  position: relative;
+  padding: 0 0 30px 28px;
+}
+
+.story-step:last-child {
+  padding-bottom: 0;
+}
+
+.story-step::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: -8px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--bg);
+  border: 2px solid var(--border-input);
+}
+
+.story-step.failed::before {
+  border-color: var(--danger);
+}
+
+.story-step:last-child::before {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+
+.story-by {
+  margin: 0;
+}
+
+.story-text {
+  display: grid;
+  gap: 2px;
+  margin: 2px 0 10px;
+  font-size: var(--step-2);
+  font-weight: 600;
+  line-height: 1.45;
+  color: var(--text-strong);
+}
+
+.gloss {
+  font-size: var(--step-0);
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.story-verdict {
+  padding: 10px 14px;
+  border-left: 2px solid var(--danger);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: var(--danger-soft);
+  font-size: var(--step-0);
+}
+
+.story-verdict p {
+  margin: 0;
+}
+
+.story-reason,
+.story-fix {
+  display: grid;
+  gap: 2px;
+}
+
+.story-rule {
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.story-source {
+  margin: 2px 0 8px !important;
+}
+
+.story-fix {
+  margin-top: 10px !important;
+}
+
+.story-pass {
+  margin: 0;
+  color: var(--text);
+  font-size: var(--step--1);
+  font-weight: 600;
+}
+
+.story-dropped {
+  margin: 14px 0 0;
+  padding: 10px 14px;
+  border: 1px dashed var(--border-input);
+  border-radius: var(--radius-sm);
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+.story-fit {
+  display: grid;
+  gap: 6px;
+  max-width: 420px;
+  margin-top: 12px;
+}
+
+.story-fit p {
+  margin: 0;
+}

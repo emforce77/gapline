@@ -3,8 +3,11 @@ import localFont from "next/font/local";
 import { cookies } from "next/headers";
 import { asUiLang, dictionary, UI_LANG_COOKIE } from "@/i18n";
 import "@/styles/tokens.css";
+import "@/styles/landing-story.css";
 import "@/styles/landing.css";
 import "@/styles/workspace.css";
+import "@/styles/player.css";
+import "@/styles/inspector.css";
 import "@/styles/timeline.css";
 
 const pretendard = localFont({
@@ -22,9 +25,15 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
   const lang = asUiLang((await cookies()).get(UI_LANG_COOKIE)?.value);
+  const t = dictionary(lang);
   return (
     <html lang={lang} className={pretendard.variable}>
-      <body>{children}</body>
+      <body>
+        <a className="skip-link" href="#main">
+          {t.nav.skip}
+        </a>
+        {children}
+      </body>
     </html>
   );
 }

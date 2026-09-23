@@ -1,6 +1,6 @@
 .timeline {
   display: grid;
-  grid-template-columns: 96px minmax(0, 1fr);
+  grid-template-columns: 104px minmax(0, 1fr);
   gap: 10px;
   padding: 12px 14px 14px;
   border: 1px solid var(--border);
@@ -9,10 +9,14 @@
   user-select: none;
 }
 
-.tl-labels {
+.tl-labels,
+.tl-body {
   display: grid;
-  grid-template-rows: 20px 48px 22px 26px 34px;
+  grid-template-rows: 20px 48px 22px 46px;
   row-gap: 8px;
+}
+
+.tl-labels {
   font-size: var(--step--1);
   color: var(--muted);
 }
@@ -22,11 +26,24 @@
   align-items: center;
 }
 
+/* The narration row is the room row: its label names both. */
+.tl-labels .tl-label-room {
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  line-height: 1.25;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.tl-label-room small {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+}
+
 .tl-body {
   position: relative;
-  display: grid;
-  grid-template-rows: 20px 48px 22px 26px 34px;
-  row-gap: 8px;
   cursor: pointer;
 }
 
@@ -41,10 +58,16 @@
   transform: translateX(-50%);
   font-size: 11px;
   color: var(--muted);
+  white-space: nowrap;
 }
 
+.tl-tick:last-child {
+  transform: translateX(-100%);
+}
+
+/* Clear of the playhead parked at 0. */
 .tl-tick:first-child {
-  transform: none;
+  transform: translateX(5px);
 }
 
 .tl-track {
@@ -68,31 +91,41 @@
   animation: grow 300ms ease-out both;
 }
 
+/* Dialogue heard only when its silence was recognized again on its own: same lane, hatched. */
+.tl-dialogue.relisten {
+  background: repeating-linear-gradient(-45deg, var(--dialogue) 0 2px, transparent 2px 5px);
+  box-shadow: inset 0 0 0 1px var(--dialogue);
+}
+
 .tl-room {
   position: absolute;
   top: 0;
   bottom: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: 1px dashed var(--border-strong);
+  border: 1.5px dashed var(--room-edge);
   border-radius: 4px;
   background: var(--room);
-  font-size: 11px;
-  color: var(--muted);
-  white-space: nowrap;
-  overflow: hidden;
   animation: grow 300ms ease-out both;
+}
+
+.tl-room-label {
+  position: absolute;
+  top: 1px;
+  right: 5px;
+  font-size: 10px;
+  line-height: 1.2;
+  color: var(--accent);
+  white-space: nowrap;
 }
 
 .tl-narration .cue {
   position: absolute;
-  top: 2px;
-  bottom: 2px;
+  top: 14px;
+  bottom: 3px;
   display: flex;
   align-items: center;
-  min-width: 18px;
-  padding: 0 6px;
+  justify-content: flex-start;
+  min-width: 24px;
+  padding: 0 7px;
   border-radius: 4px;
   border: 1px solid var(--accent);
   background: var(--accent-soft);
@@ -101,10 +134,27 @@
   font-weight: 700;
   cursor: pointer;
   overflow: hidden;
+  white-space: nowrap;
   animation: grow 300ms ease-out both;
   transition:
     background 200ms ease,
-    border-color 200ms ease;
+    border-color 200ms ease,
+    box-shadow 200ms ease;
+}
+
+/*
+ * Lines too close to sit side by side on screen (a phone gives about 4 px per second, a box is at
+ * least 24 px) stack in lanes; Timeline.tsx sets --lanes on the timeline and --lane on each box.
+ */
+.timeline.stacked .tl-labels,
+.timeline.stacked .tl-body {
+  grid-template-rows: 20px 48px 22px calc(16px + var(--lanes) * 26px);
+}
+
+.timeline.stacked .tl-narration .cue {
+  top: calc(14px + var(--lane) * 26px);
+  bottom: auto;
+  height: 24px;
 }
 
 .cue.approved {
@@ -122,21 +172,25 @@
   color: var(--danger);
 }
 
-.cue.rejected .cue-id::after {
-  content: " ✗";
-}
-
-.cue.dropped {
+/* A removed line is out of the track like a dropped one; the inspector says who took it out. */
+.cue.dropped,
+.cue.removed {
   border-style: dashed;
-  border-color: var(--border-strong);
-  background: transparent;
+  border-color: var(--border-input);
+  background: var(--surface);
   color: var(--muted);
   text-decoration: line-through;
 }
 
+.cue.speaking {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--accent);
+}
+
 .cue.selected {
   outline: 2px solid var(--text-strong);
-  outline-offset: 1px;
+  outline-offset: 2px;
 }
 
 .tl-playhead {
@@ -153,5 +207,21 @@
   from {
     opacity: 0;
     transform: scaleY(0.4);
+  }
+}
+
+@media (max-width: 600px) {
+  .timeline {
+    grid-template-columns: 64px minmax(0, 1fr);
+    padding: 10px;
+  }
+  .tl-tick.minor {
+    display: none;
+  }
+  .tl-room-label {
+    display: none;
+  }
+  .tl-labels .tl-label-room small {
+    display: none;
   }
 }

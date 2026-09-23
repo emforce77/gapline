@@ -1,18 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { formatClock, formatSeconds } from "@/lib/format";
-import { GUIDELINE_RULES } from "@/lib/pipeline/guidelines";
 import { STAGES, type RunView } from "@/lib/pipeline/reduce";
-import type { Cue } from "@/lib/pipeline/schemas";
-
-const RULES = new Map(GUIDELINE_RULES.map((r) => [r.id, r]));
+import type { Cue, Language } from "@/lib/pipeline/schemas";
+import { Gloss } from "./glosses";
+import { VersionHistory } from "./VersionHistory";
 
 /**
  * Stage list with elapsed time for the running stage. clockRate is 1 while live, the replay speed
- * during a replay, and 0 for a finished run.
+ * during a replay, and 0 for a finished run. A finished run lists only the stages it went through:
+ * older runs predate some stages, and "Waiting" forever would read as a hang.
  */
 export function StageList({ view, clockRate }: { view: RunView; clockRate: number }) {
   const { t, lang } = useI18n();
@@ -26,34 +26,53 @@ export function StageList({ view, clockRate }: { view: RunView; clockRate: numbe
     return () => clearInterval(timer);
   }, [clockRate]);
   const runClock = clockRate > 0 ? anchor.t + ((now - anchor.wall) / 1000) * clockRate : view.t;
+  const finished = view.summary !== null;
+  const stages = STAGES.filter((stage) => !finished || view.stages[stage].state !== "waiting");
 
   return (
     <ol className="stages">
-      {STAGES.map((stage) => {
+      {stages.map((stage) => {
         const s = view.stages[stage];
-        const label = t.stages[stage];
         let status: React.ReactNode = <span className="label">{t.stages.waiting}</span>;
         if (s.state === "running") {
           const elapsed = Math.max(0, runClock - (s.startedAt ?? runClock));
           status = (
             <span className="stage-running">
-              <span className="spinner" />
+              <span className="spinner" aria-hidden="true" />
               {fill(t.stages.running, { elapsed: formatSeconds(elapsed, lang) })}
             </span>
           );
         } else if (s.state === "done") {
           status = (
             <span className="label">
-              ✓ {fill(t.stages.done, { seconds: (s.seconds ?? 0).toFixed(1) })}
+              <span aria-hidden="true">✓ </span>
+              {fill(t.stages.done, { seconds: (s.seconds ?? 0).toFixed(1) })}
             </span>
           );
         } else if (s.state === "reused") {
-          status = <span className="label">✓ {t.stages.reused}</span>;
+          status = (
+            <span className="label">
+              <span aria-hidden="true">✓ </span>
+              {t.stages.reused}
+            </span>
+          );
         }
+        const found = stage === "relisten" ? view.relisten : null;
         return (
-          <li key={stage} className={`stage ${s.state}`}>
-            <span>{label}</span>
+          <li key={stage} className={`stage ${s.state}${found ? " has-detail" : ""}`}>
+            <span>{t.stages[stage]}</span>
             {status}
+            {found ? (
+              <small className="stage-detail">
+                {found.wordsFound > 0
+                  ? fill(t.stages.relistenFound, {
+                      gaps: found.gapsChecked,
+                      words: found.wordsFound,
+                      blocked: formatSeconds(found.blockedSeconds, lang),
+                    })
+                  : fill(t.stages.relistenQuiet, { gaps: found.gapsChecked })}
+              </small>
+            ) : null}
           </li>
         );
       })}
@@ -69,7 +88,7 @@ function FitMeter({ cue }: { cue: Cue }) {
   const ratio = Math.min(1.2, spoken / room);
   return (
     <div className="fit">
-      <div className="fit-bar">
+      <div className="fit-bar" aria-hidden="true">
         <span
           className={`fit-fill${spoken > room ? " over" : ""}`}
           style={{ width: `${(ratio / 1.2) * 100}%` }}
@@ -89,102 +108,104 @@ function FitMeter({ cue }: { cue: Cue }) {
   );
 }
 
-/** One line: its final words, whether it fits, and every version with the reviewer's findings. */
+const VERDICT_ICON = { pass: "✓", fixed: "↺", fail: "✗", removed: "−" } as const;
+
+/** One sentence on how the line got here, so the history below reads as evidence, not a puzzle. */
+function Verdict({ cue }: { cue: Cue }) {
+  const { t } = useI18n();
+  const v = t.line.verdict;
+  const versions = cue.versions;
+  const last = versions[versions.length - 1];
+  const rejected = versions.filter((x) => x.review && !x.review.pass);
+  const shortened = versions.some((x) => x.by === "shorten");
+  let tone: "pass" | "fixed" | "fail" | "removed";
+  let text: string;
+  if (cue.status === "removed") {
+    // An editor's decision, not a failed check: a neutral chip.
+    tone = "removed";
+    text = t.line.by.remove;
+  } else if (cue.status === "dropped") {
+    tone = "fail";
+    text = cue.droppedReason ? t.line.dropped[cue.droppedReason] : t.line.state.dropped;
+  } else if (!last.review?.pass) {
+    return null;
+  } else if (rejected.length === 0) {
+    tone = "pass";
+    text = shortened ? `${v.firstPass}, ${v.shortened}` : v.firstPass;
+  } else {
+    tone = "fixed";
+    const head =
+      rejected.length === 1
+        ? v.rejectedOnce
+        : rejected.length === 2
+          ? v.rejectedTwice
+          : fill(v.rejectedMany, { n: rejected.length });
+    const tail =
+      last.by === "human"
+        ? v.byEditor
+        : rejected.some((x) => x.text === last.text)
+          ? v.sameWords
+          : v.rewritten;
+    text = `${head}, ${tail}`;
+  }
+  return (
+    <p className={`verdict-chip ${tone}`}>
+      <span aria-hidden="true">{VERDICT_ICON[tone]}</span>
+      {text}
+    </p>
+  );
+}
+
+/**
+ * One line: its words, one sentence on how it got here, whether it fits, every version with the
+ * reviewer's findings, and only then the form to edit it.
+ */
 export function LineDetail({
   cue,
+  lineNumber,
+  language,
   onPlay,
   evidence,
   editor,
 }: {
   cue: Cue;
+  lineNumber: number;
+  language: Language | null;
   onPlay: () => void;
   evidence?: string;
-  editor?: React.ReactNode;
+  editor: React.ReactNode;
 }) {
   const { t, lang } = useI18n();
   const latest = cue.versions[cue.versions.length - 1];
-  const room = cue.windowEnd - cue.start;
+  const outOfTrack = cue.status === "dropped" || cue.status === "removed";
+  const heading = useRef<HTMLHeadingElement>(null);
+  // Moving focus to the heading tells keyboard and screen-reader users where the details went.
+  useEffect(() => heading.current?.focus({ preventScroll: true }), [cue.id]);
   return (
     <div className="line-detail">
       <div className="line-head">
-        <span className="label mono">
-          {fill(t.line.title, { id: cue.id })} · {formatClock(cue.start)}
-        </span>
+        <h2 className="line-heading label mono" tabIndex={-1} ref={heading}>
+          {fill(t.line.title, { n: lineNumber })} · {formatClock(cue.start)}
+        </h2>
         <button type="button" className="button ghost small" onClick={onPlay}>
-          ▶ {t.line.play}
+          <span aria-hidden="true">▶</span> {t.line.play}
         </button>
       </div>
-      <p className={`line-text${cue.status === "dropped" ? " struck" : ""}`}>{latest.text}</p>
+      <p className={`line-text${outOfTrack ? " struck" : ""}`} lang={language ?? undefined}>
+        {latest.text}
+      </p>
+      <Gloss text={latest.text} pageLang={lang} textLang={language} />
+      <Verdict cue={cue} />
+      {outOfTrack ? null : <FitMeter cue={cue} />}
+      <h3 className="inspector-heading">{t.line.history}</h3>
+      <VersionHistory cue={cue} language={language} />
+      {editor}
       {evidence ? (
         <div className="scene-evidence">
-          <h4>{t.editor.evidence}</h4>
+          <h3 className="inspector-heading">{t.line.evidence}</h3>
           <p>{evidence}</p>
         </div>
       ) : null}
-      {cue.status === "dropped" && cue.droppedReason ? (
-        <p className="line-dropped">⚠ {t.line.dropped[cue.droppedReason]}</p>
-      ) : (
-        <FitMeter cue={cue} />
-      )}
-      {latest.review && !latest.review.pass ? (
-        <div className="verdict fail">
-          <p>{latest.review.violations.map((v) => v.reason).join(" ")}</p>
-          <p>
-            {t.line.fix}: {latest.review.fix}
-          </p>
-        </div>
-      ) : null}
-      {editor}
-      <h4>{t.line.history}</h4>
-      <ol className="versions">
-        {cue.versions.map((version, i) => (
-          <li key={i} className="version">
-            <div className="version-head label">
-              <span className="mono">v{i + 1}</span> {t.line.by[version.by]}
-            </div>
-            <p className="version-text">{version.text}</p>
-            {version.voice ? (
-              <p className={`voiced label${version.voice.seconds > room ? " over" : ""}`}>
-                {fill(t.line.voiced, {
-                  seconds: formatSeconds(version.voice.seconds, lang),
-                  rate: version.voice.rate.toFixed(2),
-                })}{" "}
-                ·{" "}
-                {version.voice.seconds > room
-                  ? fill(t.line.tooLong, { room: formatSeconds(room, lang) })
-                  : t.line.fits}
-              </p>
-            ) : null}
-            {version.review ? (
-              version.review.pass ? (
-                <p className="verdict pass">✓ {t.line.passed}</p>
-              ) : (
-                <div className="verdict fail">
-                  <p>✗ {t.line.rejected}</p>
-                  <ul>
-                    {version.review.violations.map((v, j) => {
-                      const rule = RULES.get(v.rule);
-                      return (
-                        <li key={j}>
-                          <strong>{rule?.title[lang] ?? v.rule}</strong>
-                          <span className="quote">“{v.quote}”</span>
-                          <span>{v.reason}</span>
-                          <span className="label">{rule?.source[lang]}</span>
-                        </li>
-                      );
-                    })}
-                  </ul>
-                  {version.review.fix ? (
-                    <p className="fix">
-                      {t.line.fix}: {version.review.fix}
-                    </p>
-                  ) : null}
-                </div>
-              )
-            ) : null}
-          </li>
-        ))}
-      </ol>
     </div>
   );
 }

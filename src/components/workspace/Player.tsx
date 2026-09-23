@@ -1,18 +1,35 @@
 "use client";
 
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
+import { fill } from "@/i18n";
 import { useI18n } from "@/i18n/client";
 import { formatClock } from "@/lib/format";
-import type { Cue } from "@/lib/pipeline/schemas";
+import type { Cue, Language, SpeechSegment } from "@/lib/pipeline/schemas";
+import { Gloss } from "./glosses";
 
 export interface PlayerHandle {
   seek: (seconds: number, play?: boolean) => void;
 }
 
 /**
+ * Seeking a freshly loaded video to 0 clears its "show poster" flag and paints frame 0, which is
+ * black in most films. Only positions past this are restored after a source switch.
+ */
+const RESUME_MIN_SECONDS = 0.05;
+
+/** Keys stay with the control that has focus: typing, native button activation, sliders. */
+function keyBelongsToControl(target: EventTarget | null, key: string): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target.isContentEditable) return true;
+  const tag = target.tagName;
+  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+  return key === " " && (tag === "BUTTON" || tag === "A" || tag === "SUMMARY");
+}
+
+/**
  * The film with or without description. Switching tracks keeps the position and play state.
- * "Eyes closed" blacks out the picture so a sighted viewer hears what a blind viewer hears; the line
- * being spoken is shown as text so the demo is followable without sound.
+ * "Eyes closed" blacks out the picture so a sighted viewer hears what a blind viewer hears. The strip
+ * under the picture shows the line being spoken, so the demo can be followed without sound.
  */
 export const Player = forwardRef<
   PlayerHandle,
@@ -21,10 +38,28 @@ export const Player = forwardRef<
     posterUrl: string;
     describedUrl: string | null;
     cues: Cue[];
+    speech: SpeechSegment[];
+    /** BCP 47 code of the film's own dialogue, e.g. "en-US". */
+    filmLanguage: string;
+    narrationLanguage: Language | null;
+    lineNumbers: Map<string, number>;
     onTime: (seconds: number) => void;
   }
->(function Player({ originalUrl, posterUrl, describedUrl, cues, onTime }, ref) {
-  const { t } = useI18n();
+>(function Player(
+  {
+    originalUrl,
+    posterUrl,
+    describedUrl,
+    cues,
+    speech,
+    filmLanguage,
+    narrationLanguage,
+    lineNumbers,
+    onTime,
+  },
+  ref,
+) {
+  const { t, lang } = useI18n();
   const video = useRef<HTMLVideoElement>(null);
   const [adOn, setAdOn] = useState(true);
   const [eyesClosed, setEyesClosed] = useState(false);
@@ -32,7 +67,15 @@ export const Player = forwardRef<
   const [duration, setDuration] = useState(0);
   const [playing, setPlaying] = useState(false);
   const resume = useRef<{ time: number; playing: boolean } | null>(null);
-  const src = adOn && describedUrl ? describedUrl : originalUrl;
+  const described = adOn && describedUrl !== null;
+  const src = described ? describedUrl : originalUrl;
+
+  function togglePlay() {
+    const el = video.current;
+    if (!el) return;
+    if (el.paused) void el.play();
+    else el.pause();
+  }
 
   useImperativeHandle(ref, () => ({
     seek(seconds, play) {
@@ -56,12 +99,32 @@ export const Player = forwardRef<
     previousSrc.current = src;
     const el = video.current;
     if (!el) return;
-    resume.current = { time: time, playing: !el.paused };
+    resume.current = { time: el.currentTime, playing: !el.paused };
   }, [src]);
+
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      if (keyBelongsToControl(event.target, event.key)) return;
+      const key = event.key.toLowerCase();
+      if (key === " " || key === "k") {
+        event.preventDefault();
+        togglePlay();
+      } else if (key === "d" && describedUrl) {
+        setAdOn((on) => !on);
+      } else if (key === "e") {
+        setEyesClosed((closed) => !closed);
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [describedUrl]);
 
   const speaking = cues.find(
     (c) => c.status === "fits" && time >= c.start && time <= c.start + (c.seconds ?? 0),
   );
+  const spokenText = speaking && described ? speaking.versions.at(-1)!.text : null;
+  const dialogue = speech.find((s) => time >= s.start && time <= s.end);
 
   return (
     <div className="player">
@@ -72,17 +135,16 @@ export const Player = forwardRef<
           poster={posterUrl}
           playsInline
           preload="auto"
-          onClick={(e) =>
-            e.currentTarget.paused ? void e.currentTarget.play() : e.currentTarget.pause()
-          }
+          onClick={togglePlay}
           onPlay={() => setPlaying(true)}
           onPause={() => setPlaying(false)}
           onLoadedMetadata={(e) => {
             setDuration(e.currentTarget.duration);
-            if (!resume.current) return;
-            e.currentTarget.currentTime = resume.current.time;
-            if (resume.current.playing) void e.currentTarget.play();
+            const saved = resume.current;
             resume.current = null;
+            if (!saved) return;
+            if (saved.time > RESUME_MIN_SECONDS) e.currentTarget.currentTime = saved.time;
+            if (saved.playing) void e.currentTarget.play();
           }}
           onTimeUpdate={(e) => {
             setTime(e.currentTarget.currentTime);
@@ -90,32 +152,51 @@ export const Player = forwardRef<
           }}
         />
         {eyesClosed ? (
-          <div className="eyes-closed" aria-live="polite">
+          <div className="eyes-closed">
             <span className="label">{t.workspace.listening}</span>
-            {speaking && adOn ? (
-              <p className="spoken-line">{speaking.versions[speaking.versions.length - 1].text}</p>
+            {spokenText ? (
+              <p className="spoken-line" lang={narrationLanguage ?? undefined}>
+                {spokenText}
+              </p>
             ) : null}
           </div>
         ) : null}
       </div>
+      <div className="caption-strip">
+        {spokenText && speaking ? (
+          <>
+            <span className="caption-tag">
+              {fill(t.line.title, { n: lineNumbers.get(speaking.id) ?? "" })}
+            </span>
+            <span className="caption-text narration" lang={narrationLanguage ?? undefined}>
+              {spokenText}
+            </span>
+            <Gloss text={spokenText} pageLang={lang} textLang={narrationLanguage} />
+          </>
+        ) : dialogue ? (
+          <>
+            <span className="caption-tag">{t.workspace.dialogue}</span>
+            <span className="caption-text" lang={filmLanguage}>
+              {dialogue.text}
+            </span>
+          </>
+        ) : (
+          <span className="caption-text idle">{t.workspace.captionIdle}</span>
+        )}
+      </div>
       <div className="player-controls">
         <button
           type="button"
-          className="button play"
-          aria-label={playing ? t.workspace.pause : t.workspace.play}
-          onClick={() => {
-            const el = video.current;
-            if (!el) return;
-            if (el.paused) void el.play();
-            else el.pause();
-          }}
+          className={`button play${describedUrl && !playing ? " primary" : ""}`}
+          aria-label={playing ? t.workspace.pause : undefined}
+          onClick={togglePlay}
         >
-          {playing ? "❚❚" : "▶"}
+          <span aria-hidden="true">{playing ? "❚❚" : "▶"}</span>
+          {playing ? null : <span>{described ? t.workspace.playDescribed : t.workspace.play}</span>}
         </button>
         <span className="player-time mono">
           {formatClock(time)} / {formatClock(duration)}
         </span>
-        <span className="player-spacer" />
         <input
           className="player-seek"
           aria-label={t.editor.seek}
@@ -150,6 +231,7 @@ export const Player = forwardRef<
           </button>
         </div>
       </div>
+      <p className="label keys-hint">{t.workspace.keys}</p>
     </div>
   );
 });

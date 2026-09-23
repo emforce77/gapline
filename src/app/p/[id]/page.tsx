@@ -1,13 +1,28 @@
+import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
+import { originalRun } from "@/components/workspace/labels";
 import { Workspace } from "@/components/workspace/Workspace";
-import { asUiLang, dictionary, UI_LANG_COOKIE } from "@/i18n";
+import { asUiLang, dictionary, fill, UI_LANG_COOKIE } from "@/i18n";
 import { I18nProvider } from "@/i18n/client";
 import { listRuns, readAnalysis, type Project } from "@/lib/store/projects";
 import { loadShowcase } from "@/lib/store/showcase";
 import { accessibleProject, publicProject } from "@/lib/store/access";
 
 export const dynamic = "force-dynamic";
+
+/** The tab names the clip, so a screen reader and a crowded tab bar both say what is open. */
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+  const lang = asUiLang((await cookies()).get(UI_LANG_COOKIE)?.value);
+  const t = dictionary(lang);
+  const project = await accessibleProject((await params).id);
+  // An unknown or private clip renders the 404 page; its tab says so instead of the landing title.
+  return { title: project ? fill(t.meta.project, { title: project.title }) : t.notFound.metaTitle };
+}
 
 export default async function ProjectPage({
   params,
@@ -41,7 +56,9 @@ export default async function ProjectPage({
         }
         initialRuns={runs}
         analysis={analysis}
-        measured={showcase?.preview?.summary ?? null}
+        measured={
+          (showcase && originalRun(showcase.runs, showcase.preview?.runId)?.summary) ?? null
+        }
       />
     </I18nProvider>
   );

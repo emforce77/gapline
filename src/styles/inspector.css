@@ -1,0 +1,318 @@
+/* The inspector's line view: verdict, fit, version history with diffs, and the folded editor. */
+/* Line detail */
+.line-detail {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+}
+
+.line-detail .inspector-heading {
+  margin: 6px 0 -4px;
+}
+
+.line-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.line-heading {
+  margin: 0;
+  line-height: 1.4;
+}
+
+.line-text {
+  margin: 0;
+  font-size: var(--step-2);
+  font-weight: 600;
+  line-height: 1.5;
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.line-detail > .gloss {
+  margin-top: -8px;
+}
+
+.version .gloss,
+.verdict .gloss,
+.quality-note .gloss {
+  display: block;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+.version > .gloss {
+  margin: -4px 0 8px;
+}
+
+.line-text.struck {
+  text-decoration: line-through;
+  color: var(--muted);
+}
+
+.verdict-chip {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  font-size: var(--step--1);
+  font-weight: 600;
+  background: var(--surface-2);
+  color: var(--text);
+}
+
+.verdict-chip.fixed {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.verdict-chip.fail {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.fit {
+  display: grid;
+  gap: 6px;
+}
+
+.fit-bar {
+  position: relative;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--surface-3);
+}
+
+.fit-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  border-radius: 4px;
+  background: var(--accent);
+}
+
+.fit-fill.over {
+  background: var(--danger);
+}
+
+.fit-limit {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: var(--text);
+}
+
+.fit-legend {
+  display: flex;
+  justify-content: space-between;
+}
+
+.versions {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.version {
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+}
+
+.version.by-human {
+  border-color: var(--room-edge);
+}
+
+.version.by-remove {
+  border-style: dashed;
+}
+
+.version-same {
+  color: var(--muted);
+}
+
+.version-text {
+  margin: 4px 0 8px;
+  overflow-wrap: anywhere;
+}
+
+/* Word-level changes between versions: removed struck through, added underlined in amber. */
+.version-text del {
+  color: var(--muted);
+  text-decoration: line-through;
+  text-decoration-color: var(--danger);
+}
+
+.version-text del + ins {
+  margin-left: 0.3em;
+}
+
+.version-text ins {
+  color: var(--text-strong);
+  text-decoration: underline;
+  text-decoration-color: var(--accent);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+}
+
+.voiced {
+  margin: 0 0 8px;
+}
+
+.voiced.over {
+  color: var(--danger);
+}
+
+.verdict {
+  margin: 0;
+  font-size: var(--step--1);
+}
+
+.verdict.pass {
+  color: var(--text);
+}
+
+.verdict-title {
+  margin: 0 0 6px;
+  color: var(--danger);
+  font-weight: 600;
+}
+
+.verdict.fail ul {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.verdict.fail li {
+  display: grid;
+  gap: 2px;
+  padding: 8px 10px;
+  border-left: 2px solid var(--danger);
+  background: var(--danger-soft);
+  border-radius: 0 4px 4px 0;
+}
+
+.verdict .quote {
+  color: var(--text-strong);
+  overflow-wrap: anywhere;
+}
+
+.verdict .fix {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.scene-evidence {
+  border-left: 2px solid var(--border-strong);
+  padding-left: 12px;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+.scene-evidence p {
+  margin: 0;
+}
+
+/* Editing is folded under a button so the review history reads first. */
+.edit-line > summary {
+  list-style: none;
+  justify-content: center;
+  width: 100%;
+}
+
+.edit-line > summary::-webkit-details-marker {
+  display: none;
+}
+
+.edit-line[open] > summary {
+  background: var(--surface-3);
+}
+
+.cue-editor {
+  margin: 12px 0 0;
+  padding: 16px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.cue-picker,
+.cue-editor label,
+.result-picker {
+  display: grid;
+  gap: 6px;
+  font-size: var(--step--1);
+  color: var(--muted);
+}
+
+.cue-editor label {
+  margin: 0 0 12px;
+}
+
+.cue-picker select,
+.cue-editor textarea,
+.cue-editor input,
+.result-picker select {
+  width: 100%;
+  min-width: 0;
+  padding: 10px;
+  font: inherit;
+  color: var(--text);
+  border: 1px solid var(--border-input);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.cue-editor textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* Removing a line: a quiet button under the editor, then an explicit question before anything runs. */
+.remove-line {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+}
+
+.remove-line > .button {
+  justify-self: start;
+}
+
+.remove-confirm {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+  border: 1px dashed var(--danger);
+  border-radius: var(--radius-sm);
+}
+
+.remove-confirm p {
+  margin: 0;
+}
+
+.remove-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.button.danger {
+  border-color: var(--danger);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.button.danger:hover:not(:disabled) {
+  background: rgba(217, 132, 116, 0.24);
+}
