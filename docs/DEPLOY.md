@@ -1,31 +1,131 @@
-# Existing Cloud Run service
+# Deploy your own
 
-Deploy from the working checkout using the existing `scene-ad` gcloud configuration. This updates the already-public app; it does not publish the Git repository.
+This sets up Scene on Cloud Run in a Google Cloud project of your own: the APIs, a bucket, two service
+accounts and a secret, then one deploy command. Every step uses the gcloud CLI.
+
+## You need
+
+- A Google Cloud project with billing enabled.
+- The gcloud CLI, signed in with an account that can enable APIs and create buckets, service accounts,
+  secrets and IAM bindings in that project (Owner works). That account must also be allowed to act as
+  the two service accounts below; Owner is, otherwise grant it `roles/iam.serviceAccountUser` on each.
+- An API key for the Gemini calls. <!-- GEMINI_ACCESS_LABEL: update with deploy/cloud-run.sh when the Gemini access changes. -->
+- For the sample: Node.js 20.9 or newer and FFmpeg, as in the README's "Run it locally".
+
+## 1. Choose names
 
 ```sh
-CLOUDSDK_ACTIVE_CONFIG_NAME=scene-ad \
-GCP_PROJECT_ID=majestic-voice-486204-q6 \
-DAILY_BUDGET_USD=5 bash deploy/cloud-run.sh
+PROJECT_ID=<your-project-id>
+REGION=asia-northeast3
+PROJECT_NUMBER="$(gcloud projects describe "$PROJECT_ID" --format='value(projectNumber)')"
+BUCKET="scene-ad-data-$PROJECT_NUMBER"
+RUN_SA="scene-ad-run@$PROJECT_ID.iam.gserviceaccount.com"
+BUILD_SA="scene-ad-build@$PROJECT_ID.iam.gserviceaccount.com"
 ```
 
-Before updating the service, check recent generation/edit requests and active runs. Avoid switching revisions while a paid request is executing. The script uses the existing build account, run account, regional Cloud Storage bucket and Secret Manager key. It sets `DATA_BUCKET` for conditional budget and edit-request writes; omitting it deliberately stops paid Cloud Run mutations.
+The deploy script expects these bucket and service-account names. `GCP_REGION`, `SERVICE` and
+`DATA_BUCKET` override its defaults (`asia-northeast3`, `scene-ad`, `scene-ad-data-<project number>`).
 
-Runtime state is mounted at `/data`. Public samples are under `projects/<sample>/`; uploads contain owner hashes and remain private. Keep `.env.local`, runtime media, ledgers, browser cookies and local build directories out of the build context and Git.
+## 2. Enable the APIs
 
-After deployment, inspect the ready revision and traffic, then check one sample playback, sentence edit and download. Check upload ownership with two separate browser sessions. A completed build alone does not prove those paths work.
+```sh
+gcloud services enable --project "$PROJECT_ID" \
+  run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
+  speech.googleapis.com texttospeech.googleapis.com \
+  secretmanager.googleapis.com storage.googleapis.com
+```
 
-Optional `showcase.json` in the data root pins the landing-page/default sample results:
+## 3. Create the bucket
+
+Projects, analysis and runs live here. Cloud Run mounts it at `/data`, and the daily allowance and edit
+requests are written to it with conditional writes.
+
+```sh
+gcloud storage buckets create "gs://$BUCKET" --project "$PROJECT_ID" \
+  --location "$REGION" --uniform-bucket-level-access
+```
+
+## 4. Create the service accounts
+
+`scene-ad-run` is the identity of the running service. `scene-ad-build` builds the container from
+source.
+
+```sh
+gcloud iam service-accounts create scene-ad-run --project "$PROJECT_ID" --display-name "Scene service"
+gcloud iam service-accounts create scene-ad-build --project "$PROJECT_ID" --display-name "Scene build"
+
+# The service calls Speech-to-Text and Text-to-Speech, billed to this project.
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member "serviceAccount:$RUN_SA" --role roles/speech.client
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member "serviceAccount:$RUN_SA" --role roles/serviceusage.serviceUsageConsumer
+
+# It reads and writes objects in the data bucket.
+gcloud storage buckets add-iam-policy-binding "gs://$BUCKET" \
+  --member "serviceAccount:$RUN_SA" --role roles/storage.objectUser
+
+# Source deploys build as this account.
+gcloud projects add-iam-policy-binding "$PROJECT_ID" \
+  --member "serviceAccount:$BUILD_SA" --role roles/run.builder
+```
+
+## 5. Store the model API key
+
+The deploy script mounts the secret `scene-ad-openrouter-key` as the service's model API key.
+<!-- GEMINI_ACCESS_LABEL: the secret name and variable come from deploy/cloud-run.sh; change them together. -->
+
+```sh
+read -rs MODEL_API_KEY   # paste the key; it is not shown
+printf '%s' "$MODEL_API_KEY" | gcloud secrets create scene-ad-openrouter-key \
+  --project "$PROJECT_ID" --data-file=-
+gcloud secrets add-iam-policy-binding scene-ad-openrouter-key --project "$PROJECT_ID" \
+  --member "serviceAccount:$RUN_SA" --role roles/secretmanager.secretAccessor
+```
+
+## 6. Deploy
+
+```sh
+GCP_PROJECT_ID="$PROJECT_ID" bash deploy/cloud-run.sh
+```
+
+The script runs `gcloud run deploy --source .` with the account of your active gcloud configuration
+(set `CLOUDSDK_ACTIVE_CONFIG_NAME` to pick another). Cloud Build builds the `Dockerfile`, the image goes
+to Artifact Registry, and Cloud Run starts the service with:
+
+- the second-generation execution environment, 2 vCPU, 2 GiB, up to 10 requests per instance, a
+  900-second request timeout, and 0 to 2 instances;
+- the bucket mounted at `/data`, with `DATA_DIR`, `DATA_BUCKET`, `GCP_PROJECT_ID` and
+  `DAILY_BUDGET_USD` set (the daily API allowance, 5 US dollars unless you set it);
+- the model API key from Secret Manager;
+- public access, by turning off the invoker IAM check.
+
+## 7. Add the sample
+
+The service starts with no projects. To show the _Tears of Steel_ sample, prepare it locally and copy
+it into the bucket:
+
+```sh
+npm ci
+cp -n .env.example .env.local   # keeps an existing file; the sample steps need no key
+npm run samples              # downloads the film once and prepares runtime/projects/tos-opening
+gcloud storage cp -r runtime/projects/tos-opening "gs://$BUCKET/projects/"
+```
+
+Open the service URL that the deploy printed, open the sample and generate a track. The landing page
+shows the newest Standard track in the viewer's language. To choose which tracks it shows, put
+a `showcase.json` at the top of the bucket:
 
 ```json
-{ "projectId": "tos-opening", "runs": { "ko": "chosen-run-id", "en": "chosen-run-id" } }
+{ "projectId": "tos-opening", "runs": { "ko": "<run id>", "en": "<run id>" } }
 ```
 
-The selected result must exist and be complete. Explicit `?run=<id>` links take precedence. Language/density availability is read from completed stored runs. Do not select a result solely because its model audit passed; independent listening acceptance remains separate.
+A run ID is the folder name under `projects/tos-opening/runs/`.
 
-Reservations with unknown costs and edit claims left running after a crash fail closed. Reconcile the provider ledger and artifacts before an operator changes those records. Automatic cleanup must never turn an unknown charge into zero.
+## Check it
 
-## September 22 verification
+A finished build does not show that generation works. After each deploy, play the sample, generate
+one track, change one line, and download the four files. Upload a clip in one browser and confirm that
+a second browser session cannot open it.
 
-Revision `scene-ad-00008-jcs` received all traffic. A real sentence edit created `edit-6c4ddb3c5a06c7901a834befe1bb25ba04a7ebde` from `edit-b81cc95c158ee4acf857a44a2f7cf609e1df851c`; all five unchanged WAV files matched byte for byte. Repeating the earlier edit request returned its existing run. The final smoke check confirmed sample playback, the mobile sentence selector without horizontal overflow, and MP4/WAV/VTT/JSON downloads. A separate session received 404 on all six private upload read/mutation paths; the owner received a 206 range response.
-
-Evidence is saved locally in `runtime/demo-v2/live-check.json`. The selected six-line result still has unresolved coverage and remains **Review needed**. Deployment verification does not close the independent listening acceptance gate.
+A new revision replaces the running instances, and a generation runs inside its request. Deploy when
+no generation or edit is in progress.

@@ -13,8 +13,8 @@ account="scene-ad-run@$project.iam.gserviceaccount.com"
 # to the source bucket in this project.
 builder="projects/$project/serviceAccounts/scene-ad-build@$project.iam.gserviceaccount.com"
 
-# The project's organisation only allows its own domain in IAM policies, so the service is made
-# public by switching off the invoker check instead of granting allUsers.
+# The demo is public. --no-invoker-iam-check lets unauthenticated requests reach the service
+# without an allUsers invoker binding; the app itself checks each request's origin and project access.
 gcloud run deploy "$service" \
   --project "$project" --region "$region" --source . \
   --service-account "$account" \

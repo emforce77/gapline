@@ -1,39 +1,150 @@
-# September 22 upgrade screening
+# How well it works
 
-**Keep the high-effort reviewer. Do not promote the medium-effort candidate.** The lower-effort setting lost the essential “40 years later” transition in the opening case and marked a Korean interview as model-checked while introductory visual context remained absent. This small screen does not establish the quality of either setting for unattended publication.
+## In short
 
-The screen contains **10 run records over six clip cases: seven completed and three failed**. The four development cases received both settings. Only the retained high setting ran on two separate held-out cases, because the medium candidate had already failed the coverage criterion. No tuning loop followed, and the twelve-run ceiling was not filled merely to spend the budget.
+**What we tested.** On 22 September 2026 we ran Scene on six openly licensed clips: three scenes from
+the open movie _Tears of Steel_, two excerpts of a Korean-language interview, and a synthetic clip of
+coloured squares and beeps. Two of the six were held back and run only after the other four had
+decided the reviewer setting. For each clip we wrote down a short list of essential facts in advance
+(for example "40 YEARS LATER marks the change to a laboratory") and checked the finished track against
+that list, sampled frames, subtitles and an independent speech recognizer.
 
-Both settings include this upgrade's integrity fixes. This is a comparison of reviewer effort, **not** a controlled before/after test of the entire old and new application.
+**What we learned.**
 
-Post-screen inspection found two shared prompt defects: gap boundaries were rendered at one decimal place (45.41 became 45.4), and the writer was told to use wording the reviewer could reject as viewer framing. The final-audit system instruction also still conditioned omissions on free room. These were corrected after screening and covered by focused checks. The frozen runs are not presented as a paid validation of those later prompt corrections; no further tuning or cost-comparison claim was added. Stochastic drafts also prevent attributing every paired difference solely to reviewer effort.
+- 4 of 6 clips produced a described track. The other 2 stopped because the speech recognizer returned
+  words whose start and end times were identical. Scene stopped instead of guessing where the
+  silences were. Since then, Scene treats such words as speech and carries on (see "How we checked").
+- All 18 lines in the four finished tracks fit their room by measured audio, and none overlaps the
+  speech Chirp 3 recognized. One of them, in the opening, still talks over dialogue: Chirp 3 had put
+  the launch call about 2 s early (see "The opening's launch call").
+- On the two scored film clips, every fixed essential fact made it into the finished track.
+- Every finished track came back _Review needed_, with a list of what the editor should add. On the
+  Korean interview, which leaves only 2.46 s of usable silence, both essential facts were missing and
+  the final check said so.
+- A 45–65 second clip took 3 min 11 s to 5 min 49 s and $0.13–0.24 in API calls when nothing had been
+  analysed before.
 
-## Independent evidence and observed failures
+**The decision.** We also tried a cheaper reviewer setting (medium instead of high reasoning). On the
+opening it lost the "40 years later" time jump without listing it as missing, and it marked the Korean
+interview as checked while both essential facts were absent. We kept the stricter reviewer.
 
-| Case                                          | High reviewer             | Medium reviewer           | Evidence and decision                                                                                                                                                                                         |
-| --------------------------------------------- | ------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Film opening → Korean, 65 s                   | Five lines; review needed | Five lines; review needed | Medium omitted the fixed essential time jump. Its invalid 45.40 s placement was rejected rather than relocated to a 45.41 s gap. High retained the time jump but still flagged holograms and simulation text. |
-| Native Korean interview, 45 s                 | One line; review needed   | One line; model checked   | Both omitted the two fixed introductory visual-context facts. Medium failed to flag that absence. Dense speech leaves only 2.46 s of allowed room; forced additions would be inappropriate.                   |
-| Film city/action → English, 45 s              | Nine lines; review needed | Nine lines; model checked | Both cover the four fixed broad facts in sampled frames. High additionally flags a newspaper headline. This does not reverse the candidate's failed essential-coverage decision.                              |
-| Synthetic color/sound signals, 30 s           | Failed                    | Failed                    | Invalid zero-duration recognition intervals were rejected. Neither failed run is scored as a quality success. The visual analysis also returned no sound events despite authored beeps.                       |
-| Native Korean held-out speech, 40 s           | Failed                    | Not run                   | One bounded raw-response diagnosis confirmed real words returned with start and end both zero at the clip boundary. No timing was invented and the words were not silently discarded.                         |
-| Held-out film team/laboratory → English, 45 s | Completed; review needed  | Not run                   | Unresolved coverage remains in the model report; independent full listening acceptance is open.                                                                                                               |
+## Results with the default settings
 
-The source intervals, licenses, hashes and essential facts are in [cases.json](../evals/cases.json). The opening smoke result was already known when its metadata was consolidated, so this case is not blinded. Other initial references preceded their runs. The held-out film reference misread the transformation as happening inside the laboratory; later output/frame inspection showed the exterior street becoming a sunny canal town. Its original fact and subsequent correction are both retained, and this case has no independent omission score. Several excerpts share a film; they are not independent productions.
+| Clip                                       | Narration | Result                          | Lines in the finished track | Essential facts missed | Flagged by the independent recognizer | Time     | API cost |
+| ------------------------------------------ | --------- | ------------------------------- | --------------------------- | ---------------------- | ------------------------------------- | -------- | -------- |
+| _Tears of Steel_ opening, 65 s             | Korean    | Described, _Review needed_      | 5                           | 0 of 4                 | 1 line, 1.89 s                        | 349.29 s | $0.2407  |
+| _Tears of Steel_ city scene, 45 s          | English   | Described, _Review needed_      | 9                           | 0 of 4                 | none                                  | 219.03 s | $0.1708  |
+| _Tears of Steel_ lab scene, 45 s, held out | English   | Described, _Review needed_      | 3                           | not scored (see below) | 1 line, 0.03 s                        | 240.97 s | $0.1664  |
+| Korean interview, 45 s                     | Korean    | Described, _Review needed_      | 1                           | 2 of 2                 | 1 line, 0.46 s                        | 191.31 s | $0.1302  |
+| Korean interview, later 40 s, held out     | Korean    | Stopped: zero-length word times | none                        | n/a                    | n/a                                   | n/a      | $0.0159  |
+| Synthetic squares and beeps, 30 s          | Korean    | Stopped: zero-length word times | none                        | n/a                    | n/a                                   | n/a      | $0.0139  |
 
-Source subtitles, sampled frames and **faster-whisper 1.2.1 / small / CPU int8** provide evidence independent of the generating Gemini/Chirp pipeline. Whisper is another recognizer, not a human annotation. It disagrees with Chirp about the opening mission-control speech timing; these intervals are stored as overlap **candidates**, not confirmed intrusions. Source subtitles also omit that speech. Unknown factual errors, exact dialogue intrusions and important-sound intrusions remain `null`, not zero, in the machine-readable report.
+Times are for a first run on each clip, with nothing reused. API cost is Gemini plus Google speech
+list prices. Hosting, storage, build and network costs are not included. The line flagged in the
+opening was checked on 23 September and covers dialogue (see "The opening's launch call"); the
+other two flags have not been checked.
 
-The known omission counts refer only to the fixed facts and inspected frames. They are not exhaustive semantic scores. No blind/low-vision participants were recruited; no comprehension, satisfaction, accessibility-outcome or population-wide quality claim is supported.
+## Default reviewer against a cheaper setting
 
-## Spending and performance
+The cheaper setting ran on the four development clips, reusing the default run's saved analysis, so
+its time and cost are not comparable and are left out.
 
-Screening used **$0.847577 OpenRouter** plus **$0.134520 Google speech list-price estimates**, totaling **$0.982097 API cost**. All screening ledger charges are known; failed calls are included. A separate diagnostic STT request cost about $0.010667. Demo narration and actual editor demonstrations are production/verification costs, recorded separately. Infrastructure, build, storage and network charges are excluded.
+| Clip                        | Default reviewer                                                                                             | Cheaper reviewer                                                                                                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| _Tears of Steel_ opening    | 5 lines. Kept "40 years later". Final check listed two missing moments (holograms, "simulation ready" text). | 5 lines. The "40 years later" line started at 45.40 s, just before its silence began at 45.41 s, so it was dropped rather than moved. The final check did not list it as missing. |
+| Korean interview            | 1 line. Final check listed both missing facts.                                                               | 1 line. Marked checked, with both essential facts missing.                                                                                                                        |
+| _Tears of Steel_ city scene | 9 lines, all four facts covered. Final check listed a newspaper headline that had been dropped as too long.  | 9 lines, all four facts covered. Marked checked.                                                                                                                                  |
+| Synthetic squares and beeps | Stopped: zero-length word times.                                                                             | Stopped: zero-length word times.                                                                                                                                                  |
 
-The pinned 65-second cold generation took **349.29 s** and **$0.240700 API cost**. The paired medium run reused its analysis, so their total time and cost are **not** compared as evidence of an efficiency improvement. Each pair uses the same clip, output language, density and analysis. The cheaper candidate was rejected on coverage before performance selection.
+After seeing the first two rows, we did not run the cheaper setting on the held-out clips.
 
-The implementation enforces a $20 total/$10 daily experiment allowance, serial experiments, and a separate $5 daily public-demo allowance through conditional reservations. Unknown charges retain their hold. The OpenRouter key limit was not changed and no balance was recharged.
+## How we checked
 
-## Reproduction and artifacts
+- **Clips and references.** Every source, interval, licence, file hash and fixed fact is in
+  [`evals/cases.json`](../evals/cases.json). The references were written before the runs, except for
+  the opening: an earlier result on that clip was already known when its facts were written down.
+- **Essential facts.** We compared each finished track with the fixed facts and with sampled frames.
+  These counts cover only the listed facts; they are not a full quality score.
+- **Held-out lab scene.** Its reference said the transformation happens inside the laboratory. Looking
+  at the frames afterwards showed the street outside turning into a sunny canal town. We kept the
+  original reference and the correction, and did not score omissions for this clip.
+- **Speech overlap.** "No overlap with the recognized speech" is measured against Chirp 3, the
+  recognizer Scene uses. As a cross-check we ran faster-whisper 1.2.1 (small model, CPU, int8), and
+  subtitles where they exist, and listed each disagreement as a line to check rather than a confirmed
+  overlap.
+- **The opening's launch call.** On 23 September we checked the flag in the opening. Chirp 3 had
+  timed "We have main engine start." at 2.32–3.96 s and missed the "Roger, Roger" spoken in that
+  stretch. faster-whisper places the call at 4.21–6.17 s over the whole clip. Recognized as separate
+  slices, 1.8–4.4 s returns "Roger, Roger.", 4.4–6.7 s returns "We have main engine start." at
+  4.40–6.16 s, and 6.7–10.0 s returns "Four, three, two, one." A spectrogram shows voice at 4.8–6.3 s.
+  So Chirp 3 put the call about 2 s early. It placed the countdown after it correctly ("4 3 2" at
+  6.84–8.92 s, "1" at 9.28–9.76 s). The line "망고 오픈 무비 프로젝트." (The Mango Open Movie Project.),
+  voiced at 4.50–6.39 s in a silence Scene had found at 4.21–6.59 s from Chirp 3's timings, talks
+  over the call. The sample track's other lines overlap neither recognizer's words.
+- **What we changed.** An editor removed that line from the sample track (see "The editor at work").
+  Scene now recognizes every usable silence a second time, on its own
+  ([architecture](ARCHITECTURE.md#what-runs-on-google-cloud)). A test replays this clip's recorded
+  first pass with the call at 4.40–6.16 s and checks that the silence at 4.21–6.59 s closes and the
+  line can no longer be placed there. The re-listen has not yet run on the real audio;
+  `npm run relisten -- tos-opening` is that check.
+- **The two stopped runs.** The held-out Korean excerpt starts in the middle of a sentence. One
+  diagnostic request showed Chirp 3 returning its first three words, "어쩔 수 없고요" ("can't be
+  helped"), with start and end both at zero. The synthetic clip, which has no speech, failed the same
+  check. Scene now blocks each stretch of untimed words as speech, from the previous timed word to the
+  next one, instead of stopping. Replaying the saved response for the Korean excerpt through the
+  current code blocks its first 1.24 s and leaves three silences, 5.95 s in total. We have not re-run
+  the paid evaluation with this change.
+- **What stays unknown.** Factual errors beyond the fixed facts, exact dialogue intrusions and
+  intrusions on important sounds are recorded as unknown (`null`) in the results file, not as zero.
+
+## What these results do not show
+
+- This is a small test: six clips, three of them from the same film. It shows how the system behaves,
+  not how good it is across films.
+- No blind or low-vision listeners took part yet, so there is no measure of comprehension or
+  satisfaction. Listening sessions are our next step.
+- After the test, inspecting the runs showed two prompt problems shared by both settings: silence
+  boundaries were shown to one decimal place (45.41 became 45.4), and the writer was told to use a
+  phrasing the reviewer rejects as viewer framing. The final check's instructions also tied omissions
+  to free room. All three were fixed and covered by tests. The results above come from before those
+  fixes, and we did not re-run the test afterwards.
+- Drafts vary from run to run, so not every difference between the two settings comes from the
+  reviewer alone.
+
+## Spending
+
+The whole test, ten runs including the three that stopped, cost $0.847577 in Gemini calls plus
+$0.134520 in Google speech at list price: $0.982097 in total. Every charge was known. One separate
+diagnostic speech request cost about $0.010667.
+
+## The editor at work
+
+The Korean sample track is the automatic run on the opening plus three edits. Each edit made a new
+version and kept the one before it.
+
+1. **A line rewritten.** An editor changed the line at 45.5 s from "40년 후." (40 years later.) to
+   "40년 후, 두 사람의 홀로그램이 재생된다." (40 years later, a hologram of two people plays.). The edit
+   took 67.83 s and $0.041100 in API calls.
+2. **A dropped line filled.** The automatic loop had dropped the line at 54.2 s: the reviewer rejected
+   "연구원이 콘솔 앞에 앉아 있다." (A researcher sits at a console.) because the "SIMULATION READY" text
+   mattered more, then rejected the rewrite "시뮬레이션 준비 완료라는 문구가 뜬다." (The words "Simulation
+   ready" appear.) as viewer framing. An editor typed the reviewer's suggested fix, "시뮬레이션 준비
+   완료." (Simulation ready.). It was voiced in 2.26 s with 2.80 s of room and passed review. The track
+   then had six lines, and the other five audio files were reused unchanged. The edit took 96.49 s
+   and $0.088032, and the final check listed one missing moment.
+3. **A line removed.** After the launch-call check above, an editor removed "망고 오픈 무비 프로젝트."
+   (The Mango Open Movie Project.). Nothing was voiced: the five remaining audio files were reused
+   byte for byte, the mix and text track were rebuilt, and the final check ran again. It now lists
+   three missing moments, among them the "the Mango Open Movie project" title the removed line had
+   read. That title is on screen while the launch call and the countdown are spoken, so no usable
+   silence is left to read it in. The removal took 75.94 s and $0.045488. A first attempt ended when
+   the model provider's stream broke; that call's charge was not reported.
+
+The sample track now has five lines, two of them typed by an editor, and every one passed review and
+fits its room by measured audio. Across the automatic run and the three edits, it took $0.415 in API
+calls, plus the editor's time.
+
+## Reproducing the test
 
 ```sh
 npm run samples
@@ -44,10 +155,9 @@ node --env-file=.env.local --import tsx scripts/screen-upgrade.ts confirmation h
 node --import tsx scripts/summarize-upgrade.ts
 ```
 
-Preparation downloads licensed sources and writes references. Paid screening skips journaled case/setting pairs and never exceeds twelve records. Do not delete the journal to hide failures or bypass the limit. This checkpoint deliberately does not rerun failed recognition cases with invented ground truth.
+Preparation downloads the sources and writes the references. The paid step skips clip and
+setting pairs already in its journal (`runtime/evaluation/runs.jsonl`) and stops at twelve runs. It
+spends from its own allowance, $10 a day and $20 in total, and runs one clip at a time.
 
-[Run-level JSON](../evals/results-2026-09-22.json) · [CSV](../evals/results-2026-09-22.csv) · [Protocol](../evals/README.md)
-
-The selected demo remains a reviewable production example. Its real editor actions restore missing information while preserving the original WAVs and parent run. A model approval is still not a listening-quality certificate. **Full-length human listening and important-sound acceptance remain outstanding before final contest submission.**
-
-The selected final edit restored “시뮬레이션 준비 완료.” at 54.2 seconds, producing six fitting lines in 96.49 seconds for $0.088032 API cost. The remaining coverage finding stays visible. English and Korean demo drafts are each 175.00 seconds, 1920×1080 H.264/AAC, with English captions. Full decoding passed; measured true peaks are −0.8 and −0.9 dBFS respectively, with −16.2 LUFS integrated loudness. Both presenters finish before the recorded listening section. The eight-page English presentation and technical media checks are under `runtime/demo-v2/`; these runtime artifacts are intentionally excluded from Git.
+Results: [run-level JSON](../evals/results-2026-09-22.json), [CSV](../evals/results-2026-09-22.csv),
+[protocol](../evals/README.md).
