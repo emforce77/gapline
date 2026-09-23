@@ -127,7 +127,7 @@ export const en = {
       "Clips up to 90 seconds and 30 MB. Preparing a clip takes under a minute; generating its description takes a few minutes more and calls paid Google Cloud and Gemini APIs, within a daily allowance shared by every visitor. Only the browser that uploaded a clip can open it.",
     uploadTitle: "Your clip",
     uploadHint:
-      "MP4, MOV or WebM, up to 30 MB and 90 seconds. Drop the file here or choose it. The 65-second sample took {time} and cost {cost}.",
+      "MP4, MOV or WebM, up to 30 MB and 90 seconds. Drop the file here or choose it. Generating {language} narration for the 65-second sample took {time} and cost {cost}.",
     uploadChoose: "Choose a video",
     uploadWorking: "Preparing the clip…",
     uploadTooLong: "This clip is longer than 90 seconds. Trim it to one scene and try again.",
@@ -238,7 +238,8 @@ export const en = {
     replaying: "Replaying at {speed}× speed",
     stopReplay: "Stop replay",
     noRun: "No {language} track at this density yet.",
-    noRunHint: "Generating the 65-second sample took {time} and cost {cost}.",
+    noRunHint:
+      "Generating {language} narration for the 65-second sample took {time} and cost {cost}.",
     adOn: "Description on",
     adOff: "Description off",
     eyesClosed: "Eyes closed",

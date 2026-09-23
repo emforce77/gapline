@@ -5,15 +5,14 @@ import { fill } from "@/i18n";
 import { useI18n } from "@/i18n/client";
 import { fetchRun } from "@/lib/client/run-stream";
 import { useLiveRun } from "@/lib/client/use-live-run";
-import { formatDuration, formatUsd } from "@/lib/format";
-import type { RunSummary, TimedRunEvent } from "@/lib/pipeline/events";
+import type { TimedRunEvent } from "@/lib/pipeline/events";
 import { findGaps } from "@/lib/pipeline/gaps";
 import { emptyRun, foldRun, reduceRun, STAGES, type RunView } from "@/lib/pipeline/reduce";
 import type { Density, Language, SceneMap, SpeechSegment } from "@/lib/pipeline/schemas";
 import type { Project, RunListing } from "@/lib/store/projects";
 import { EditLine } from "./CueEditor";
 import { LineDetail, StageList } from "./Inspector";
-import { languageName, lineNumbers } from "./labels";
+import { languageName, lineNumbers, sampleRunFigures } from "./labels";
 import { LiveRunNotices, littleRoomOf } from "./LiveRunNotices";
 import { Player, type PlayerHandle } from "./Player";
 import { RunPanel } from "./RunPanel";
@@ -40,7 +39,8 @@ export function Workspace({
   project: Project;
   initialRuns: RunListing[];
   analysis: { speech: SpeechSegment[]; scene: SceneMap } | null;
-  measured: RunSummary | null;
+  /** The run the empty panel's "the sample took … and cost …" line quotes (see sampleRunFigures). */
+  measured: RunListing | null;
   initialRunId?: string;
 }) {
   const { t, lang } = useI18n();
@@ -180,6 +180,12 @@ export function Workspace({
     }
     timers.current.push(window.setTimeout(() => setMode("idle"), (lastT / speed) * 1000 + 400));
   }
+
+  // The whole saved run: a replay lists only the stages it goes through.
+  const trace = useMemo(
+    () => (events ? foldRun(events, project.clipSeconds) : null),
+    [events, project.clipSeconds],
+  );
 
   // Before any run, the timeline still shows the picture, the dialogue and the room from the analysis.
   const shown = useMemo<RunView | null>(() => {
@@ -338,11 +344,11 @@ export function Workspace({
                 canReplay={Boolean(events) && mode !== "live"}
                 replaySpeed={replaySpeed}
                 emptyHint={
-                  measured
-                    ? fill(t.workspace.noRunHint, {
-                        time: formatDuration(measured.wallSeconds, lang),
-                        cost: formatUsd(measured.costUsd, lang),
-                      })
+                  measured?.summary
+                    ? fill(
+                        t.workspace.noRunHint,
+                        sampleRunFigures(measured.language, measured.summary, lang),
+                      )
                     : null
                 }
                 onChooseRun={setChosenRunId}
@@ -371,6 +377,7 @@ export function Workspace({
               {view && !parentRunId ? (
                 <StageList
                   view={view}
+                  trace={mode === "replay" ? trace : null}
                   clockRate={mode === "live" ? 1 : mode === "replay" ? replaySpeed : 0}
                 />
               ) : null}
@@ -379,7 +386,8 @@ export function Workspace({
                   {fill(t.workspace.noRun, { language: languageName(narration, lang) })}
                 </p>
               ) : null}
-              {view?.coverage.length ? (
+              {/* A finished result shows the final check's list (QualityNote) instead. */}
+              {view?.coverage.length && view.summary === null ? (
                 <Coverage coverage={view.coverage} language={cueLanguage} />
               ) : null}
               {final ? <p className="label hint">{t.line.pickHint}</p> : null}

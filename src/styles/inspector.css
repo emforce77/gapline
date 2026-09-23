@@ -37,7 +37,8 @@
 
 .version .gloss,
 .verdict .gloss,
-.quality-note .gloss {
+.quality-note .gloss,
+.coverage .gloss {
   display: block;
   font-size: var(--step--1);
   color: var(--muted);

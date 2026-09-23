@@ -1,5 +1,7 @@
 import { fill, type UiLang } from "@/i18n";
 import type { Dictionary } from "@/i18n/en";
+import { formatDuration, formatUsd } from "@/lib/format";
+import type { RunSummary } from "@/lib/pipeline/events";
 import type { Cue } from "@/lib/pipeline/schemas";
 import type { RunListing } from "@/lib/store/projects";
 
@@ -113,6 +115,24 @@ export function runLabel(
  */
 export function originalRun(runs: RunListing[], runId: string | undefined): RunListing | undefined {
   return lineage(runs, runId).at(-1);
+}
+
+/**
+ * The figures of every "generating the 65-second sample took … and cost …" line (upload card,
+ * fresh-upload workspace). Both quote one run, the original automatic run behind the pinned Korean
+ * result the story follows, and name its narration language so the figures are not read as the
+ * viewer's language.
+ */
+export function sampleRunFigures(
+  language: string,
+  summary: RunSummary,
+  lang: UiLang,
+): { language: string; time: string; cost: string } {
+  return {
+    language: languageName(language, lang),
+    time: formatDuration(summary.wallSeconds, lang),
+    cost: formatUsd(summary.costUsd, lang),
+  };
 }
 
 /** A result followed by the results it was edited from, back to the original run. */

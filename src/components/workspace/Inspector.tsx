@@ -4,17 +4,26 @@ import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { formatClock, formatSeconds } from "@/lib/format";
-import { STAGES, type RunView } from "@/lib/pipeline/reduce";
+import type { RunView } from "@/lib/pipeline/reduce";
 import type { Cue, Language } from "@/lib/pipeline/schemas";
 import { Gloss } from "./glosses";
+import { listedStages } from "./listed-stages";
 import { VersionHistory } from "./VersionHistory";
 
 /**
  * Stage list with elapsed time for the running stage. clockRate is 1 while live, the replay speed
- * during a replay, and 0 for a finished run. A finished run lists only the stages it went through:
- * older runs predate some stages, and "Waiting" forever would read as a hang.
+ * during a replay, and 0 for a finished run. trace is the whole saved run during a replay, null
+ * otherwise; which stages are listed is decided by listedStages.
  */
-export function StageList({ view, clockRate }: { view: RunView; clockRate: number }) {
+export function StageList({
+  view,
+  trace,
+  clockRate,
+}: {
+  view: RunView;
+  trace: RunView | null;
+  clockRate: number;
+}) {
   const { t, lang } = useI18n();
   const [now, setNow] = useState(() => Date.now());
   // The run clock advances between events: last event time plus wall time since it arrived.
@@ -26,8 +35,7 @@ export function StageList({ view, clockRate }: { view: RunView; clockRate: numbe
     return () => clearInterval(timer);
   }, [clockRate]);
   const runClock = clockRate > 0 ? anchor.t + ((now - anchor.wall) / 1000) * clockRate : view.t;
-  const finished = view.summary !== null;
-  const stages = STAGES.filter((stage) => !finished || view.stages[stage].state !== "waiting");
+  const stages = listedStages(view, trace);
 
   return (
     <ol className="stages">

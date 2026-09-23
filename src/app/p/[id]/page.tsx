@@ -41,11 +41,15 @@ export default async function ProjectPage({
   } catch {
     notFound();
   }
-  const [runs, analysis, showcase] = await Promise.all([
+  const [runs, analysis, showcase, korean] = await Promise.all([
     listRuns(project.id),
     readAnalysis(project.id),
     loadShowcase(lang),
+    loadShowcase("ko"),
   ]);
+  // The sample's cost and time quote the same run as the landing page: the original automatic run
+  // behind the pinned Korean result the story follows, whatever the viewer's language.
+  const measured = (korean && originalRun(korean.runs, korean.preview?.runId)) ?? null;
   return (
     <I18nProvider lang={lang} t={dictionary(lang)}>
       <Workspace
@@ -56,9 +60,7 @@ export default async function ProjectPage({
         }
         initialRuns={runs}
         analysis={analysis}
-        measured={
-          (showcase && originalRun(showcase.runs, showcase.preview?.runId)?.summary) ?? null
-        }
+        measured={measured}
       />
     </I18nProvider>
   );

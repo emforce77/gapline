@@ -119,7 +119,7 @@ export const ko: Dictionary = {
       "90초, 30MB 이하 영상을 받습니다. 영상 준비는 1분 안에 끝나고, 해설 생성은 몇 분 더 걸리며 유료 Google Cloud와 Gemini API를 호출합니다. 생성 한도는 모든 방문자가 하루 단위로 함께 씁니다. 올린 영상은 올린 브라우저에서만 열 수 있습니다.",
     uploadTitle: "내 영상",
     uploadHint:
-      "MP4, MOV, WebM, 30MB와 90초 이하. 파일을 여기에 끌어 놓거나 골라 주세요. 65초 샘플은 생성에 {time} 걸렸고, 비용은 {cost}입니다.",
+      "MP4, MOV, WebM, 30MB와 90초 이하. 파일을 여기에 끌어 놓거나 골라 주세요. 65초 샘플의 {language} 해설은 생성에 {time} 걸렸고, 비용은 {cost}입니다.",
     uploadChoose: "영상 고르기",
     uploadWorking: "영상을 준비하는 중…",
     uploadTooLong: "90초보다 긴 영상입니다. 한 장면으로 잘라서 다시 올려 주세요.",
@@ -230,7 +230,7 @@ export const ko: Dictionary = {
     replaying: "{speed}배속으로 다시 보는 중",
     stopReplay: "다시 보기 멈춤",
     noRun: "이 밀도의 {language} 트랙이 아직 없습니다.",
-    noRunHint: "65초 샘플 생성에 {time}, {cost}가 들었습니다.",
+    noRunHint: "65초 샘플의 {language} 해설 생성에 {time}, {cost}가 들었습니다.",
     adOn: "해설 켬",
     adOff: "해설 끔",
     eyesClosed: "눈 감고 듣기",

@@ -4,7 +4,7 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { TimelinePreview } from "@/components/TimelinePreview";
 import { UploadCard } from "@/components/UploadCard";
 import { glossFor } from "@/components/workspace/glosses";
-import { lineage, originalRun } from "@/components/workspace/labels";
+import { lineage, originalRun, sampleRunFigures } from "@/components/workspace/labels";
 import { featuredLine, RejectionStory } from "@/components/landing/RejectionStory";
 import { SevenSeconds, type NarrationTrack } from "@/components/landing/SevenSeconds";
 import { asUiLang, dictionary, fill, UI_LANG_COOKIE, type UiLang } from "@/i18n";
@@ -241,10 +241,7 @@ export default async function LandingPage() {
             labels={{
               title: t.landing.uploadTitle,
               hint: measured
-                ? fill(t.landing.uploadHint, {
-                    time: formatDuration(measured.wallSeconds, lang),
-                    cost: formatUsd(measured.costUsd, lang),
-                  })
+                ? fill(t.landing.uploadHint, sampleRunFigures(original!.language, measured, lang))
                 : "",
               choose: t.landing.uploadChoose,
               working: t.landing.uploadWorking,

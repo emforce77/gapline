@@ -144,7 +144,10 @@ export function EditSummary({ parent, note }: { parent: string; note: RunNote })
   );
 }
 
-/** During a live run: what the reviewer found missing, round by round. */
+/**
+ * During a run, live or replayed: what the reviewer found missing, round by round. Later rounds
+ * cover some of it, so a finished result shows the final check's list (QualityNote) instead.
+ */
 export function Coverage({
   coverage,
   language,
@@ -152,7 +155,7 @@ export function Coverage({
   coverage: { round: number; missing: MissingItem[] }[];
   language: Language;
 }) {
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   return (
     <div className="coverage">
       <h2 className="inspector-heading">{t.coverage.title}</h2>
@@ -163,6 +166,7 @@ export function Coverage({
             <li key={i}>
               <span className="mono label">{formatClock(m.at)}</span>{" "}
               <span lang={language}>{m.what}</span>
+              <Gloss text={m.what} pageLang={lang} textLang={language} />
             </li>
           ))}
       </ul>

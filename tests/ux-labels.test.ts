@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { diffWords } from "../src/components/workspace/diff";
-import { lineNumbers, noteFromScript, runLabel } from "../src/components/workspace/labels";
+import {
+  lineNumbers,
+  noteFromScript,
+  runLabel,
+  sampleRunFigures,
+} from "../src/components/workspace/labels";
+import { fill } from "../src/i18n";
 import { en } from "../src/i18n/en";
 import { ko } from "../src/i18n/ko";
+import type { RunSummary } from "../src/lib/pipeline/events";
 import type { Cue } from "../src/lib/pipeline/schemas";
 import type { RunListing } from "../src/lib/store/projects";
 
@@ -141,5 +148,39 @@ describe("line labels", () => {
       runLabel(runs[2], runs, { line: 1, kind: "removed" }, ko, "ko", false),
       "수정 2 · 해설 1 삭제",
     );
+  });
+});
+
+describe("sample run figures", () => {
+  /** The pinned Korean sample's original run (20260922t051536291-ko-standard-d88b71, script.json). */
+  const summary = { wallSeconds: 349.29, costUsd: 0.2407 } as RunSummary;
+
+  it("quotes one run and names its narration language in both interface languages", () => {
+    assert.deepEqual(sampleRunFigures("ko", summary, "en"), {
+      language: "Korean",
+      time: "5 min 49 s",
+      cost: "$0.241",
+    });
+    assert.deepEqual(sampleRunFigures("ko", summary, "ko"), {
+      language: "한국어",
+      time: "5분 49초",
+      cost: "$0.241",
+    });
+  });
+
+  it("fills every placeholder of the upload card and fresh-workspace hints", () => {
+    for (const [t, lang] of [
+      [en, "en"],
+      [ko, "ko"],
+    ] as const) {
+      for (const hint of [t.landing.uploadHint, t.workspace.noRunHint]) {
+        const text = fill(hint, sampleRunFigures("ko", summary, lang));
+        assert.doesNotMatch(text, /\{\w+\}/, text);
+        assert.match(
+          text,
+          lang === "en" ? /Korean.*5 min 49 s.*\$0\.241/ : /한국어.*5분 49초.*\$0\.241/,
+        );
+      }
+    }
   });
 });

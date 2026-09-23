@@ -107,7 +107,7 @@ export const GUIDELINE_RULES: GuidelineRule[] = [
     source: {
       en:
         "KMCC guideline p.7 (must describe: characters, place, time, movement, unidentifiable " +
-        "sounds, on-screen text), p.8 (no description for sounds recognised at once or feelings " +
+        "sounds, on-screen text), p.8 (no description for sounds recognized at once or feelings " +
         "the dialogue conveys); Netflix AD Style Guide §1.2",
       ko:
         "방미통위 가이드라인 p.7 「반드시 해설할 요소: 등장인물·장소·시간·움직임·식별이 불가능한 " +
