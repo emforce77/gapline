@@ -62,15 +62,17 @@ flowchart LR
   hearing. Why: on 2026-09-23 we found that over its 55 s piece of the Tears of Steel opening, Chirp 3
   had put "We have main engine start." at 2.32–3.96 s. faster-whisper places it at 4.21–6.17 s on
   the whole clip and at 4.40–6.16 s on a 4.4–6.7 s slice, inside a 4.21–6.59 s "silence" that a line
-  had been written for. A test replays that case from the recorded first pass; the re-listen has not
-  yet run on the real audio (`npm run relisten -- tos-opening` does that without changing the
-  project).
+  had been written for. A test replays that case from the recorded first pass. On 2026-09-23 the
+  re-listen ran on the real audio for the first time. Of 6 silences recognized again, one held new
+  words: "We have main engine start" at 3.71–6.47 s, which closed the 4.21–6.59 s silence (2.38 s).
+  `npm run relisten -- tos-opening` repeats that check without changing the project.
 - **Text-to-Speech, Chirp 3 HD.** One narrator per language, `ko-KR-Chirp3-HD-Charon` and
   `en-US-Chirp3-HD-Charon`, as 24 kHz mono WAV. Scene trims silence below −45 dBFS and takes the
   remaining length as the spoken length.
 - **Gemini 3.8 Flash.** Every call streams, returns JSON that must match a schema, and is validated
-  again on arrival. Reasoning is set per stage: writing at medium, rewriting at low, reviewing at high,
-  watching at the model default. Writer and reviewer watch the same 360p copy of the clip.
+  again on arrival; an answer that does not is asked for once more. Reasoning is set per stage:
+  writing at medium, rewriting at low, reviewing at high, watching at the model default. Writer and
+  reviewer watch the same 360p copy of the clip.
 - **Secret Manager.** Holds the model API key, exposed to the service as an environment variable.
 - **Identity.** On Cloud Run, Google API calls use the service account's token from the metadata
   server. Locally they use the gcloud CLI configuration named in `GCLOUD_CONFIGURATION`.
@@ -79,8 +81,10 @@ flowchart LR
 
 The model decides what to say. Code decides where it may be said, whether a line is accepted, how long
 it takes to say, and when to stop trying. [`src/lib/pipeline/run.ts`](../src/lib/pipeline/run.ts)
-drives the loop; its stages sit next to it: `analyze.ts` (hear, re-listen, watch), `cues.ts`
-(placing lines), `fit-voice.ts` (voicing and fitting) and `finish-run.ts` (mix and summary).
+drives the loop, including the final check and the fix after it; its stages sit next to it:
+`analyze.ts` (hear, re-listen, watch), `cues.ts` (placing lines, and free room in a voiced track),
+`fit-voice.ts` (voicing and fitting) and `finish-run.ts` (mix and summary). A run finishes on its
+own; an editor is optional.
 
 ```mermaid
 flowchart TD
@@ -91,21 +95,24 @@ flowchart TD
   watch --> room
   room --> write["Write: each line names its silence"]
   write --> review{"Review against 8 cited rules"}
-  review -->|"rejected on first review"| rewrite["Rewrite once"]
+  review -->|"rejected, fewer than 3 reviews"| rewrite["Rewrite from the reviewer's fix"]
   rewrite --> review
   review -->|"important moment missing"| add["Add a line for it"]
   add --> review
-  review -->|"rejected again or unchanged"| drop["Drop the line"]
+  review -->|"rejected a third time, or rewrite unchanged"| drop["Drop the line"]
   review -->|"passed"| voice["Voice: Chirp 3 HD"]
   voice --> fit{"Measured audio fits its room?"}
   fit -->|"would fit at up to 1.15x: voice faster"| voice
   fit -->|"too long, fewer than 2 shortenings"| shorten["Gemini shortens it"]
-  shorten --> review
+  shorten -->|"one rewrite left"| review
   fit -->|"still too long"| drop
-  fit -->|"fits"| audit["Final check: what the finished track still misses"]
-  audit --> mix["Mix: FFmpeg ducks the film and adds narration"]
+  fit -->|"fits"| audit["Final check, once: failing lines, missing moments"]
+  audit -->|"nothing it can fix"| mix["Mix: FFmpeg ducks the film and adds narration"]
+  audit -->|"failing line, or missing moment with free room"| fix["Fix: rewrite from the check's fix, or add a line in the free room"]
+  fix --> refit["Review with one rewrite left, voice and fit, as above"]
+  refit -->|"no second audit; findings updated"| mix
   mix --> out["MP4, WAV, WebVTT and JSON script"]
-  out --> edit["Editor: change, restore or remove a line (see Editing a line)"]
+  out -.->|"optional"| edit["Editor: change, restore or remove a line (see Editing a line)"]
 ```
 
 1. **Hear and watch run at the same time.** Hearing is the first pass and then the re-listen of each
@@ -122,19 +129,36 @@ flowchart TD
    1.0 s of room means the line is dropped. The length budget is 5.0 Korean syllables or 2.5 English
    words per second, below the narrator's measured 5.64 syllables and 2.82 words per second.
 4. **Review.** The reviewer checks each line and returns, for every violation, the rule, the exact
-   words and a reason, plus a suggested fix. Its answer is rejected if it skips a line, names a line
-   that does not exist, or contradicts itself. On the first pass over the whole script it also lists
-   important moments no line covers, each placed in a silence; the writer adds lines for them and they
-   are reviewed like the rest. A rejected line gets one rewrite. A rewrite with the same words, or a
-   second rejection, drops the line.
-5. **Voice and measure.** Up to four lines are voiced at once. If a line is longer than its room but
-   would fit at up to 1.15× speed, it is voiced again at that speed. Otherwise the writer shortens it
-   to aim at 90% of the room, the shorter text is reviewed again, and it is voiced again. After two
-   shortenings a line that still overruns is dropped.
+   words and a reason, plus a suggested fix. An answer that skips a line or names a line that does not
+   exist is asked for once more; one that contradicts itself fails its schema and is also asked for
+   once more. A second bad answer ends the run. On the first pass over the whole script the reviewer
+   also lists important moments no line covers, each placed in a silence; the writer adds lines for
+   them and they are reviewed like the rest. A rejected line is rewritten from the reviewer's own fix
+   and reviewed again, up to two rewrites (`MAX_REVIEW_ROUNDS` is 3). A third rejection drops the
+   line, as does a rewrite with the same words or one the writer leaves out (reason `unchanged`).
+5. **Voice and measure.** Up to four lines are voiced at once; a Text-to-Speech call that fails with a
+   rate limit or server error is retried once. If a line is longer than its room but would fit at up
+   to 1.15× speed, it is voiced again at that speed. Otherwise the writer shortens it to aim at 90% of
+   the room, the shorter text is reviewed again with one rewrite left, and it is voiced again. After
+   two shortenings a line that still overruns is dropped, and so is a line whose shortening the writer
+   leaves out.
 6. **Final check.** The reviewer sees exactly the lines that will be heard, with their measured end
-   times, and lists essential moments that are still missing even where no room is left. Any finding
-   marks the run _Review needed_; the findings stay in the summary and on screen.
-7. **Mix.** Narration is normalized to −16 LUFS, close to the sample's dialogue level. The film is
+   times, once. It returns a verdict for each line and lists essential moments that are still missing
+   even where no room is left.
+7. **Fix what the check found.** This stage runs only when the check found something it can act on.
+   Each failing line is rewritten from the check's fix, with its whole room available. Each missing
+   moment whose silence still has free room gets a new line, one per stretch of free room: free room
+   starts 0.3 s after the end of the last voiced line before the moment and runs to the next line or
+   the end of the silence, and it must be at least 1.0 s (`freeRoom` in `cues.ts`). Both kinds are
+   reviewed with one rewrite left, then voiced and fitted like any other line. If the writer leaves a
+   rewrite out, the line stays as voiced and its failing verdict stays listed. The track is not
+   audited a second time: on the sample, a second audit took over 3 minutes and only listed new items
+   it could not act on. Instead the check's findings are updated with the fixes and saved as
+   `summary.finalReview`, and `summary.finalFix` records `{ failing, missing, rewritten, added }`.
+   What still stands, a fix that failed or a moment with no free silence, stays in the summary. The
+   result reads _Final check passed_ when nothing is listed and _Final check · notes_ otherwise, and
+   the screen marks each listed moment that has no free silence left.
+8. **Mix.** Narration is normalized to −16 LUFS, close to the sample's dialogue level. The film is
    lowered by 9 dB under each line with 0.15 s ramps. Outputs: a described H.264/AAC MP4, the narration
    WAV, a WebVTT text track and `script.json` with every version, verdict and measured length.
 
@@ -143,8 +167,9 @@ and `ledger.jsonl`, one line per paid call with tokens, latency and cost, failed
 
 ## Editing a line
 
-An editor can change a line's words, its start time, or both, including a line the automatic loop
-dropped, or remove a line from the track. The code is in
+A run does not wait for an editor. Anyone who wants to step in can change a line's words, its start
+time, or both, including a line the automatic loop dropped, or remove a line from the track. This
+flow does not run the fix stage. The code is in
 [`src/lib/runs/edit-run.ts`](../src/lib/runs/edit-run.ts).
 
 ```mermaid
@@ -180,8 +205,8 @@ removed by the editor, the other lines' WAV files are reused byte for byte, the 
 track are rebuilt without it, and the final audit runs again on what remains, so anything only that line
 described is listed as missing. A removed line can be put back with an ordinary edit, its own words
 included. Both kinds of edit share [`src/lib/runs/edit-track.ts`](../src/lib/runs/edit-track.ts).
-This is how the sample's line over the opening's launch call was taken out
-([evaluation](EVALUATION.md#the-editor-at-work)).
+This is how the line over the opening's launch call was taken out of the sample's earlier, edited
+track ([evaluation](EVALUATION.md#the-editor-at-work)).
 
 ## Saving work and reusing analysis
 
@@ -205,18 +230,23 @@ This is how the sample's line over the opening's launch call was taken out
   could not be read keeps its full reservation. The allowance lives in the bucket and is updated with
   conditional writes, so two instances cannot spend the same money. Hosting, storage and network costs
   are outside this API total.
-- **Provider hiccups.** A rate-limited or unavailable model call is retried once when the provider
-  asks for a short wait. A longer wait ends the run with an error that says to try again, instead of
-  holding the request open. Every attempt, failed ones included, is logged with its cost.
+- **Provider hiccups and bad answers.** A rate-limited or unavailable model call is retried once when
+  the provider asks for a short wait. A longer wait ends the run with an error that says to try
+  again, instead of holding the request open. Model output that is not valid JSON for its schema is
+  retried once, and a review that names unknown lines or skips one is asked for once more. A
+  retryable Text-to-Speech failure is retried once. A rewrite or shortening the writer leaves out
+  drops that line (reason `unchanged`) instead of failing the run; in the fix stage it keeps the line
+  as voiced. Every model attempt, failed ones included, is logged with its cost.
 
 ## Tests
 
 - `npm test` runs deterministic tests, with no paid calls: silence finding, placement, length budgets,
-  silence trimming, replaying a run from its events, review validation, untimed words in a recorded
-  Chirp 3 response, the re-listen (slicing, words at a silence's edge, untimed words, the concurrency
-  cap, and a replay of the opening's misplaced launch call), retries and unknown charges, saved
-  analysis, concurrent budget reservations, access and edit bounds, placing a line next to a removed
-  one, and the API's error codes.
+  silence trimming, free room for a line added after the final check, replaying a run from its
+  events, review validation, untimed words in a recorded Chirp 3 response, the re-listen (slicing,
+  words at a silence's edge, untimed words, the concurrency cap, and a replay of the opening's
+  misplaced launch call), retries and unknown charges, saved analysis, concurrent budget
+  reservations, access and edit bounds, placing a line next to a removed one, and the API's error
+  codes.
 - `npm run test:media` runs the full FFmpeg path on a synthetic clip with the providers mocked,
   including the re-listen slices FFmpeg cuts and a removal that reuses every other WAV byte for byte
   and can be put back.

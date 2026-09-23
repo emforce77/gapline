@@ -9,6 +9,12 @@ decided the reviewer setting. For each clip we wrote down a short list of essent
 (for example "40 YEARS LATER marks the change to a laboratory") and checked the finished track against
 that list, sampled frames, subtitles and an independent speech recognizer.
 
+**Since then.** On 23 September Scene gained a fix stage after the final check and a third review
+round ([architecture](ARCHITECTURE.md#the-loop-that-makes-each-line)). The results below predate both
+and have not been re-run. _Review needed_ is what a result with open findings was called then; it now
+reads _Final check · notes_. The automatic sample runs of 23 September are under
+[The automatic sample track](#the-automatic-sample-track).
+
 **What we learned.**
 
 - 4 of 6 clips produced a described track. The other 2 stopped because the speech recognizer returned
@@ -81,12 +87,13 @@ After seeing the first two rows, we did not run the cheaper setting on the held-
   6.84–8.92 s, "1" at 9.28–9.76 s). The line "망고 오픈 무비 프로젝트." (The Mango Open Movie Project.),
   voiced at 4.50–6.39 s in a silence Scene had found at 4.21–6.59 s from Chirp 3's timings, talks
   over the call. The sample track's other lines overlap neither recognizer's words.
-- **What we changed.** An editor removed that line from the sample track (see "The editor at work").
-  Scene now recognizes every usable silence a second time, on its own
+- **What we changed.** An editor removed that line from the sample track of the time (see "The editor
+  at work"). Scene now recognizes every usable silence a second time, on its own
   ([architecture](ARCHITECTURE.md#what-runs-on-google-cloud)). A test replays this clip's recorded
   first pass with the call at 4.40–6.16 s and checks that the silence at 4.21–6.59 s closes and the
-  line can no longer be placed there. The re-listen has not yet run on the real audio;
-  `npm run relisten -- tos-opening` is that check.
+  line can no longer be placed there. On 23 September the re-listen ran on the real audio: it heard
+  "We have main engine start" at 3.71–6.47 s, and the silence at 4.21–6.59 s is gone.
+  `npm run relisten -- tos-opening` repeats that check.
 - **The two stopped runs.** The held-out Korean excerpt starts in the middle of a sentence. One
   diagnostic request showed Chirp 3 returning its first three words, "어쩔 수 없고요" ("can't be
   helped"), with start and end both at zero. The synthetic clip, which has no speech, failed the same
@@ -119,8 +126,9 @@ diagnostic speech request cost about $0.010667.
 
 ## The editor at work
 
-The Korean sample track is the automatic run on the opening plus three edits. Each edit made a new
-version and kept the one before it.
+Until 23 September, the Korean sample track was the automatic run of 22 September on the opening plus
+three edits. That track is still in the sample's run list. Each edit made a new version and kept the
+one before it.
 
 1. **A line rewritten.** An editor changed the line at 45.5 s from "40년 후." (40 years later.) to
    "40년 후, 두 사람의 홀로그램이 재생된다." (40 years later, a hologram of two people plays.). The edit
@@ -140,9 +148,40 @@ version and kept the one before it.
    silence is left to read it in. The removal took 75.94 s and $0.045488. A first attempt ended when
    the model provider's stream broke; that call's charge was not reported.
 
-The sample track now has five lines, two of them typed by an editor, and every one passed review and
-fits its room by measured audio. Across the automatic run and the three edits, it took $0.415 in API
-calls, plus the editor's time.
+That track has five lines, two of them typed by an editor, and every one passed review and fits its
+room by measured audio. Across the automatic run and the three edits, it took $0.415 in API calls,
+plus the editor's time.
+
+## The automatic sample track
+
+Since 23 September the app's Korean sample is an automatic run no editor touched
+(`20260923t065852164-ko-standard-350b05`): the opening, Korean narration, standard density, made
+after the fix stage and the third review round were added.
+
+- 7 lines voiced, all inside their silence by measured audio, and 0 s of narration over the speech
+  Chirp 3 recognized. None overlaps faster-whisper's words either.
+- One line, at 63.0 s, failed three reviews and was dropped: "화면이 암전된다." (The screen goes
+  black.) and "암전된다." (It goes black.) were rejected as viewer framing, the second also as not on
+  screen, and "남자가 뇌를 응시한다." (The man stares at the brain.) as redundant and inconsistent
+  naming.
+- The final check sent one line back: "홀로그램 재생창이 뜬다." (A hologram playback window appears.),
+  as viewer framing. Its fix suggested reading the words on screen instead, and Scene rewrote the line
+  to "전체 기억 재생." (Full memory playback.). The rewrite passed review and was voiced in 1.74 s of
+  2.63 s of room.
+- The check left 3 notes, all moments with no free silence left: a credit at 2.0 s, a conversation on
+  a canal bridge at 25.1 s, and a hologram of two people at 39.8 s.
+- It took 8 min 6 s and $0.317 in API calls, reusing the saved hearing and watching. Review, final
+  check included, was $0.276 of that.
+
+Automatic runs of the same sample that day:
+
+| Run                                     | Time        | API cost               | Note                                                                       |
+| --------------------------------------- | ----------- | ---------------------- | -------------------------------------------------------------------------- |
+| `20260923t064439178-ko-standard-837b9f` | 12 min 24 s | $0.453                 | Analysed from scratch; ran a second audit after the fix, since removed     |
+| `20260923t065852164-ko-standard-350b05` | 8 min 6 s   | $0.317                 | The pinned sample; analysis reused                                         |
+| `20260923t070742966-ko-standard-bca29a` | 5 min 11 s  | $0.175, known subtotal | Analysis reused; one rate-limited call has unknown cost; 5 lines, no notes |
+
+These are single runs of one clip, not a re-run of the test above.
 
 ## Reproducing the test
 

@@ -2,10 +2,11 @@
 
 **Descriptions that fit between the lines.**
 
-Scene drafts audio description, the narration that tells blind and low-vision viewers what is on
-screen. It writes each line for one silence between the dialogue, checks it against a published
-audio-description guideline, measures the synthesized voice, and gives an editor a timeline to finish
-the job. It works in Korean and English.
+Scene makes audio description, the narration that tells blind and low-vision viewers what is on
+screen, in one pass. It writes each line for one silence between the dialogue, checks it against a
+published audio-description guideline, measures the synthesized voice, and fixes what a final check
+finds before the track is mixed. An editor can still change any line on a timeline. It works in Korean
+and English.
 
 [Live demo](https://scene-ad-958994530029.asia-northeast3.run.app) |
 [Architecture](docs/ARCHITECTURE.md) | [Evaluation](docs/EVALUATION.md) | [Deploy your own](docs/DEPLOY.md)
@@ -35,9 +36,11 @@ Making one Korean film accessible still takes about three months, about ten spec
   line for one named silence. A separate review pass checks it against eight rules taken from Korea's
   accessible-broadcasting guideline and Netflix's audio-description style guide. Every rejection names
   its rule and the page it comes from.
-- **Voices, measures and hands over.** A Google voice speaks each line, and the length of that audio,
-  not a word count, decides whether it fits. The editor sees every line on a timeline and can rewrite
-  or remove any of them. Only a rewritten line is re-voiced, and every change is checked again.
+- **Voices, measures and fixes.** A Google voice speaks each line, and the length of that audio, not a
+  word count, decides whether it fits. A final check reviews exactly what will be heard, and Scene
+  rewrites the lines it fails and adds lines where silence is still free, without waiting for anyone.
+  An editor can still rewrite or remove any line on the timeline. Only a rewritten line is re-voiced,
+  and every change is checked again.
 
 ## Try it in 60 seconds
 
@@ -47,11 +50,12 @@ Making one Korean film accessible still takes about three months, about ten spec
    seconds of _Tears of Steel_ where nobody speaks. Play **Original sound**, then **With description**,
    and turn on **Hide the picture** to hear it the way a blind viewer would.
 2. Choose **Open the sample** for the full 65 seconds, with Korean and English tracks. Press play, turn
-   on **Eyes closed**, and switch **Description off** and on to compare. In the Korean track, an editor
-   typed two of the five lines and removed a sixth that talked over dialogue.
+   on **Eyes closed**, and switch **Description off** and on to compare. The Korean track is an
+   automatic run no editor touched: seven lines, each inside its silence, one of them rewritten by
+   Scene after the final check sent it back.
 3. Select a narration line on the timeline. You see what the model saw in the scene, every draft, the
    rule that rejected a draft with its guideline page, and the voiced length against the room it had.
-4. Choose **Try your own clip** and upload up to 90 seconds and 30 MB. A new track takes a few minutes.
+4. Choose **Try your own clip** and upload up to 90 seconds and 30 MB. A new track takes several minutes.
    New tracks share a daily allowance on the public demo; when it runs out, the sample keeps playing.
 
 ## How the AI works
@@ -72,39 +76,55 @@ how long it takes to say, and when to stop trying.
    syllables and English in words, calibrated on the narrator's measured pace. A line that starts
    outside the silence it names is dropped, never moved.
 6. **Review.** A separate pass, with its own prompt and rubric, checks every line against the eight
-   rules below and lists important moments no line covers. A rejected line gets one rewrite and is
-   reviewed again. If it still fails, or the rewrite changes nothing, it is dropped.
+   rules below and lists important moments no line covers. A rejected line is rewritten from the
+   reviewer's own fix and reviewed again, up to twice. If it fails a third review, or a rewrite changes
+   nothing, it is dropped.
 7. **Voice and measure.** Text-to-Speech (Chirp 3 HD) speaks each line and Scene measures the audio it
    gets back. A line that is too long but would fit at up to 1.15× speed is voiced again that much
-   faster. Otherwise Gemini shortens it (at most twice), the shorter line goes back through review, and
-   it is voiced again. A line that still does not fit is dropped.
-8. **Final check.** The reviewer audits exactly the lines that will be heard and lists what the
-   finished track still misses. Anything on that list marks the result **Review needed**.
-9. **Mix.** FFmpeg lowers the film by 9 dB under each line and sets the narration to −16 LUFS. You get a
-   described MP4, a narration WAV, a WebVTT text track and a JSON script with every version and verdict.
-10. **Edit.** An editor can rewrite or move any line, bring back one the loop dropped, or remove one.
-    A rewritten line is voiced at normal speed and the whole track is reviewed again. If it runs long
-    or breaks a rule, Scene returns the reason and leaves the editor's words as they are. A removal
-    voices nothing: the other lines keep their audio byte for byte, and the final check runs again on
-    what is left, so anything only that line covered is listed as missing. Every edit makes a new
-    version and keeps the old one.
+   faster. Otherwise Gemini shortens it (at most twice), the shorter line goes back through review with
+   one rewrite left, and it is voiced again. A line that still does not fit is dropped.
+8. **Final check.** The reviewer audits exactly the lines that will be heard, once. It lists lines that
+   break a rule and moments the finished track still misses.
+9. **Fix.** Scene rewrites each failing line from the check's fix, and writes a new line for a missing
+   moment wherever its silence still has free room: from 0.3 s after the last voiced line before it, at
+   least 1.0 s. Both are reviewed and voiced like any other line. The track is not audited a second
+   time; the check's list is updated with the fixes. What it still lists, such as a moment with no free
+   silence left, stays in the result, which reads **Final check · notes**, or **Final check passed**
+   when nothing is listed.
+10. **Mix.** FFmpeg lowers the film by 9 dB under each line and sets the narration to −16 LUFS. You get
+    a described MP4, a narration WAV, a WebVTT text track and a JSON script with every version and
+    verdict.
+11. **Edit, if anyone wants to.** Nothing waits for an editor, but one can rewrite or move any line,
+    bring back one the loop dropped, or remove one. A rewritten line is voiced at normal speed and the
+    whole track is reviewed again. If it runs long or breaks a rule, Scene returns the reason and leaves
+    the editor's words as they are. A removal voices nothing: the other lines keep their audio byte for
+    byte, and the final check runs again on what is left, so anything only that line covered is listed
+    as missing. Every edit makes a new version and keeps the old one.
 
-Every model call returns JSON checked against a schema, and every call is logged with its cost. The
-browser follows the run live over server-sent events.
+Every model call returns JSON checked against a schema, and every call is logged with its cost. One bad
+answer does not end a run: output that does not match its schema is asked for once more, as is a
+review that skips a line or names one it was not given, and a Text-to-Speech call that fails with a
+busy or server error is retried once. A rewrite or shortening the writer leaves out drops that line
+instead; a fix left out after the final check leaves the line as it was voiced. The browser follows the
+run live over server-sent events.
 
-One line from the Korean sample, in the room from 54.2 s to 57.0 s:
+One line from the Korean sample's earlier track (22 September, before the fix step and the second
+rewrite existed), in the room from 54.2 s to 57.0 s:
 
 | Step        | Line                                                                           | What happened                                                                                        |
 | ----------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------- |
 | Draft       | "연구원이 콘솔 앞에 앉아 있다." (A researcher sits at a console.)              | Rejected, _Redundant or low priority_: the large "SIMULATION READY" text on screen matters more.     |
 | Rewrite     | "시뮬레이션 준비 완료라는 문구가 뜬다." (The words "Simulation ready" appear.) | Rejected, _Viewer or camera framing_: "the words appear" narrates the screen. The line was dropped.  |
-| Final check | none                                                                           | Listed the "SIMULATION READY" text as missing. The result read _Review needed_.                      |
+| Final check | none                                                                           | Listed the "SIMULATION READY" text as missing, for an editor to add.                                 |
 | Editor      | "시뮬레이션 준비 완료." (Simulation ready.)                                    | The reviewer's suggested fix, typed by an editor. 2.26 s of speech in 2.80 s of room; passed review. |
 
 The reviewer's first suggestion had led to the rewrite it then rejected, so the reviewer is now told
-that every fix it suggests must pass all eight rules. At the time of that run, the first rejection's
-rule was titled "Redundant with the soundtrack" and cited only KMCC p.8. It now also cites p.7, which
-lists on-screen text among what must be described.
+that every fix it suggests must pass all eight rules. The line the editor typed was the reviewer's
+second fix; a rejected line now gets that second rewrite from Scene itself. In the automatic track
+pinned on 23 September, the first draft for this room was already "시뮬레이션 준비 완료." and passed
+review. At the time of the earlier run, the first rejection's rule was titled "Redundant with the
+soundtrack" and cited only KMCC p.8. It now also cites p.7, which lists on-screen text among what must
+be described.
 
 ### The review rules
 
@@ -159,17 +179,19 @@ flowchart LR
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cloud Run (second-generation environment) | Runs the Next.js app and FFmpeg in one container. Streams each run's progress to the browser.                                                                                                                         |
 | Speech-to-Text v2, Chirp 3                | Times every spoken word. Called at the `us` multi-region, where Chirp 3 is served.                                                                                                                                    |
-| Gemini 3.8 Flash                          | Watches the clip, writes lines, reviews them and runs the final check, with a reasoning level set per stage.                                                                                                          |
+| Gemini 3.8 Flash                          | Watches the clip, writes and rewrites lines, reviews them and runs the final check, with a reasoning level set per stage.                                                                                             |
 | Text-to-Speech, Chirp 3 HD                | Speaks each line with one narrator per language. Scene measures the returned audio.                                                                                                                                   |
 | Cloud Storage                             | Holds clips, saved analysis and every run, mounted into Cloud Run as a volume. The daily allowance and edit requests use conditional writes, so two instances cannot spend the same money or run the same edit twice. |
 | Secret Manager                            | Holds the model API key.                                                                                                                                                                                              |
 | Cloud Build and Artifact Registry         | Build the container from source on every deploy.                                                                                                                                                                      |
 
-More detail, including the review and fit loops, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+More detail, including the review, fit and fix loops, is in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Results
 
-In September 2026 we ran Scene on six openly licensed clips with its default settings.
+On 22 September 2026 we ran Scene on six openly licensed clips with its default settings. These runs
+predate the fix step and the second automatic rewrite (added on 23 September), and we have not re-run
+them since.
 
 | Clip                                       | Narration | Result         | Lines in the finished track      | Time and API cost |
 | ------------------------------------------ | --------- | -------------- | -------------------------------- | ----------------- |
@@ -191,18 +213,21 @@ In September 2026 we ran Scene on six openly licensed clips with its default set
   call at 4.21–6.17 s over the whole clip and at 4.40–6.16 s when that stretch is recognized on its
   own, and a spectrogram shows voice at 4.8–6.3 s. Chirp 3 placed the countdown after it correctly. So
   the line "망고 오픈 무비 프로젝트." (The Mango Open Movie Project.), at 4.50–6.39 s, talks over the
-  call. An editor removed it from the sample track, and Scene now re-listens to every usable silence
-  (step 2 above). A test replays this clip's recorded speech and checks that the silence closes and the line
-  can no longer be placed there; running the re-listen on the real audio is our next check. The five
-  lines left in the sample track overlap neither recognizer's words.
+  call. An editor removed it from that track, and Scene now re-listens to every usable silence (step 2
+  above). On 23 September the re-listen ran on the real audio and heard the call at 3.71–6.47 s, so the
+  silence at 4.21–6.59 s no longer exists and no line can be placed there. The seven lines in the
+  current sample track overlap neither recognizer's words.
 - **With the default reviewer, both scored film clips kept every fixed essential fact.** A cheaper
   reviewer setting lost the "40 years later" time jump in the opening without listing it as missing,
   and marked the Korean interview as checked while both of its essential facts were absent. We kept
   the stricter reviewer.
-- **Scene reports what it missed.** All four finished tracks came back _Review needed_, each with a
-  list of what the editor should add.
-- **A 45–65 second clip takes about 3–6 minutes and $0.13–0.24 in API calls** when nothing has been
-  analysed before. Hosting and storage are not included.
+- **Scene reports what it missed.** In all four finished tracks the final check listed moments still
+  missing. Since 23 September Scene fixes what it can of that list itself (step 9 above) and keeps the
+  rest in the result.
+- **A 45–65 second clip took about 3–6 minutes and $0.13–0.24 in API calls** when nothing had been
+  analysed before. With the fix step and the second rewrite, automatic runs of the 65 s sample on 23
+  September took 5 min 11 s and 8 min 6 s, for $0.175 (a known subtotal) and $0.317, with its analysis
+  already saved. Hosting and storage are not included.
 
 The method, references and every number are in [docs/EVALUATION.md](docs/EVALUATION.md) and
 [`evals/`](evals/).
@@ -219,11 +244,14 @@ Developer Competition winner, already describes video in Korean. What Scene adds
 1. **Every rejection cites a written rule.** The reviewer's eight rules come from Korea's
    accessible-broadcasting guideline and Netflix's style guide, and the editor sees the page next to
    each rejected line. Korean lines are written in the broadcast register and sized in syllables.
-2. **One gate for everything that gets voiced.** Drafts, automatic rewrites, automatic shortenings and
-   the editor's own changes all pass the same review, and ship only if their measured audio fits.
-   Scene never rewrites an editor's words; if they break a rule or run long, it returns the reason.
-3. **It says what it missed.** The final check lists what the finished track still lacks, and the
-   result reads _Review needed_ instead of claiming compliance.
+2. **One gate for everything that gets voiced.** Drafts, automatic rewrites and shortenings, the fixes
+   made after the final check, and the editor's own changes all pass the same review, and ship only if
+   their measured audio fits. Scene never rewrites an editor's words; if they break a rule or run long,
+   it returns the reason.
+3. **It fixes what the final check finds, and lists what it could not.** The final check reviews the
+   finished track once. Scene rewrites the lines it fails and adds lines for missing moments where
+   silence is still free; anything left, such as a moment with no free silence, stays listed in the
+   result instead of being hidden behind a pass.
 
 Competitor facts are from their public pages as of 23 September 2026.
 
@@ -232,12 +260,13 @@ Competitor facts are from their public pages as of 23 September 2026.
 - **Short clips only.** Scene takes clips up to 90 seconds and 30 MB and processes each one within a
   single request. Feature films would need a job queue.
 - **The reviewer is a model.** It is the same model as the writer, with its own prompt and rubric, and
-  it can be wrong. That is why every result lists what may be missing and an editor has the last word.
+  it can be wrong. That is why every result lists what the final check could not fix, and an editor
+  can still change any line.
 - **Speech timing comes from one recognizer.** Over a long stretch, Chirp 3 can attach a phrase to the
   wrong moment, as it did with the launch call in the opening. The per-silence re-listen is built to
-  catch this and is covered by tests on this clip's recorded speech; its first run on the real audio
-  is still to come. Words that Chirp 3 returns without usable times are treated as speech, which can
-  leave less room to describe.
+  catch this. On this clip's real audio it did, on 23 September; it has not yet been checked on other
+  clips. Words that Chirp 3 returns without usable times are treated as speech, which can leave less
+  room to describe.
 - **Not yet tested with blind or low-vision listeners.** Listening sessions and timing an editor against
   writing from scratch are our next steps.
 
@@ -269,7 +298,8 @@ In `.env.local`, set the model API key, `GCP_PROJECT_ID` (your project), and `GC
 `DATA_DIR` defaults to `./runtime`, and `DAILY_BUDGET_USD` caps API spending per UTC day (default 5).
 
 A fresh clone has no finished tracks. Generate one from the page, or from the command line with
-`npm run pipeline -- tos-opening ko standard` (about $0.25 in API calls for the sample). Uploaded clips
+`npm run pipeline -- tos-opening ko standard` (on 23 September, $0.317 in API calls for the sample
+with its analysis already saved; hearing and watching it the first time added $0.04). Uploaded clips
 and generated files stay in `runtime/`, which Git ignores. `npm run relisten -- tos-opening` runs only
 the two hearing passes on a clip's real audio and prints the speech and silences before and after,
 without changing the project (about $0.02 of Speech-to-Text).
@@ -282,7 +312,7 @@ without changing the project (about $0.02 of Speech-to-Text).
 ## Repository map
 
 ```text
-src/lib/pipeline/   the loop: hear, re-listen, watch, find room, write, review, voice (run.ts drives it)
+src/lib/pipeline/   the loop: hear, re-listen, watch, find room, write, review, voice, check, fix (run.ts)
 src/lib/runs/       starting runs, editor changes and removals, the daily allowance
 src/lib/store/      projects, uploads, access cookie, conditional writes
 src/lib/media/      FFmpeg: watching copy, narration track, mix and loudness
