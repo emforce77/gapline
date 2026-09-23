@@ -2,7 +2,7 @@
 
 Scene is one Next.js 16 application with FFmpeg in the same container, deployed on Cloud Run. A clip
 of up to 90 seconds goes in; a described film, a narration track, a text track and a full review log
-come out. This page covers what runs where, the loop that makes each line, how an editor's change or
+come out. This page covers what runs where, the loop that makes each line, how an optional edit or
 removal is applied, and how work and money are protected.
 
 ## What runs on Google Cloud
@@ -83,8 +83,8 @@ The model decides what to say. Code decides where it may be said, whether a line
 it takes to say, and when to stop trying. [`src/lib/pipeline/run.ts`](../src/lib/pipeline/run.ts)
 drives the loop, including the final check and the fix after it; its stages sit next to it:
 `analyze.ts` (hear, re-listen, watch), `cues.ts` (placing lines, and free room in a voiced track),
-`fit-voice.ts` (voicing and fitting) and `finish-run.ts` (mix and summary). A run finishes on its
-own; an editor is optional.
+`fit-voice.ts` (voicing and fitting) and `finish-run.ts` (mix and summary). One press of Generate
+runs every stage through to the mixed track; editing a line afterwards is optional.
 
 ```mermaid
 flowchart TD
@@ -112,7 +112,7 @@ flowchart TD
   fix --> refit["Review with one rewrite left, voice and fit, as above"]
   refit -->|"no second audit; findings updated"| mix
   mix --> out["MP4, WAV, WebVTT and JSON script"]
-  out -.->|"optional"| edit["Editor: change, restore or remove a line (see Editing a line)"]
+  out -.->|"optional"| edit["Edit: change, restore or remove a line (see Editing a line)"]
 ```
 
 1. **Hear and watch run at the same time.** Hearing is the first pass and then the re-listen of each
@@ -167,20 +167,19 @@ and `ledger.jsonl`, one line per paid call with tokens, latency and cost, failed
 
 ## Editing a line
 
-A run does not wait for an editor. Anyone who wants to step in can change a line's words, its start
-time, or both, including a line the automatic loop dropped, or remove a line from the track. This
-flow does not run the fix stage. The code is in
+Editing is optional. You can change a line's words, its start time, or both, including a line the
+automatic loop dropped, or remove a line from the track. This flow does not run the fix stage. The code is in
 [`src/lib/runs/edit-run.ts`](../src/lib/runs/edit-run.ts).
 
 ```mermaid
 flowchart TD
-  pick["Editor picks a line in a finished run"] --> kind{"Change or remove?"}
+  pick["Pick a line in a finished run"] --> kind{"Change or remove?"}
   kind -->|"new words or start"| bounds["Start must sit between the neighbours' measured audio"]
   bounds --> voice["Voice only this line, at normal speed"]
   voice --> fits{"Fits its room?"}
   fits -->|"no"| refuse["Refused: seconds needed and available"]
   fits -->|"yes"| review{"Whole track reviewed again"}
-  review -->|"editor's line breaks a rule"| refuse2["Refused: the reviewer's reason and fix"]
+  review -->|"the new line breaks a rule"| refuse2["Refused: the reviewer's reason and fix"]
   review -->|"passes"| rebuild
   kind -->|"remove a line in the track"| audit["Final check again on the remaining lines"]
   audit --> rebuild["New run: other WAVs reused byte for byte, narration, mix and text track rebuilt"]
@@ -191,22 +190,22 @@ flowchart TD
    finishes, before the next one starts, inside the same silence.
 2. Only the edited line is voiced, at normal speed. If it runs past its room, the edit is refused with
    the exact seconds needed and available.
-3. The whole final script is reviewed again with measured end times. If the editor's line breaks a
-   rule, the edit is refused with the reviewer's reason and fix. Scene never rewrites an editor's words.
+3. The whole final script is reviewed again with measured end times. If the new line breaks a rule,
+   the edit is refused with the reviewer's reason and fix. Scene never rewrites words typed by hand.
 4. An accepted edit becomes a new run that points to its parent. The other lines' WAV files are
    reused byte for byte, the mix and text track are rebuilt, and the before and after text is recorded.
    The original run is kept.
 5. Each edit carries a request ID, claimed with a conditional write. Repeating the same request returns
    the same result; reusing the ID for a different edit is refused.
 
-An editor can also remove a line that is in the track (`{ cueId, action: "remove", requestId }`, same
+A line that is in the track can also be removed (`{ cueId, action: "remove", requestId }`, same
 route, same request-ID rules). Nothing is voiced: the line keeps its history with a last version marked
-removed by the editor, the other lines' WAV files are reused byte for byte, the narration, mix and text
+removed, the other lines' WAV files are reused byte for byte, the narration, mix and text
 track are rebuilt without it, and the final audit runs again on what remains, so anything only that line
 described is listed as missing. A removed line can be put back with an ordinary edit, its own words
 included. Both kinds of edit share [`src/lib/runs/edit-track.ts`](../src/lib/runs/edit-track.ts).
 This is how the line over the opening's launch call was taken out of the sample's earlier, edited
-track ([evaluation](EVALUATION.md#the-editor-at-work)).
+track ([evaluation](EVALUATION.md#edits-on-the-earlier-sample-track)).
 
 ## Saving work and reusing analysis
 

@@ -24,7 +24,7 @@ reads _Final check · notes_. The automatic sample runs of 23 September are unde
   speech Chirp 3 recognized. One of them, in the opening, still talks over dialogue: Chirp 3 had put
   the launch call about 2 s early (see "The opening's launch call").
 - On the two scored film clips, every fixed essential fact made it into the finished track.
-- Every finished track came back _Review needed_, with a list of what the editor should add. On the
+- Every finished track came back _Review needed_, with a list of what the track still missed. On the
   Korean interview, which leaves only 2.46 s of usable silence, both essential facts were missing and
   the final check said so.
 - A 45–65 second clip took 3 min 11 s to 5 min 49 s and $0.13–0.24 in API calls when nothing had been
@@ -87,13 +87,15 @@ After seeing the first two rows, we did not run the cheaper setting on the held-
   6.84–8.92 s, "1" at 9.28–9.76 s). The line "망고 오픈 무비 프로젝트." (The Mango Open Movie Project.),
   voiced at 4.50–6.39 s in a silence Scene had found at 4.21–6.59 s from Chirp 3's timings, talks
   over the call. The sample track's other lines overlap neither recognizer's words.
-- **What we changed.** An editor removed that line from the sample track of the time (see "The editor
-  at work"). Scene now recognizes every usable silence a second time, on its own
+- **What we changed.** Scene now recognizes every usable silence a second time, on its own
   ([architecture](ARCHITECTURE.md#what-runs-on-google-cloud)). A test replays this clip's recorded
   first pass with the call at 4.40–6.16 s and checks that the silence at 4.21–6.59 s closes and the
-  line can no longer be placed there. On 23 September the re-listen ran on the real audio: it heard
-  "We have main engine start" at 3.71–6.47 s, and the silence at 4.21–6.59 s is gone.
-  `npm run relisten -- tos-opening` repeats that check.
+  line can no longer be placed there. On 23 September the re-listen ran on the real audio, in run
+  `20260923t064439178-ko-standard-837b9f`: of 6 silences recognized again, one held 5 new words, "We
+  have main engine start" at 3.71–6.47 s, which closed the 2.38 s silence at 4.21–6.59 s. The sample
+  track reuses that hearing and has no line there. `npm run relisten -- tos-opening` repeats that
+  check. (On the earlier sample track the line was removed by hand; see "Edits on the earlier sample
+  track".)
 - **The two stopped runs.** The held-out Korean excerpt starts in the middle of a sentence. One
   diagnostic request showed Chirp 3 returning its first three words, "어쩔 수 없고요" ("can't be
   helped"), with start and end both at zero. The synthetic clip, which has no speech, failed the same
@@ -124,23 +126,23 @@ The whole test, ten runs including the three that stopped, cost $0.847577 in Gem
 $0.134520 in Google speech at list price: $0.982097 in total. Every charge was known. One separate
 diagnostic speech request cost about $0.010667.
 
-## The editor at work
+## Edits on the earlier sample track
 
 Until 23 September, the Korean sample track was the automatic run of 22 September on the opening plus
 three edits. That track is still in the sample's run list. Each edit made a new version and kept the
 one before it.
 
-1. **A line rewritten.** An editor changed the line at 45.5 s from "40년 후." (40 years later.) to
+1. **A line rewritten.** We changed the line at 45.5 s from "40년 후." (40 years later.) to
    "40년 후, 두 사람의 홀로그램이 재생된다." (40 years later, a hologram of two people plays.). The edit
    took 67.83 s and $0.041100 in API calls.
 2. **A dropped line filled.** The automatic loop had dropped the line at 54.2 s: the reviewer rejected
    "연구원이 콘솔 앞에 앉아 있다." (A researcher sits at a console.) because the "SIMULATION READY" text
    mattered more, then rejected the rewrite "시뮬레이션 준비 완료라는 문구가 뜬다." (The words "Simulation
-   ready" appear.) as viewer framing. An editor typed the reviewer's suggested fix, "시뮬레이션 준비
+   ready" appear.) as viewer framing. We typed the reviewer's suggested fix, "시뮬레이션 준비
    완료." (Simulation ready.). It was voiced in 2.26 s with 2.80 s of room and passed review. The track
    then had six lines, and the other five audio files were reused unchanged. The edit took 96.49 s
    and $0.088032, and the final check listed one missing moment.
-3. **A line removed.** After the launch-call check above, an editor removed "망고 오픈 무비 프로젝트."
+3. **A line removed.** After the launch-call check above, we removed "망고 오픈 무비 프로젝트."
    (The Mango Open Movie Project.). Nothing was voiced: the five remaining audio files were reused
    byte for byte, the mix and text track were rebuilt, and the final check ran again. It now lists
    three missing moments, among them the "the Mango Open Movie project" title the removed line had
@@ -148,38 +150,47 @@ one before it.
    silence is left to read it in. The removal took 75.94 s and $0.045488. A first attempt ended when
    the model provider's stream broke; that call's charge was not reported.
 
-That track has five lines, two of them typed by an editor, and every one passed review and fits its
-room by measured audio. Across the automatic run and the three edits, it took $0.415 in API calls,
-plus the editor's time.
+That track has five lines, two of them typed by hand, and every one passed review and fits its room
+by measured audio. Across the automatic run and the three edits, it took $0.415 in API calls, plus
+the time spent editing. Since 23 September the automatic loop rewrites a rejected line a second time
+itself, and the fix stage acts on what the final check finds.
 
 ## The automatic sample track
 
-Since 23 September the app's Korean sample is an automatic run no editor touched
+Since 23 September the app's Korean sample is one automatic run
 (`20260923t065852164-ko-standard-350b05`): the opening, Korean narration, standard density, made
-after the fix stage and the third review round were added.
+after the fix stage and the third review round were added. It was started from the command line
+(`npm run pipeline`), which calls the same run code as the Generate button.
 
 - 7 lines voiced, all inside their silence by measured audio, and 0 s of narration over the speech
   Chirp 3 recognized. None overlaps faster-whisper's words either.
 - One line, at 63.0 s, failed three reviews and was dropped: "화면이 암전된다." (The screen goes
-  black.) and "암전된다." (It goes black.) were rejected as viewer framing, the second also as not on
-  screen, and "남자가 뇌를 응시한다." (The man stares at the brain.) as redundant and inconsistent
+  black.) and "암전된다." (Goes black.) were rejected as viewer framing, the second also as not on
+  screen, and "남자가 뇌를 응시한다." (The man gazes at the brain.) as redundant and inconsistent
   naming.
-- The final check sent one line back: "홀로그램 재생창이 뜬다." (A hologram playback window appears.),
-  as viewer framing. Its fix suggested reading the words on screen instead, and Scene rewrote the line
-  to "전체 기억 재생." (Full memory playback.). The rewrite passed review and was voiced in 1.74 s of
+- The final check sent one line back: "홀로그램 재생창이 뜬다." (A hologram playback window comes up.),
+  which had passed review and been voiced in 2.32 s, as viewer framing. Its fix suggested reading the
+  words on screen instead ("MEMORY PLAYBACK - GLOBAL" at 48.5 s), and Scene rewrote the line to
+  "전체 기억 재생." (Full memory playback.). The rewrite passed review and was voiced in 1.74 s of
   2.63 s of room.
-- The check left 3 notes, all moments with no free silence left: a credit at 2.0 s, a conversation on
-  a canal bridge at 25.1 s, and a hologram of two people at 39.8 s.
-- It took 8 min 6 s and $0.317 in API calls, reusing the saved hearing and watching. Review, final
-  check included, was $0.276 of that.
+- The fix stage added no line (`finalFix`: 1 failing, 3 missing, 1 rewritten, 0 added), and the check
+  left 3 notes. A conversation on a canal bridge at 25.1 s and a hologram of two people at 39.8 s have
+  no free silence left. The credit at 2.0 s, "블렌더 재단 제공." (Presented by the Blender Foundation.),
+  had 1.0 s of free room (1.07–2.07 s by `freeRoom`), yet no line was added there. We have not
+  checked why.
+- It took 8 min 6 s and $0.317 in API calls. Review, final check included, was $0.276 of that (87%).
+  Hearing and watching were reused from run `20260923t064439178-ko-standard-837b9f`, started
+  14 minutes earlier on the same clip: $0.039 (first pass $0.019, re-listen $0.010, watching $0.011)
+  and 25 s, with hearing (then its re-listen) and watching running side by side. With them the track
+  cost $0.357, or $0.33 per minute of film.
 
 Automatic runs of the same sample that day:
 
-| Run                                     | Time        | API cost               | Note                                                                       |
-| --------------------------------------- | ----------- | ---------------------- | -------------------------------------------------------------------------- |
-| `20260923t064439178-ko-standard-837b9f` | 12 min 24 s | $0.453                 | Analysed from scratch; ran a second audit after the fix, since removed     |
-| `20260923t065852164-ko-standard-350b05` | 8 min 6 s   | $0.317                 | The pinned sample; analysis reused                                         |
-| `20260923t070742966-ko-standard-bca29a` | 5 min 11 s  | $0.175, known subtotal | Analysis reused; one rate-limited call has unknown cost; 5 lines, no notes |
+| Run                                     | Time        | API cost               | Note                                                                                         |
+| --------------------------------------- | ----------- | ---------------------- | -------------------------------------------------------------------------------------------- |
+| `20260923t064439178-ko-standard-837b9f` | 12 min 24 s | $0.453                 | Analysed from scratch, reused by the sample; ran a second audit after the fix, since removed |
+| `20260923t065852164-ko-standard-350b05` | 8 min 6 s   | $0.317                 | The pinned sample; analysis reused                                                           |
+| `20260923t070742966-ko-standard-bca29a` | 5 min 11 s  | $0.175, known subtotal | Analysis reused; one rate-limited call has unknown cost; 5 lines, no notes                   |
 
 These are single runs of one clip, not a re-run of the test above.
 

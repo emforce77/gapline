@@ -7,36 +7,79 @@ captions) into `runtime/demo-v3/<lang>/`: `scene-demo-<lang>.mp4`, `_check.md`, 
 `.srt`. There is no presenter voice (the owner found the synthetic narration worse than none,
 2026-09-23): captions tell the story and the only sound is the film's own. The story follows the deck
 (`scripts/deck`, direction "Screening room"): hook with eyes closed, the same seconds with Scene, why
-now, the constraint, the product in the app (upload and Generate, the saved automatic run replayed,
-a line a check sent back and Scene rewrote from the reviewer's fix, the measured fit and playback,
-and an editor's change shown as the option it is), Google Cloud, evidence, close.
+now, the constraint, the product in the app (upload, and one press of Generate running every step;
+the saved automatic run replayed; a line the final check sent back and Scene rewrote from the
+check's fix; the measured fit and playback; the optional edit, offered once), Google Cloud,
+evidence, close.
 
-- The app scenes show one automatic run of the sample, made end to end with no editor (`SAMPLE_RUN`
-  in `config.ts`; `runtime/showcase.json` pins the same run for the app). `sample.ts` reads it and
-  refuses a run with an editor's line; `facts.ts` adds the evaluation (deck data modules) and the
-  outside facts (`scripts/deck/facts.ts`). Nothing on screen or in a caption is typed by hand. The
-  Gemini access wording is `GEMINI_ACCESS_LABEL` (src/lib/models.ts).
+- The app scenes show the one automatic run `runtime/showcase.json` pins for the app, the film and
+  the deck (`SAMPLE_RUN` in `config.ts`, read through `scripts/deck/data/runs.ts`). `facts.ts` reads
+  the sample from `scripts/deck/data/sample.ts` (with the reused hearing and watching in
+  `data/analysis.ts`), the evaluation from the deck's other data modules and the outside facts from
+  `scripts/deck/facts.ts`; it checks that the film's line is the one the final check sent back.
+  Nothing on screen or in a caption is typed by hand. "One press" is a product claim: the sample was
+  started from the command line through the same path as Generate. The Gemini access wording is
+  `GEMINI_ACCESS_LABEL` (src/lib/models.ts).
 - Timing (`timing.ts`): each caption (up to two lines) stays up 0.5 s plus its characters at 17 per
   second in English and 10 in Korean (below the Netflix timed-text maxima of 20 and 12, since the
-  picture changes underneath), never under 1.8 s. Scenes are as long as their captions, pauses and
-  film sound; the recorder and the pages key their moves to caption sentence starts.
-- Captions (`ass.ts`): Pretendard Medium 41 px in the band under the picture, fading in and out. A
+  picture changes underneath), never under 1.8 s; 0.2 s before a scene's first caption, 0.1 s
+  between sentences, 0.4 s around film sound. Scenes are as long as their captions, pauses and film
+  sound; the recorder and the pages key their moves to caption sentence starts.
+- Picture and band (`config.ts`): the picture area is 1920×880, the caption band 880–1080 (200 px,
+  solid dark, no box).
+- Captions (`ass.ts`): Pretendard SemiBold 50 px (cap height about 28 px). Each line is its own
+  event, 60 px apart; the last line sits on the 5% title-safe line (y 1026, descenders 56 px above
+  the frame's foot, measured), and a one-line caption takes the lower line. They fade in and out. A
   sentence becomes one two-line caption when a break fits both lines (42 characters English, 26
   Korean), else several; breaks keep names, counted numbers and Korean bound words together, never
   end a line on an article or preposition, and prefer a clause end or a conjunction at the start of
-  the second line. `groups` on a caption sets them by hand where a list defeats the rules.
-- Motion scenes are HTML pages in the deck's theme, rendered frame by frame in headless Chrome and
-  piped into FFmpeg (`motion.ts`, `pages/`). The cloud scene (`pages/cloud.ts`) is drawn in hairlines:
-  the Cloud Run outline, one line lighting the run's stages in order with the model each calls, the
-  two loops that send a line back, then Cloud Storage and the live progress stream; arrowheads ride
-  the drawn end of each line, and a slow push-in keeps the picture moving while it is read.
-- App scenes are recorded at device scale 2 (2880×1440 frames, 1440×720 CSS viewport). The recorder
-  logs element boxes, camera shots and overlays in film time (`recorder-kit.ts`); `camera.ts` turns
-  them into eased scale+crop filters; overlays (spotlight, service chips, labels) are ASS drawings,
-  because this FFmpeg has no drawtext.
+  the second line. `groups` on a caption sets them by hand where a list defeats the rules. The
+  reveal has no captions of its own: `segments.ts` sets its label, Scene's amber lines (with the
+  English translation in the English film) and the film's dialogue (with a Korean line under it in
+  the Korean film) inside the band.
+- Language: every word on screen follows the film's language, except product names (Cloud Run,
+  Gemini, Speech-to-Text, Chirp 3, Text-to-Speech, Cloud Storage), the URL, the film credit and the
+  film's own dialogue. Pages get `PageTiming.lang`; the app is recorded in the film's language (the
+  `scene_lang` cookie, buttons and stage names from the app's own dictionary); the labels the film
+  draws over the app are in `labels.ts`.
+- Motion scenes are HTML pages in the deck's theme, drawn on 1920×880, rendered frame by frame in
+  headless Chrome and piped into FFmpeg (`motion.ts`, `pages/`). The cloud scene (`pages/cloud.ts`)
+  is drawn in hairlines: the Cloud Run outline, one line lighting the run's stages in order (Hear,
+  Watch, Write, Review, Voice, Check, Fix, Mix) with the model each calls, the loops that send a line
+  back, then Cloud Storage and the live progress stream; arrowheads ride the drawn end of each line,
+  and a slow push-in keeps the picture moving while it is read.
+- App scenes are recorded at device scale 2 (2880×1320 frames, 1440×660 CSS viewport, the picture
+  area's aspect). The recorder logs element boxes, camera shots and overlays in film time
+  (`recorder-kit.ts`); `camera.ts` turns them into eased scale+crop filters; overlays (spotlight,
+  service chips, labels) are ASS drawings, because this FFmpeg has no drawtext. Every box is read
+  after the page settles, and each spotlight is read again as it lights up: below 90% overlap the
+  recording fails.
 - Waits (upload preparation, the saved run's replay) are squeezed, and every squeezed stretch carries
-  a label with its real length. Film playback in the app stays at 1×; its sound is laid from the
-  page's own media log. One shared gain brings all the film excerpts together to -16 LUFS.
+  a label with its real length. `clock.pace()` lands each stage of the replay on the sentence that
+  names it (a stretch is slowed at most 5×). The upload's shortened stretch ends when the upload is
+  answered; the page change, the new workspace's first paint and the switch to Korean narration (a
+  new workspace opens in the page's language) all fall inside it. Replay is pressed before its scene
+  starts, so the scene opens on the reset stage list with the app's speed badge out of shot.
+- Camera (`camera.ts`, `beats.ts`): moves take 1.2 s; close-ups are placed so their edges fall
+  between lines of text; wherever a scene holds still, a slow push-in ("drift", at most 8% closer)
+  runs, which spotlights and chips follow frame by frame and which stops before it would cut a line
+  the shot showed whole. The recording's CSS (`recorder-kit.ts`) hides the model's scene memo
+  (`.scene-evidence`) and turns off scroll anchoring, which had jumped the page 645 px at the end of
+  the replay. The reveal's amber lines appear at each line's voice onset (`onset` in
+  `scripts/deck/data/sample.ts`: the first 10 ms window within 30 dB of the file's peak).
+- Result playback: the scene starts on a freshly loaded run page. `segments.playbackExcerpt()` is
+  the one source of the excerpt's start, trim and length for both the sound (`mix.ts`) and the
+  picture: `playbackOverlay()` lays `described.mp4` over the player's measured video box (rounded
+  corners, last frame held), so a stall in the page cannot freeze the film. The sound starts at
+  `LISTEN.from` (a second before the line, or 0.15 s after the previous line's voice if that is
+  later: 46.59 s for Line 5), while the picture starts where the
+  page's "Play from here" does; the line's tag comes up with its voice. The scene ends at the
+  later of its plan and the excerpt's end plus 0.3 s. One shared gain brings all the film excerpts
+  together to -16 LUFS.
+- Sync is measured, not assumed (`check.ts`): each excerpt is found in the finished film's sound by
+  cross-correlation (10 ms loudness envelopes within ±3 s of its place, then sample by sample), and
+  video frames are counted. More than 40 ms off, a match below 0.5, or a sound track more than one
+  frame shorter than the picture fails the check note and makes `npm run demo` exit 1.
 - Nothing paid is started: Generate is only hovered, the edit is typed but never submitted, and
   requests that could start a paid run or edit are aborted (the recording fails if one was
   attempted).
@@ -51,26 +94,33 @@ npm run demo -- en build    # about 4 minutes
 ```
 
 Both steps are free. The app scenes are recorded from a production build of this repo on
-127.0.0.1:21961 (`LOCAL_URL`), reading the same `runtime/` data as the dev server:
+127.0.0.1:21961 (`LOCAL_URL`), reading the `runtime/` data through a folder of links that leaves out
+`budget/`. With the day's live allowance spent, the workspace shows a notice in the upload card,
+under Generate and above the stage list. The recording never spends, so the server it records from
+gets no `budget/`:
 
 ```sh
+REC_DATA=<any folder outside runtime/>
+mkdir -p "$REC_DATA"
+for e in runtime/*; do [ "${e##*/}" = budget ] || ln -sfn "$PWD/$e" "$REC_DATA/"; done
 NEXT_DIST_DIR=.next-verify npm run build
 cp -r .next-verify/static .next-verify/standalone/.next-verify/static
 cp -r public .next-verify/standalone/public
-cd .next-verify/standalone && DATA_DIR=$PWD/../../runtime PORT=21961 HOSTNAME=127.0.0.1 \
+cd .next-verify/standalone && DATA_DIR="$REC_DATA" PORT=21961 HOSTNAME=127.0.0.1 \
   FFMPEG_PATH=<the FFMPEG_PATH of .env.local> node server.js
 ```
 
-When the day's live allowance is spent, the workspace shows a notice and disables Generate; the
-films of 2026-09-23 were recorded with `DATA_DIR` pointing at a folder that links every entry of
-`runtime/` except `budget/` (the recording never spends). Repeat both steps for `ko`. The record step
-must follow any caption change, because each app scene is timed by its captions.
+Before it records, `record.ts` asks the server's `/api/live-status` and stops when a run could not
+start there (the notice would be in the picture). Repeat both steps for `ko`. The record step must
+follow any caption change, because each app scene is timed by its captions.
 
-The check note fails (unchecked box) on: length 180 s or more, loudness more than 1.5 LU from
--16 LUFS, a frozen stretch over 4 s in the picture area, a caption faster than the reading pace or
-shorter than 1.8 s, a line over the caption limit, more than 6 s with neither a caption nor film
-sound, and the development Gemini label (`GEMINI_ACCESS_LABEL` naming OpenRouter) on the cloud page.
-It never ticks the human watch-through.
+The check note fails (unchecked box) on: length 180 s or more, a film excerpt heard more than
+40 ms from its place or a sound track shorter than the picture (the build then exits 1), loudness
+more than 1.5 LU from -16 LUFS, a frozen stretch over 4 s in the picture area, a caption faster
+than the reading pace or shorter than 1.8 s, a line over the caption limit, more than 6 s with
+neither a caption nor film sound, a recording made where `/api/live-status` said no run could start
+(kept as `liveAllowance` in `source.json`), and the development Gemini label (`GEMINI_ACCESS_LABEL` naming
+OpenRouter) on the cloud page. It never ticks the human watch-through.
 
 ## Debug log
 
@@ -119,12 +169,61 @@ It never ticks the human watch-through.
 - [2026-09-23] The sample changed from the edited track to an automatic run made with the final
   check's fix stage (20260923t065852164-ko-standard-350b05). A first run of that day
   (…064439178…) was not used: it still audited the track a second time, which listed its own fix as
-  failing again, so the screen contradicted "fixed by itself".
+  failing again, so the screen contradicted "fixed by itself". The sample reused that run's hearing
+  and watching (same clip; speech, scene and gaps equal field for field); wherever the film prints
+  the sample's 8 min 6 s and $0.32 it says so (+$0.04, 25 s). `scripts/demo/sample.ts` moved to
+  `scripts/deck/data/sample.ts`; the dialogue total is now the union of both listens (30.83 s, was
+  a sum of 31.08 s that counted 0.25 s twice).
+- [2026-09-23] Sound 2.70 s early. Symptom: the owner reported the sound out of sync.
+  Measured on the finished files by cross-correlation: every excerpt heard 2.695 s early in both
+  films (EN sound 168.000 s against 170.700 s of picture). Cause: `adelay` pads each excerpt with
+  silence up to its start, but on a file input cut by `atrim` that silence carries no timestamps
+  (FFmpeg 7.0.2) and `amix` dropped it, so the track started at the first excerpt. Fix:
+  `aresample=async=1:first_pts=0` after `amix` (the only change to the filter graph). Re-mixed on the
+  same inputs: every excerpt +5.0 ms, sound 170.709 s against 170.700 s (KO 163.883 / 163.867 s). The
+  check now measures this and fails the build.
+- [2026-09-23] Result playback froze for 2.02 s at media 48.125 s in 3 of 3 takes when the result
+  scene reused the page after the replay and review scenes. Not the network (40–59 s buffered before
+  Play, no waiting event) and not the screencast or the cursor script alone (A/B probes, no gap over
+  0.22 s). With the result scene on a freshly loaded page: 0 of 3 froze (largest gap 0.15–0.27 s).
+  Root cause still unconfirmed. The film is now laid over the player from the source file (94 of 94
+  frames matched during the listen, the frame shown a median 19.7 ms behind the sound), so a stall
+  would only lag the page's strip and clock under the player; the recorder warns when it sees one.
+- [2026-09-23] tsx wraps named functions in `__name()`, which does not exist in the page: a named
+  function sent into `page.evaluate` failed (the video box probe). Code sent into the page uses no
+  named inner functions (the deck adds a `window.__name` shim instead).
+- [2026-09-23] Captions were 41 px Medium in a 120 px band; the owner found the film's text
+  unfriendly. The band grew to 200 px (`CONTENT_HEIGHT` 960 → 880; recording viewport 1440×720 →
+  1440×660 to keep the picture's aspect), and captions are 50 px SemiBold, one event per line at a
+  60 px pitch (56 px above the foot, measured). The rewritten captions planned EN at 183.3 s; shorter
+  gaps and four shortened English captions brought it to 172.1 s (KO 168.6 s).
+- [2026-09-23] The 19:43 (EN) and 19:50 (KO) recordings were made with `budget/` in `DATA_DIR`:
+  five demo reservations of that day had used up the live allowance, so the spent-allowance notice
+  ("Today's live allowance is used up … renews in 13 hours") showed in the upload card, under the
+  spotlit Generate button while the caption said one press does the rest, and above the stage list
+  (found on extracted frames by the verification panel). The Production note said the films had
+  been recorded without `budget/`; nothing checked it. `record.ts` now asks `/api/live-status`
+  before recording and stops when `canStart` is false.
+- [2026-09-23] The same round's framing fixes, measured on dry runs against the dev server (GET
+  only, nothing recorded into `demo-v3`): the English replay's 5.2 s still stretch is gone (the drift
+  over the stage list; longest still stretch now 2.43 s EN and 2.17 s KO, in review), and every app
+  scene ran within 0.01 s of its plan. One dry run crashed on a screencast frame acknowledged after
+  the screencast stopped; `record.ts` now ignores frames that arrive after the stop.
 
 ## Status
 
-Rebuilt on 2026-09-23 without the presenter voice, around the automatic sample run; the current
-`_check.md` of each film lists what it meets. Open: the development Gemini label (until the switch to
-Google AI Studio), the human watch-through, and the Cloud Run URL on the close page, which answers
-again only after a redeploy under the same service name. Tests: `tests/demo-captions.test.ts`
-(caption breaks, given groups, reading-time plan).
+2026-09-23: the films in `runtime/demo-v3/` (recorded 19:43 EN and 19:50 KO, built 19:47 and 19:54)
+are in sync. Raw-sample cross-correlation against the source clips puts every excerpt +1.6 to
++8.9 ms from its place (EN dark/reveal/result +5.0/+5.0/+1.6 ms, KO +5.0/+5.0/+8.9 ms, match at
+least 0.995); the build's own check reads +5 ms on each. Lengths: EN 172.2 s, KO 168.6 s. The
+English check note fails its still-picture box (5.2 s at 89.1–94.3 s against 4 s; KO 4.0 s, passes).
+Both films show the spent-allowance notice under Generate (debug log), and the verification round
+asked for caption, page and app-text changes, so both must be recorded and built again
+(`npm run demo -- en all`, then `ko`) from a `DATA_DIR` without `budget/`. With those changes in,
+`planScene` plans EN 164.8 s and KO 165.6 s (frame-rounded). Each record step leaves a
+private `u-*` upload project in `runtime/projects/`.
+Open: the development Gemini label (until the switch to Google AI Studio), the human watch-through,
+and the Cloud Run URL on the close page, which answers again only after a redeploy under the same
+service name. Tests: `tests/demo-captions.test.ts` (caption breaks, geometry, reading pace, wording,
+Korean pages) and `tests/demo-sync.test.ts` (excerpt location, mix graph, pacing, spotlights,
+overlay geometry, Korean labels); both need the gitignored `runtime/`.
