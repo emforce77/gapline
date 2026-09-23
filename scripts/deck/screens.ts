@@ -188,7 +188,7 @@ export async function captureScreens(browser: Browser): Promise<string[]> {
   const left = (await boxOf(switches.first())).x - CROP_PAD;
   const controlsCrop = around(await boxOf(switches.first()), await boxOf(switches.last()));
   const eyesClosed = inside(
-    await boxOf(controls.getByRole("button", { name: "Eyes closed", exact: true })),
+    await boxOf(controls.getByRole("button", { name: UI.workspace.eyesClosed, exact: true })),
     controlsCrop,
     "the Eyes closed button",
   );

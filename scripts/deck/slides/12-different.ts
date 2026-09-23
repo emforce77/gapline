@@ -46,13 +46,13 @@ export function differentSlide(): string {
     SCENE_ROW.length !== COMPARE_COLUMNS.length
   )
     throw new Error("comparison rows and columns disagree");
-  // The legend says a "No" comes from the vendor's own code: only the open-source row has one.
-  if (
-    COMPETITORS.some(
-      (c) => !c.name.includes("open source") && c.cells.some((x) => x.support === "no"),
-    )
-  )
-    throw new Error("a 'No' outside the open-source row; the legend says we read it in their code");
+  // The legend names the one competitor whose "No" we read in its own code: the open-source row.
+  const withNo = COMPETITORS.filter((c) => c.cells.some((x) => x.support === "no"));
+  if (withNo.length !== 1 || !withNo[0].name.includes("open source"))
+    throw new Error(
+      "a competitor's 'No' outside the open-source row; the legend says we read it in its code",
+    );
+  const readInCode = withNo[0].name.split(",")[0];
   const scene = note(
     `Every line, and every rewrite, shortening and fix, is reviewed against the same ${RULE_IDS.length} rules and must fit its measured room; so is a line a person changes. Guidelines: KMCC (Korea Media &amp; Communications Commission) accessible-broadcasting guideline, audio description section; Netflix Audio Description Style Guide v2.5. The final check’s list of what a track misses is written by a model. Standard (inline) description only; clips up to ${MAX_UPLOAD_SECONDS} s.`,
   );
@@ -79,7 +79,7 @@ export function differentSlide(): string {
   <thead><tr><th></th>${head}</tr></thead>
   <tbody>${rows}<tr class="scene"><th>Scene${scene}</th>${SCENE_ROW.map(cell).join("")}</tr></tbody>
 </table>
-<p class="df-legend">— = not published · No = checked in their open-source code${vendors}</p>
+<p class="df-legend">— = not published · ${esc(readInCode)}’s No = checked in its code${vendors}</p>
 </div>`,
   });
 }

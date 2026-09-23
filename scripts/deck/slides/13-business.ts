@@ -41,7 +41,10 @@ export function businessSlide(): string {
     throw new Error("a price or cost falls outside the chart's axis");
 
   const pays = note(
-    `Who pays, and a price below human-written description, are our hypotheses, not yet tested with a buyer. The 2017 ruling tied cinemas’ duty to films whose producer or distributor supplies the file; Korean films mostly get one through KOFIC’s programme, so we start with foreign films. Streaming has had a duty to make efforts since June 2026.`,
+    `Who pays, and a price below human-written description, are our hypotheses, not yet tested with a buyer. The 2017 ruling tied cinemas’ duty to films whose producer or distributor supplies the file. Streaming has had a duty to make efforts since June 2026.`,
+  );
+  const program = note(
+    `The Korean Film Council (KOFIC) runs the barrier-free program behind the 2025 count, for Korean releases (${esc(KOFIC_2025.source)}). Korean films mostly get their description file through it, so we start with foreign films.`,
   );
   const serves = note(
     `${esc(AUDIENCE.koreansRegistered.replace(/^a/, "A"))} registered: ${esc(AUDIENCE.koreaSource)}. Nearly two in three (${esc(AUDIENCE.asiaPacificShare)}) of the world’s ${esc(AUDIENCE.worldBlind)} blind people live in Asia-Pacific: ${esc(AUDIENCE.worldSource)}.`,
@@ -93,7 +96,7 @@ export function businessSlide(): string {
 <div class="intro"><h1 class="headline" style="max-width:1500px">Our bet: whoever supplies a film’s description file would pay Scene to make it.</h1></div>
 <dl class="bz-who-list" style="left:${MARGIN}px;top:${CHART.top - 30}px">
   <dt>Would pay</dt><dd>Foreign-film distributors and streaming services${pays}</dd>
-  <dd class="bz-why">Foreign films have no public programme</dd>
+  <dd class="bz-why">A public program covers Korean films${program}</dd>
   <dt>Runs it</dt><dd>Teams preparing accessible versions</dd>
   <dt>Benefits</dt><dd>Blind and low-vision viewers: ${esc(AUDIENCE.koreansRegistered)} in Korea${serves}</dd>
 </dl>

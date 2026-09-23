@@ -140,7 +140,7 @@ ${caption("Eyes closed: listen as its audience will", controls.left, ROW_TOP, co
 ${crop(controls)}${ring(controls, callouts.eyesClosed.box)}
 ${caption(`Each line in the silence it fits${shots}`, timeline.left, timelineTop - CAPTION_H, timeline.width)}
 ${crop(timeline)}
-${caption("Sent back by the final check, rewritten by Scene", lineShot.left, ROW_TOP, lineShot.width)}
+${caption("Scene rewrote the line the final check sent back", lineShot.left, ROW_TOP, lineShot.width)}
 ${crop(lineShot)}${ring(lineShot, callouts.fixed.box)}
 <p class="body pd-body" style="left:${px(rightX)};top:${px(bodyTop)};width:${px(lineShot.width)}">Want different words? You can still edit any line; Scene re-voices just that one and checks the track again.${edit}</p>
 <p class="tag pd-figures" style="left:${px(rightX)};top:${px(figuresTop)};width:${px(lineShot.width)}">Sample: ${summary.lines} lines in ${minutesSeconds(summary.seconds)} for ${usd(summary.costUsd)} in API calls; the clip’s hearing and watching came from an earlier run.${figures}</p>`,

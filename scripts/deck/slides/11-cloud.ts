@@ -3,9 +3,9 @@
  * path (Cloud Build into Artifact Registry), the Cloud Run service and its container with the stages
  * in the order the pipeline runs them (src/lib/pipeline/run.ts: the final check, then Fix, then Mix)
  * and the Google AI API each one calls, Cloud Storage with what it keeps and its promise that each
- * dollar is spent once (the conditional writes behind it are in the note; the volume mount is in the
- * service's note) and Secret Manager; the browser outside, fed by server-sent events; what the live service does for its
- * visitors. Service settings are read from
+ * paid step runs once (the saved analysis and the conditional writes behind it are in the note; the
+ * volume mount is in the service's note) and Secret Manager; the browser outside, fed by server-sent
+ * events; what the live service does for its visitors. Service settings are read from
  * deploy/cloud-run.sh and the Gemini access wording from GEMINI_ACCESS_LABEL (src/lib/models.ts), the
  * one place it may change.
  */
@@ -71,7 +71,7 @@ export function cloudSlide(): string {
     `From the deploy script: ${SPEC.env}, ${SPEC.cpu} vCPU, ${SPEC.memory}, concurrency ${SPEC.concurrency}, ${SPEC.min}–${SPEC.max} instances, the bucket mounted as a volume, the model key from Secret Manager; built from source by Cloud Build into Artifact Registry.`,
   );
   const storage = note(
-    "Holds clips, saved analysis and every run and version. A budget reservation or an edit request is claimed by writing an object only if its generation still matches (ifGenerationMatch), so two tabs cannot spend the same dollar or make the same edit twice. Each paid call is logged with its cost.",
+    "Holds clips, every run and version, and each clip’s hearing and watching, which its later runs reuse. A budget reservation or an edit request is claimed by writing an object only if its generation still matches (ifGenerationMatch), so two tabs cannot spend the same dollar or make the same edit twice. Each paid call is logged with its cost.",
   );
   const apis = note(
     `Speech-to-Text v2, Chirp 3, called in the “us” multi-region: Google lists Chirp 3 only in the us and eu multi-regions (Chirp 3 model page, read 23 Sep 2026). The whole clip in 55 s chunks, then each silence again on its own. Text-to-Speech, Chirp 3 HD voice Charon. Gemini access: ${esc(GEMINI_ACCESS_LABEL)}.`,
@@ -163,7 +163,7 @@ ${chips}
 ${box(STT, "Speech-to-Text v2, Chirp 3", ["word timings, heard twice"])}
 ${box(GEMINI, GEMINI_NAME, [`<span class="cl-aside">${esc(GEMINI_ACCESS_LABEL)}</span>`, "watches, writes, checks, fixes"])}
 ${box(TTS, "Text-to-Speech, Chirp 3 HD", ["voices each line"])}
-${box(STORAGE, `Cloud Storage${storage}`, ["uploads, tracks and every version", "each dollar spent once"])}
+${box(STORAGE, `Cloud Storage${storage}`, ["uploads, tracks and every version", "each paid step runs once"])}
 ${box(SECRET, "Secret Manager", ["API key"])}
 ${box(BROWSER, "Browser", ["you"])}
 <p class="cl-edge" style="left:${BROWSER.x + BROWSER.w + 12}px;top:${midY(BROWSER) - 62}px">clip</p>

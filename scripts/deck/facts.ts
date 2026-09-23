@@ -166,7 +166,7 @@ export const SCENE_ROW: CompetitorCell[] = [
   { support: "no", note: "" },
 ];
 
-/** KOFIC's barrier-free film programme in 2025, via Newspim (24 Mar 2026); single secondary source. */
+/** KOFIC's barrier-free film program in 2025, via Newspim (24 Mar 2026); single secondary source. */
 export const KOFIC_2025 = {
   accessible: 147,
   releases: 213,

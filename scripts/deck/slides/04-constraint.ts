@@ -162,7 +162,7 @@ ${inLane}
 ${gapLabels}
 <div class="ct-axis" style="top:${Y.axis}px"></div>
 <div style="position:absolute;left:0;width:${W}px;top:${Y.axis}px">${ticks}</div>
-<p class="body ct-result" style="left:${MARGIN}px;top:${Y.result}px"><span>Scene fit ${opening.lines.length} lines, ${secs(opening.narrationTotal, 1)} of voice, into ${opening.gaps.length} usable silences in ${opening.clip}${" "}s.</span><span>None talks over speech; two speech recognizers checked every line.${resultNote}</span></p>`,
+<p class="body ct-result" style="left:${MARGIN}px;top:${Y.result}px"><span>Scene fit ${opening.lines.length} lines, ${secs(opening.narrationTotal, 1)} of voice, into ${opening.gaps.length} usable silences in ${opening.clip}${" "}s.</span><span>None talks over speech; a second recognizer confirms it.${resultNote}</span></p>`,
   });
 }
 

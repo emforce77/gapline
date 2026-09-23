@@ -204,17 +204,32 @@ every `[lang=ko]` text on the deck (compared without whitespace).
   note). The requested business text took that slide to 107 words; the Asia-Pacific share moved from
   its face to its note (96). The exhibit cap stays 100.
 
+- [2026-09-23] Polish round after the re-verify (all P2). Unsourced: the business slide's "Foreign
+  films have no public programme" (no note carried it; the releases note itself prices a foreign
+  barrier-free film), now "A public program covers Korean films" with a note on KOFIC's program.
+  Misread: the constraint slide's "two speech recognizers checked every line" sounded like a product
+  feature (Scene uses one recognizer, twice; the deck's build runs the second); the comparison
+  legend's "No = checked in their open-source code" also covered Scene's own No. The comparison slide
+  is at 99 of 100 words, so the legend names Microsoft instead of adding "a competitor's".
+
 ## Status
 
-Last built 2026-09-23 with `npm run deck` (no `--screens`; the product crops were captured the same
-day by screens.ts from the dev server on 127.0.0.1:21960, run 350b05, the Generate crop reading
-"Generate"): 18 pages (14 slides, 4 notes pages, 47 endnotes), 0 check problems, the Korean PDF
-text check passed, visible words 39–99 per slide (all within their caps; how Scene differs 99,
-constraint and business 96), the optional edit told on one slide. The app's copy is changing in the
-same round: build again with `npm run deck -- --screens` and
-`SCENE_APP_URL=http://127.0.0.1:21961` once the local production server is rebuilt, so the crops
-show the new copy. 4 submission items open (see `runtime/deck/scene-deck_check.md`):
-the development Gemini label, repo URL, video URL and team. The close slide's URL is the one the
-22 Sep live check recorded; the service was taken down on 23 Sep, so it answers only after a
-redeploy. The 1080p master stays in `runtime/deck/cache/` (584 MB) for `--stills`; delete it when
-the stills are final. Tests: `tests/deck-data.test.ts` (needs the gitignored `runtime/`).
+Last built 2026-09-23 with `npm run deck` (no `--screens`), after the polish round logged above:
+18 pages (14 slides, 4 notes pages, 48 endnotes), 0 check problems, the Korean PDF text check
+passed, visible words 39–99 per slide (all within their caps; how Scene differs 99, business 97,
+constraint and Google Cloud 95), the optional edit told on one slide. The product crops are the ones
+the 22:15 build captured with `--screens` from the rebuilt local production server
+(`SCENE_APP_URL=http://127.0.0.1:21961`, run 350b05, Line 5 chosen, the Generate crop reading
+"Generate"); that build also had 0 check problems and 39–99 words. The polish round changed wording
+only, no number: Google Cloud's storage box reads "each paid step runs once" (its note names the
+reused hearing and watching); business "A public program covers Korean films", with its own note;
+constraint "a second recognizer confirms it"; the dropped line's note opens "Not every rewrite
+passes"; the comparison legend names Microsoft's No; the product caption reads "Scene rewrote the
+line the final check sent back". The app's verdict chip is changing to "Sent back by the final
+check, then passed after a rewrite": capture the crops again with `--screens` against 21961 once the
+app is rebuilt (`screens.ts` finds the chip by its class, not its words). 4 submission items open
+(see `runtime/deck/scene-deck_check.md`): the development Gemini label, repo URL, video URL and
+team. The close slide's URL is the one the 22 Sep live check recorded; the service was taken down
+on 23 Sep, so it answers only after a redeploy. The 1080p master stays in `runtime/deck/cache/`
+(584 MB) for `--stills`; delete it when the stills are final. Tests: `tests/deck-data.test.ts`
+(needs the gitignored `runtime/`).

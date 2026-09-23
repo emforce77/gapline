@@ -66,7 +66,7 @@ export function reviewerSlide(): string {
   );
   const [first, ...rest] = dropped.rounds;
   const own = note(
-    `${esc(dropped.cueId)} at ${dropped.start} s: “${esc(first.gloss)}” (${esc(titles(first.rules))}) → ${rest.map((r) => `“${esc(r.gloss)}” (${esc(titles(r.rules))})`).join(" → ")}. The last fix was “${esc(dropped.rounds[dropped.rounds.length - 1].fixGloss)}”, the wording of round ${dropped.lastFixRepeatsRound}. After ${dropped.rewrites} rewrites Scene drops a line that still fails.`,
+    `Not every rewrite passes: the reviewer rejected all ${dropped.rounds.length} versions of ${esc(dropped.cueId)}, at ${dropped.start} s: “${esc(first.gloss)}” (${esc(titles(first.rules))}) → ${rest.map((r) => `“${esc(r.gloss)}” (${esc(titles(r.rules))})`).join(" → ")}. The last fix was “${esc(dropped.rounds[dropped.rounds.length - 1].fixGloss)}”, the wording of round ${dropped.lastFixRepeatsRound}. After ${dropped.rewrites} rewrites Scene drops a line that still fails.`,
   );
 
   const verdict = (mark: string, title: string, marker = "") =>
