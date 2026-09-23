@@ -284,6 +284,8 @@ export function Workspace({
           {final?.summary ? (
             <QualityNote
               summary={final.summary}
+              gaps={final.gaps}
+              cues={final.cues}
               language={final.language}
               lineNumbers={numbers}
               onSelect={select}

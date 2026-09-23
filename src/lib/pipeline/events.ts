@@ -11,7 +11,7 @@ import type {
 } from "./schemas";
 
 export type StageId =
-  "hear" | "relisten" | "watch" | "gaps" | "write" | "review" | "voice" | "verify" | "mix";
+  "hear" | "relisten" | "watch" | "gaps" | "write" | "review" | "voice" | "verify" | "fix" | "mix";
 
 /** What re-recognizing each usable silence on its own found (relisten.ts). */
 export interface RelistenReport {
@@ -26,6 +26,12 @@ export interface RelistenReport {
 export interface RunSummary {
   qualityStatus?: "review_needed" | "model_checked";
   finalReview?: { verdicts: Verdict[]; missing: MissingItem[] };
+  /**
+   * What the final check found (failing lines, missing moments) and how many of them the fix stage
+   * turned into voiced lines; `finalReview` is that check brought up to date with the fixes. Absent
+   * when the check found nothing that could be fixed, and in runs before 2026-09-23.
+   */
+  finalFix?: { failing: number; missing: number; rewritten: number; added: number };
   costStatus?: "known" | "unresolved";
   analysisReused?: { speech: boolean; scene: boolean };
   parentRunId?: string;

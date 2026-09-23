@@ -5,7 +5,8 @@ import { fill } from "@/i18n";
 import { useI18n } from "@/i18n/client";
 import { formatClock, formatDuration, formatSeconds, formatUsd } from "@/lib/format";
 import type { RunFiles, RunSummary } from "@/lib/pipeline/events";
-import type { Language, MissingItem } from "@/lib/pipeline/schemas";
+import { freeRoom } from "@/lib/pipeline/cues";
+import type { Cue, Gap, Language, MissingItem } from "@/lib/pipeline/schemas";
 import { Gloss } from "./glosses";
 import type { RunNote } from "./labels";
 
@@ -33,16 +34,22 @@ export function Metrics({ summary }: { summary: RunSummary }) {
 }
 
 /**
- * What the final check still wants an editor to look at. Older results have no final check; they
- * get no badge rather than a sentence that sounds like a failure.
+ * The final check's outcome: what Scene fixed by itself after it, and what it still lists, for anyone
+ * who wants to step in. A listed moment with no free silence left says so: Scene could not add a line
+ * there without talking over dialogue. Older results have no final check; they get no badge rather
+ * than a sentence that sounds like a failure.
  */
 export function QualityNote({
   summary,
+  gaps,
+  cues,
   language,
   lineNumbers,
   onSelect,
 }: {
   summary: RunSummary;
+  gaps: Gap[];
+  cues: Cue[];
   language: Language | null;
   lineNumbers: Map<string, number>;
   onSelect: (cueId: string) => void;
@@ -50,12 +57,27 @@ export function QualityNote({
   const { t, lang } = useI18n();
   if (!summary.qualityStatus) return null;
   const failing = summary.finalReview?.verdicts.filter((v) => !v.pass) ?? [];
+  const fixed = summary.finalFix ? summary.finalFix.rewritten + summary.finalFix.added : 0;
   const missing = summary.finalReview?.missing ?? [];
+  const voiced = cues
+    .filter((c) => c.status === "fits")
+    .map((c) => ({ start: c.start, end: c.start + (c.seconds ?? 0) }));
+  const noRoom = (m: MissingItem) => {
+    const gap = gaps.find((g) => g.id === m.gapId);
+    return !gap || !freeRoom(Math.min(Math.max(m.at, gap.start), gap.end), gap, voiced);
+  };
   return (
     <div className="quality-note" role="status">
       <strong>
         {summary.qualityStatus === "model_checked" ? t.editor.checked : t.editor.reviewNeeded}
       </strong>
+      {fixed > 0 ? (
+        <p>
+          {fill(t.editor.autoFixed, {
+            lines: fill(t.editor.lines[fixed === 1 ? "one" : "other"], { n: fixed }),
+          })}
+        </p>
+      ) : null}
       {summary.costStatus === "unresolved" ? <p>{t.editor.uncertainty}</p> : null}
       {missing.length || failing.length ? (
         <ul>
@@ -64,6 +86,7 @@ export function QualityNote({
               <span className="mono label">{formatClock(m.at)}</span>{" "}
               <span lang={language ?? undefined}>{m.what}</span>
               <Gloss text={m.what} pageLang={lang} textLang={language} />
+              {noRoom(m) ? <span className="label"> · {t.editor.noRoom}</span> : null}
             </li>
           ))}
           {failing.map((v) => (
@@ -76,6 +99,7 @@ export function QualityNote({
           ))}
         </ul>
       ) : null}
+      <p className="label">{t.editor.optional}</p>
     </div>
   );
 }

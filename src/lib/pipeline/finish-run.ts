@@ -77,6 +77,7 @@ export function summarizeRun(input: {
   cues: Cue[];
   shipped: Cue[];
   finalReview: NonNullable<RunSummary["finalReview"]>;
+  finalFix?: RunSummary["finalFix"];
   analysisReused: NonNullable<RunSummary["analysisReused"]>;
   clipSeconds: number;
   gaps: Gap[];
@@ -105,6 +106,7 @@ export function summarizeRun(input: {
         ? "review_needed"
         : "model_checked",
     finalReview,
+    ...(input.finalFix ? { finalFix: input.finalFix } : {}),
     costStatus: summarizeCosts(calls).costStatus,
     analysisReused: input.analysisReused,
     clipSeconds: input.clipSeconds,

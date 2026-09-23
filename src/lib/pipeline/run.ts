@@ -3,22 +3,24 @@ import { join } from "node:path";
 import { readCallRecords } from "../llm/ledger";
 import type { AnalysisParts } from "../store/analysis";
 import { encodeWatchingVideo } from "../media/proxies";
-import { ModelOutputError } from "../errors";
 import { describeFailure } from "../runs/failure";
 import { analyzeClip } from "./analyze";
 import type { ClipContext } from "./context";
-import { latest, MIN_ROOM_SECONDS, placeCues, sameWords } from "./cues";
+import { freeRoom, latest, MIN_ROOM_SECONDS, placeCues, sameWords } from "./cues";
 import type { RunEvent, RunSummary, StageId, TimedRunEvent } from "./events";
 import { mixRun, RUN_FILES, summarizeRun } from "./finish-run";
 import { voiceToFit } from "./fit-voice";
 import { assessRoom, findGaps } from "./gaps";
 import { unitBudget } from "./length";
 import { reviewLines } from "./review";
-import type { Cue, Density, DraftCue, Language, Verdict } from "./schemas";
+import type { Cue, Density, DraftCue, Language, MissingItem, Verdict } from "./schemas";
 import { reviseLines, writeScript, type RevisionRequest } from "./write";
 
-/** Review rounds: one revision chance, then a line that still breaks a rule is dropped. */
-const MAX_REVIEW_ROUNDS = 2;
+/**
+ * Review rounds: two rewrites, each from the reviewer's own fix, then a line that still breaks a rule
+ * is dropped. On the sample, the line an editor once finished by hand was the reviewer's second fix.
+ */
+const MAX_REVIEW_ROUNDS = 3;
 
 export interface RunOptions {
   runId: string;
@@ -265,8 +267,9 @@ export async function runDescription(
         pending = [];
         for (const { cue } of failed) {
           const text = revisions.get(cue.id);
-          if (!text) throw new ModelOutputError(`revise returned nothing for ${cue.id}`);
-          if (sameWords(text, latest(cue).text)) {
+          // A rewrite the writer left out counts as no rewrite: the line goes, the run carries on.
+          if (!text) console.warn(`revise returned nothing for ${cue.id}; dropping it`);
+          if (!text || sameWords(text, latest(cue).text)) {
             cue.status = "dropped";
             cue.droppedReason = "unchanged";
             await emit({ type: "cue_dropped", cueId: cue.id, reason: "unchanged" });
@@ -297,14 +300,17 @@ export async function runDescription(
         writerModel: options.writerModel,
         ledgerFile,
         emit,
-        reviewShortened: (shortened) => review(shortened, MAX_REVIEW_ROUNDS, false),
+        reviewShortened: (shortened) => review(shortened, MAX_REVIEW_ROUNDS - 1, false),
       }),
     );
 
-    // 6. Mix.
-    const shipped = cues.filter((c) => c.status === "fits");
-    // Audit exactly what will be heard, once. Findings remain visible; no regeneration loop.
-    const finalReview = await stage("verify", () =>
+    // 6. Audit exactly what will be heard, once. What the audit finds is fixed without asking anyone:
+    //    a failing line is rewritten from its fix, and a missing moment gets a new line where its gap
+    //    still has free room. Both are reviewed and voiced like any other line. The track is not
+    //    audited a second time: on the sample that took over three minutes and only listed new items it
+    //    could no longer act on. The audit's findings are brought up to date with the fixes instead, so
+    //    what still stands (a fix that failed, a moment with no free room) stays in the summary.
+    let finalReview = await stage("verify", () =>
       reviewLines({
         context,
         model: options.reviewerModel,
@@ -313,14 +319,143 @@ export async function runDescription(
         wholeScript: true,
         finalOutput: true,
         approved: [],
-        lines: shipped.map((c) => ({
-          id: c.id,
-          start: c.start,
-          end: c.start + c.seconds!,
-          text: latest(c).text,
-        })),
+        lines: cues
+          .filter((c) => c.status === "fits")
+          .map((c) => ({
+            id: c.id,
+            start: c.start,
+            end: c.start + c.seconds!,
+            text: latest(c).text,
+          })),
       }),
     );
+    const failing = finalReview.verdicts
+      .filter((v) => !v.pass)
+      .map((verdict) => ({ cue: cues.find((c) => c.id === verdict.cueId)!, verdict }));
+    // A failing line keeps its whole window: its rewrite may speak longer than it does now.
+    const taken = cues
+      .filter((c) => c.status === "fits")
+      .map((c) => ({
+        start: c.start,
+        end: failing.some((f) => f.cue === c) ? c.windowEnd : c.start + c.seconds!,
+      }));
+    const addable: (MissingItem & { end: number })[] = [];
+    for (const item of finalReview.missing) {
+      const gap = gaps.find((g) => g.id === item.gapId);
+      if (!gap) continue;
+      const at = Math.min(Math.max(item.at, gap.start), gap.end);
+      const free = freeRoom(at, gap, taken);
+      // One new line per stretch of free room: the first item found there claims it.
+      if (free && !addable.some((a) => a.gapId === gap.id && a.end === free.end))
+        addable.push({ ...item, at: free.start, end: free.end });
+    }
+    let finalFix: RunSummary["finalFix"];
+    if (failing.length > 0 || addable.length > 0) {
+      finalReview = await stage("fix", async () => {
+        const { revisions, additions } = await reviseLines({
+          context,
+          model: options.writerModel,
+          ledgerFile,
+          label: "revise:final",
+          requests: failing.map(({ cue, verdict }) => ({
+            cue,
+            text: latest(cue).text,
+            violations: verdict.violations,
+            fix: verdict.fix,
+            maxUnits: unitBudget(cue.windowEnd - cue.start, options.language),
+          })),
+          otherLines: active()
+            .filter((c) => !failing.some((f) => f.cue === c))
+            .map((c) => ({ id: c.id, start: c.start, text: latest(c).text })),
+          missing: addable.map((a) => ({ gapId: a.gapId, at: a.at, what: a.what })),
+        });
+        const changed: Cue[] = [];
+        for (const { cue, verdict } of failing) {
+          const text = revisions.get(cue.id);
+          // Left out by the writer: the line stays as voiced, and its failing verdict stays listed.
+          if (!text) {
+            console.warn(`final fix returned nothing for ${cue.id}; keeping it as it was`);
+            continue;
+          }
+          lines.delete(cue.id);
+          // The check's verdict becomes the replaced version's review, so its history shows why.
+          latest(cue).review = verdict;
+          await emit({ type: "cue_reviewed", cueId: cue.id, round: 0, verdict });
+          if (sameWords(text, latest(cue).text)) {
+            cue.status = "dropped";
+            cue.droppedReason = "unchanged";
+            await emit({ type: "cue_dropped", cueId: cue.id, reason: "unchanged" });
+            continue;
+          }
+          cue.versions.push({ text: text.trim(), by: "revise", model: options.writerModel });
+          cue.status = "pending";
+          await emit({
+            type: "cue_revised",
+            cueId: cue.id,
+            by: "revise",
+            text,
+            model: options.writerModel,
+          });
+          changed.push(cue);
+        }
+        // Each new line goes into the free room of its item, nearest first, and stays inside it.
+        const used = new Set<(typeof addable)[number]>();
+        const placed: DraftCue[] = [];
+        for (const draft of additions) {
+          const open = addable.filter((a) => a.gapId === draft.gapId && !used.has(a));
+          const room =
+            open.find((a) => draft.at >= a.at && draft.at < a.end) ??
+            open.sort((a, b) => Math.abs(a.at - draft.at) - Math.abs(b.at - draft.at))[0];
+          if (!room) continue;
+          used.add(room);
+          placed.push({
+            ...draft,
+            at: Math.min(Math.max(draft.at, room.at), room.end - MIN_ROOM_SECONDS),
+          });
+        }
+        const added = await addCues(placed);
+        const fixes = [...changed, ...added];
+        await review(fixes, MAX_REVIEW_ROUNDS - 1, false);
+        const voiced = await voiceToFit({
+          active,
+          pending: fixes.filter((c) => c.status === "approved"),
+          context,
+          language: options.language,
+          writerModel: options.writerModel,
+          ledgerFile,
+          emit,
+          reviewShortened: (shortened) => review(shortened, MAX_REVIEW_ROUNDS - 1, false),
+        });
+        for (const [id, line] of voiced) lines.set(id, line);
+        const voicedAdded = added.filter((c) => c.status === "fits");
+        finalFix = {
+          failing: failing.length,
+          missing: finalReview.missing.length,
+          rewritten: changed.filter((c) => c.status === "fits").length,
+          added: voicedAdded.length,
+        };
+        const filled = (item: MissingItem) =>
+          addable.some(
+            (a) =>
+              a.gapId === item.gapId &&
+              a.what === item.what &&
+              voicedAdded.some((c) => c.start >= a.at && c.start < a.end),
+          );
+        return {
+          verdicts: [
+            ...finalReview.verdicts.map((v) => {
+              const cue = failing.find((f) => f.cue.id === v.cueId)?.cue;
+              return cue?.status === "fits" ? { ...latest(cue).review!, cueId: cue.id } : v;
+            }),
+            ...voicedAdded.map((c) => ({ ...latest(c).review!, cueId: c.id })),
+          ],
+          missing: finalReview.missing.filter((m) => !filled(m)),
+        };
+      });
+    }
+
+    // 7. Mix.
+    const shipped = cues.filter((c) => c.status === "fits");
     await stage("mix", () =>
       mixRun({
         runDir: options.runDir,
@@ -331,12 +466,13 @@ export async function runDescription(
       }),
     );
 
-    // 7. Summary from the ledger and the final cues.
+    // 8. Summary from the ledger and the final cues.
     const summary = summarizeRun({
       calls: await readCallRecords(ledgerFile),
       cues,
       shipped,
       finalReview,
+      finalFix,
       analysisReused: { speech: !!options.cached?.speech, scene: !!options.cached?.scene },
       clipSeconds: options.clipSeconds,
       gaps,

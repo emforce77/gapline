@@ -68,7 +68,11 @@ export function retryAfterSeconds(value: string | null, now = Date.now()): numbe
  */
 export const MAX_RETRY_WAIT_SECONDS = 30;
 
-/** One retry, with a separate ledger entry for every attempt, including streamed errors. */
+/**
+ * One retry, with a separate ledger entry for every attempt, including streamed errors: after a
+ * retryable provider error, or after output that is not valid JSON for the schema (a run should not
+ * end on one malformed answer).
+ */
 export async function callStructured<T>(
   call: StructuredCall<T>,
 ): Promise<{ data: T; record: CallRecord }> {
@@ -76,6 +80,10 @@ export async function callStructured<T>(
     try {
       return await callOnce(call, attempt);
     } catch (error) {
+      if ((error instanceof SyntaxError || error instanceof z.ZodError) && attempt === 1) {
+        console.warn(`LLM output invalid, retrying once: label=${call.label} model=${call.model}`);
+        continue;
+      }
       if (
         !(error instanceof ProviderError) ||
         !error.retryable ||

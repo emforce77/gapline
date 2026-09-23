@@ -181,6 +181,8 @@ export async function writeEditedRun(
     ...base.summary,
     ...summarizeCosts(calls),
     parentRunId: run.baseRunId,
+    // What the automatic run's fix stage did belongs to that run, not to an edit of it.
+    finalFix: undefined,
     cuesShipped: shipped.length,
     cuesDropped: cues.filter((c) => c.status === "dropped").length,
     cuesRemoved: cues.filter((c) => c.status === "removed").length,

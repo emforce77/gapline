@@ -1,3 +1,4 @@
+import { ModelOutputError } from "../errors";
 import { callStructured } from "../llm/openrouter";
 import { reasoningEffort } from "../models";
 import {
@@ -11,6 +12,9 @@ import {
 } from "./context";
 import { ruleSummaryForPrompt } from "./guidelines";
 import { ReviewSchema, type MissingItem, type Verdict } from "./schemas";
+
+/** A review that names lines it was not given, or skips one, is asked for once more. */
+const REVIEW_ATTEMPTS = 2;
 
 /** Exported for tests, which pin the instructions the reviewer is given. */
 export function reviewerSystem(context: ClipContext, finalOutput = false): string {
@@ -58,47 +62,71 @@ export async function reviewLines(input: {
   const approved = input.approved
     .map((l) => `- ${l.id} at ${l.start.toFixed(3)} s: ${l.text}`)
     .join("\n");
-  const { data } = await callStructured({
-    label: input.label,
-    model: input.model,
-    system: reviewerSystem(input.context, input.finalOutput),
-    user: [
-      { type: "video_url", video_url: { url: input.context.videoDataUrl } },
-      {
-        type: "text",
-        text:
-          `Dialogue:\n${renderTranscript(input.context.speech)}\n\nPeople:\n${renderNames(input.context.scene)}\n\n` +
-          `First-viewing notes:\n${renderScene(input.context.scene)}\n\n` +
-          `Gaps where narration may speak:\n${renderGaps(input.context.gaps)}\n\n` +
-          `Lines already approved:\n${approved || "(none)"}\n\n` +
-          `${input.wholeScript ? "Review the whole script" : "Review only these lines"}:\n${lines}` +
-          (input.finalOutput
-            ? "\nFINAL OUTPUT AUDIT: these are the actual spoken lines after all deletions and shortening. List any essential missing action, person or on-screen text even when no free room remains. Use its scene time and the nearest gap id. Do not assume deleted draft lines are still present."
-            : ""),
-      },
-    ],
-    schemaName: "line_review",
-    schema: ReviewSchema,
-    temperature: 0,
-    ledgerFile: input.ledgerFile,
-    reasoningEffort: reasoningEffort("review"),
-  });
-  const byId = new Map(data.verdicts.map((v) => [v.cueId, v]));
+  let retry = "";
+  for (let attempt = 1; ; attempt++) {
+    const { data } = await callStructured({
+      label: input.label,
+      model: input.model,
+      system: reviewerSystem(input.context, input.finalOutput),
+      user: [
+        { type: "video_url", video_url: { url: input.context.videoDataUrl } },
+        {
+          type: "text",
+          text:
+            `Dialogue:\n${renderTranscript(input.context.speech)}\n\nPeople:\n${renderNames(input.context.scene)}\n\n` +
+            `First-viewing notes:\n${renderScene(input.context.scene)}\n\n` +
+            `Gaps where narration may speak:\n${renderGaps(input.context.gaps)}\n\n` +
+            `Lines already approved:\n${approved || "(none)"}\n\n` +
+            `${input.wholeScript ? "Review the whole script" : "Review only these lines"}:\n${lines}` +
+            (input.finalOutput
+              ? "\nFINAL OUTPUT AUDIT: these are the actual spoken lines after all deletions and shortening. List any essential missing action, person or on-screen text even when no free room remains. Use its scene time and the nearest gap id. Do not assume deleted draft lines are still present."
+              : "") +
+            retry,
+        },
+      ],
+      schemaName: "line_review",
+      schema: ReviewSchema,
+      temperature: 0,
+      ledgerFile: input.ledgerFile,
+      reasoningEffort: reasoningEffort("review"),
+    });
+    const problem = reviewProblem(data, input);
+    if (problem && attempt < REVIEW_ATTEMPTS) {
+      console.warn(`review answer rejected, asking again: label=${input.label} ${problem}`);
+      retry = `\n\nYour previous answer could not be used (${problem}). Give exactly one verdict for each line listed above, and no other.`;
+      continue;
+    }
+    if (problem) throw new ModelOutputError(problem);
+    const byId = new Map(data.verdicts.map((v) => [v.cueId, v]));
+    return {
+      verdicts: input.lines.map((l) => byId.get(l.id)!),
+      missing: input.wholeScript ? data.missing : [],
+    };
+  }
+}
+
+/** Why a review answer cannot be used as it is: a verdict per given line, missing items in their gap. */
+function reviewProblem(
+  data: { verdicts: Verdict[]; missing: MissingItem[] },
+  input: {
+    context: ClipContext;
+    lines: { id: string }[];
+    wholeScript: boolean;
+    finalOutput?: boolean;
+  },
+): string | null {
   if (data.verdicts.some((v) => !input.lines.some((l) => l.id === v.cueId)))
-    throw new Error("review returned an unknown cue id");
+    return "review returned an unknown cue id";
   if (
+    input.wholeScript &&
     !input.finalOutput &&
     data.missing.some(
       (m) => !input.context.gaps.some((g) => g.id === m.gapId && m.at >= g.start && m.at < g.end),
     )
   )
-    throw new Error("review returned a missing item outside its named gap");
-  const missing = input.lines.filter((l) => !byId.has(l.id));
-  if (missing.length > 0) {
-    throw new Error(`review returned no verdict for ${missing.map((l) => l.id).join(", ")}`);
-  }
-  return {
-    verdicts: input.lines.map((l) => byId.get(l.id)!),
-    missing: input.wholeScript ? data.missing : [],
-  };
+    return "review returned a missing item outside its named gap";
+  const unjudged = input.lines.filter((l) => !data.verdicts.some((v) => v.cueId === l.id));
+  if (unjudged.length > 0)
+    return `review returned no verdict for ${unjudged.map((l) => l.id).join(", ")}`;
+  return null;
 }

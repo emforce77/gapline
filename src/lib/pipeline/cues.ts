@@ -49,6 +49,32 @@ export function placeCues(drafts: DraftCue[], gaps: Gap[]): { placed: Cue[]; dro
   return { placed, dropped };
 }
 
+/** Air kept after a voiced line before a line added behind it may start. */
+export const LINE_SPACING_SECONDS = 0.3;
+
+/**
+ * Where a line can still be added to a voiced track near second `at` without moving or cutting any
+ * voiced line: inside the gap, from the end of the last line spoken before `at` (plus spacing) to the
+ * next line's start or the gap end. The line starts at `at`, or earlier when `at` is within a second of
+ * the room's end (a moment at the end of a silence, or just after it), never before the line in front.
+ * Null when that leaves less than MIN_ROOM_SECONDS.
+ */
+export function freeRoom(
+  at: number,
+  gap: Gap,
+  voiced: { start: number; end: number }[],
+): { start: number; end: number } | null {
+  const inGap = voiced
+    .filter((l) => l.start >= gap.start && l.start < gap.end)
+    .sort((a, b) => a.start - b.start);
+  const before = inGap.filter((l) => l.start <= at).at(-1);
+  const after = inGap.find((l) => l.start > at);
+  const earliest = Math.max(gap.start, before ? before.end + LINE_SPACING_SECONDS : gap.start);
+  const end = after ? after.start : gap.end;
+  const start = Math.max(earliest, Math.min(at, end - MIN_ROOM_SECONDS));
+  return end - start >= MIN_ROOM_SECONDS ? { start, end } : null;
+}
+
 /** The version a line currently stands on. */
 export function latest(cue: Cue) {
   return cue.versions[cue.versions.length - 1];

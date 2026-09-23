@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { renderGaps } from "../src/lib/pipeline/context";
 import { findGaps, MIN_GAP_SECONDS, SPEECH_GUARD_SECONDS } from "../src/lib/pipeline/gaps";
-import { placeCues } from "../src/lib/pipeline/cues";
+import { freeRoom, LINE_SPACING_SECONDS, placeCues } from "../src/lib/pipeline/cues";
 import { spokenUnits, unitBudget } from "../src/lib/pipeline/length";
 import { foldRun } from "../src/lib/pipeline/reduce";
 import type { TimedRunEvent } from "../src/lib/pipeline/events";
@@ -116,6 +116,48 @@ describe("placeCues", () => {
       assert.equal(dropped[0].start, draft.at);
       assert.equal(dropped[0].droppedReason, "invalid_placement");
     }
+  });
+});
+
+describe("freeRoom", () => {
+  const gap = { id: "g4", start: 45.4, end: 53.9 };
+
+  it("starts a line added to a voiced track after the last line spoken before its moment", () => {
+    // "40 years later." voiced from 45.5 to 46.6; the missing hologram quarrel is at 46.5.
+    const voiced = [{ start: 45.5, end: 46.6 }];
+    assert.deepEqual(freeRoom(46.5, gap, voiced), {
+      start: 46.6 + LINE_SPACING_SECONDS,
+      end: 53.9,
+    });
+    assert.deepEqual(freeRoom(50, gap, voiced), { start: 50, end: 53.9 });
+  });
+
+  it("ends the room at the next line and refuses less than a second of it", () => {
+    const voiced = [
+      { start: 45.5, end: 46.6 },
+      { start: 47.8, end: 50 },
+    ];
+    assert.equal(freeRoom(47.2, gap, voiced), null);
+    assert.deepEqual(freeRoom(50.5, gap, voiced), { start: 50.5, end: 53.9 });
+  });
+
+  it("starts a moment at the end of its silence, or after it, a second before the room ends", () => {
+    // "Presented by the Blender Foundation" at 2.0 s, in an empty first silence of 0–2.07 s.
+    const first = { id: "g1", start: 0, end: 2.07 };
+    const near = (room: { start: number; end: number } | null, start: number, end: number) =>
+      assert.ok(
+        room && Math.abs(room.start - start) < 1e-9 && room.end === end,
+        JSON.stringify(room),
+      );
+    near(freeRoom(2, first, []), 1.07, 2.07);
+    // A moment after the silence is clamped to its end first, as the fix stage does.
+    near(freeRoom(gap.end, gap, [{ start: 48, end: 50 }]), 52.9, 53.9);
+    // Never before the line in front of it.
+    assert.equal(freeRoom(gap.end, gap, [{ start: 48, end: 53 }]), null);
+  });
+
+  it("ignores lines in other gaps", () => {
+    assert.deepEqual(freeRoom(46, gap, [{ start: 40, end: 47 }]), { start: 46, end: 53.9 });
   });
 });
 

@@ -10,6 +10,7 @@ export const STAGES: StageId[] = [
   "review",
   "voice",
   "verify",
+  "fix",
   "mix",
 ];
 

@@ -1,5 +1,5 @@
 import { trimSilence, type TrimmedLine } from "../media/narration-track";
-import { ModelOutputError } from "../errors";
+import { ServiceError } from "../errors";
 import type { ClipContext } from "./context";
 import { latest, sameWords } from "./cues";
 import type { RunEvent } from "./events";
@@ -20,33 +20,41 @@ const RATE_HEADROOM = 1.03;
 const TTS_CONCURRENCY = 4;
 
 /**
- * Voices every approved line and measures it against its window. A line that overruns is sped up
+ * Voices approved lines and measures each against its window. A line that overruns is sped up
  * slightly, or shortened by the writer, reviewed again and re-voiced; one that still overruns is
  * dropped. Returns the audio of every line that fits, by cue id.
  */
 export async function voiceToFit(input: {
   active: () => Cue[];
+  /** Lines to voice; every active line when unset. */
+  pending?: Cue[];
   context: ClipContext;
   language: Language;
   writerModel: string;
   ledgerFile: string;
   emit: (event: RunEvent) => Promise<void>;
-  /** A shortened line is a new line: it goes back through review (last round) before it is voiced. */
+  /** A shortened line is a new line: reviewed again, with one rewrite left, before it is voiced. */
   reviewShortened: (cues: Cue[]) => Promise<void>;
 }): Promise<Map<string, TrimmedLine>> {
   const { emit, language, writerModel, ledgerFile, context } = input;
   const lines = new Map<string, TrimmedLine>();
+  // A retryable Text-to-Speech failure (busy, 5xx) is tried once more before the run gives up.
   const voice = async (cue: Cue, rate: number) => {
-    const { wav } = await synthesizeLine({
+    const request = {
       text: latest(cue).text,
       language,
       speakingRate: rate,
       ledgerFile,
       label: "voice",
+    };
+    const { wav } = await synthesizeLine(request).catch((error: unknown) => {
+      if (!(error instanceof ServiceError) || !error.retryable) throw error;
+      console.warn(`Text-to-Speech failed, retrying once: ${cue.id}`);
+      return synthesizeLine(request);
     });
     return trimSilence(wav);
   };
-  let pending = input.active();
+  let pending = input.pending ?? input.active();
   for (let pass = 0; pending.length > 0; pass++) {
     const tooLong: Cue[] = [];
     await mapLimit(pending, TTS_CONCURRENCY, async (cue) => {
@@ -110,8 +118,9 @@ export async function voiceToFit(input: {
     });
     for (const cue of tooLong) {
       const text = shortened.get(cue.id);
-      if (!text) throw new ModelOutputError(`shorten returned nothing for ${cue.id}`);
-      if (sameWords(text, latest(cue).text)) {
+      // A shortening the writer left out counts as none: the overlong line goes, the run carries on.
+      if (!text) console.warn(`shorten returned nothing for ${cue.id}; dropping it`);
+      if (!text || sameWords(text, latest(cue).text)) {
         cue.status = "dropped";
         cue.droppedReason = "unchanged";
         await emit({ type: "cue_dropped", cueId: cue.id, reason: "unchanged" });

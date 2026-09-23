@@ -5,14 +5,14 @@ export const en = {
   meta: {
     title: "Scene — audio description that fits between the lines",
     description:
-      "Scene drafts audio description for film: each line is written for one silence, checked against Korea's published guideline, voiced and measured, then handed to an editor.",
+      "Scene makes audio description for film in one pass: each line is written for one silence, checked against Korea's published guideline, voiced, measured and mixed. An editor can still change any line.",
     project: "{title} — Scene",
   },
   nav: { home: "Scene", language: "한국어", skip: "Skip to content" },
   landing: {
     eyebrow: "Audio description for blind and low-vision viewers",
     title: "Descriptions that fit between the lines.",
-    lede: "Scene drafts audio description for film. Each line is written for one real silence, checked against Korea's published guideline, voiced and measured, then handed to an editor on a timeline.",
+    lede: "Scene makes audio description for film in one pass. Each line is written for one real silence, checked against Korea's published guideline, voiced and measured, and what the final check finds is fixed before the track is mixed. An editor can still change any line on the timeline.",
     ctaSample: "Open the sample",
     ctaUpload: "Try your own clip",
     seven: {
@@ -43,7 +43,7 @@ export const en = {
     shortest: "shortest: {s}",
     sevenMark: "the seven seconds",
     timelineNote:
-      "Silences come from the speech recognizer's word timings (Chirp 3). It placed the opening launch call two seconds early, so an editor removed the line that landed on it.",
+      "Silences come from the speech recognizer's word timings (Chirp 3), and each silence is then heard again on its own. That second listen found the opening launch call Chirp 3 had placed two seconds early, so no line lands on it.",
     flowTitle: "How a line gets made",
     flow: [
       {
@@ -64,7 +64,7 @@ export const en = {
       {
         name: "Review",
         detail: "Eight rules, each citing a guideline clause",
-        loop: "rejected: one rewrite, then drop",
+        loop: "rejected: rewritten from the reviewer's fix, up to twice",
         service: "Gemini 3.8 Flash",
       },
       {
@@ -75,13 +75,14 @@ export const en = {
       },
       {
         name: "Mix",
-        detail: "The film ducks under each line; a last check lists what is missing",
+        detail:
+          "A final check finds what is missing, Scene fills it, then the film ducks under each line",
         service: "FFmpeg on Cloud Run",
       },
     ],
     rejectionTitle: "Every rejection cites a clause",
     rejectionLede:
-      "The line at {time} in the sample, the first of those seven seconds, exactly as the run log recorded it. The writer and the reviewer are the same model with separate instructions.",
+      "The line at {time} in the sample, exactly as the run log recorded it. The writer and the reviewer are the same model with separate instructions.",
     rejection: {
       step: {
         write: "First draft",
@@ -95,7 +96,7 @@ export const en = {
       passed: "Passed review",
       suggestion: "Reviewer's suggestion",
       dropped:
-        "Still breaking a rule after one rewrite, so Scene dropped the line instead of voicing it and told the editor what was missing.",
+        "Still breaking a rule after two rewrites, so Scene dropped the line instead of voicing it, and the final check listed what it missed.",
       fitted: "Voiced in {spoken} of the {room} available",
       human: "Scene reviews and voices an editor's words, but never rewrites them.",
     },
@@ -288,6 +289,7 @@ export const en = {
     review: "Review",
     voice: "Voice",
     verify: "Check final output",
+    fix: "Fix what the check found",
     mix: "Mix",
     waiting: "Waiting",
     reused: "reused from the first run",
@@ -356,7 +358,7 @@ export const en = {
     lines: "lines voiced",
     fit: "fit their silence",
     overlap: "narration over recognized speech",
-    caught: "rejected while writing",
+    caught: "sent back by a check",
     cost: "API cost",
     time: "processing time",
   },
