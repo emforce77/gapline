@@ -55,7 +55,7 @@ Making one Korean film accessible still takes about three months, about ten spec
    final check sent it back.
 3. Select a narration line on the timeline. You see what the model saw in the scene, every draft, the
    rule that rejected a draft with its guideline page, and the voiced length against the room it had.
-4. Choose **Try your own clip** and upload up to 90 seconds and 30 MB. A new track takes several minutes.
+4. Choose **Try your own clip** and upload up to 90 seconds and 30 MB. A new track takes about 10 minutes.
    New tracks share a daily allowance on the public demo; when it runs out, the sample keeps playing.
 
 ## How the AI works
@@ -85,12 +85,12 @@ how long it takes to say, and when to stop trying.
    one rewrite left, and it is voiced again. A line that still does not fit is dropped.
 8. **Final check.** The reviewer audits exactly the lines that will be heard, once. It lists lines that
    break a rule and moments the finished track still misses.
-9. **Fix.** Scene rewrites each failing line from the check's fix, and writes a new line for a missing
-   moment where its silence still has free room: from 0.3 s after the last voiced line before it, at
-   least 1.0 s. Both are reviewed and voiced like any other line. The track is not audited a second
-   time; the check's list is updated with the fixes. What it still lists, such as a moment with no free
-   silence left, stays in the result, which reads **Final check · notes**, or **Final check passed**
-   when nothing is listed.
+9. **Apply the check.** Scene rewrites each failing line from the check's fix, and can write a new
+   line for a missing moment where its silence still has free room: from 0.3 s after the last voiced
+   line before it, at least 1.0 s. Both are reviewed and voiced like any other line. The track is not
+   audited a second time; the check's list is updated with the fixes. What it still lists, such as a
+   moment with no free silence left, stays in the result, which reads **Final check · notes**, or
+   **Final check passed** when nothing is listed.
 10. **Mix.** FFmpeg lowers the film by 9 dB under each line and sets the narration to −16 LUFS. You get
     a described MP4, a narration WAV, a WebVTT text track and a JSON script with every version and
     verdict.

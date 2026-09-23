@@ -108,7 +108,7 @@ flowchart TD
   fit -->|"still too long"| drop
   fit -->|"fits"| audit["Final check, once: failing lines, missing moments"]
   audit -->|"nothing it can fix"| mix["Mix: FFmpeg ducks the film and adds narration"]
-  audit -->|"failing line, or missing moment with free room"| fix["Fix: rewrite from the check's fix, or add a line in the free room"]
+  audit -->|"failing line, or missing moment with free room"| fix["Apply the check: rewrite from the check's fix, or add a line in the free room"]
   fix --> refit["Review with one rewrite left, voice and fit, as above"]
   refit -->|"no second audit; findings updated"| mix
   mix --> out["MP4, WAV, WebVTT and JSON script"]
@@ -145,19 +145,21 @@ flowchart TD
 6. **Final check.** The reviewer sees exactly the lines that will be heard, with their measured end
    times, once. It returns a verdict for each line and lists essential moments that are still missing
    even where no room is left.
-7. **Fix what the check found.** This stage runs only when the check found something it can act on.
-   Each failing line is rewritten from the check's fix, with its whole room available. Each missing
-   moment whose silence still has free room gets a new line, one per stretch of free room: free room
+7. **Apply the check.** This stage runs only when the check found something it can act on. Each
+   failing line is rewritten from the check's fix, with its whole room available. Each missing moment
+   whose silence still has free room can get a new line, one per stretch of free room: free room
    starts 0.3 s after the end of the last voiced line before the moment and runs to the next line or
-   the end of the silence, and it must be at least 1.0 s (`freeRoom` in `cues.ts`). Both kinds are
-   reviewed with one rewrite left, then voiced and fitted like any other line. If the writer leaves a
-   rewrite out, the line stays as voiced and its failing verdict stays listed. The track is not
-   audited a second time: on the sample, a second audit took over 3 minutes and only listed new items
-   it could not act on. Instead the check's findings are updated with the fixes and saved as
-   `summary.finalReview`, and `summary.finalFix` records `{ failing, missing, rewritten, added }`.
-   What still stands, a fix that failed or a moment with no free silence, stays in the summary. The
-   result reads _Final check passed_ when nothing is listed and _Final check · notes_ otherwise, and
-   the screen marks each listed moment that has no free silence left.
+   the end of the silence, and it must be at least 1.0 s (`freeRoom` in `cues.ts`). On the sample, one
+   moment with free room got no line: the credit at 2.0 s had 1.07–2.07 s free, and no line was added
+   there ([EVALUATION.md](EVALUATION.md)). Both kinds are reviewed with one rewrite left, then voiced
+   and fitted like any other line. If the writer leaves a rewrite out, the line stays as voiced and
+   its failing verdict stays listed. The track is not audited a second time: on the sample, a second
+   audit took over 3 minutes and only listed new items it could not act on. Instead the check's
+   findings are updated with the fixes and saved as `summary.finalReview`, and `summary.finalFix`
+   records `{ failing, missing, rewritten, added }`. What still stands, a fix that failed, a moment
+   with no free silence or one that got no line, stays in the summary. The result reads _Final check
+   passed_ when nothing is listed and _Final check · notes_ otherwise, and the screen marks each
+   listed moment that has no free silence left.
 8. **Mix.** Narration is normalized to −16 LUFS, close to the sample's dialogue level. The film is
    lowered by 9 dB under each line with 0.15 s ramps. Outputs: a described H.264/AAC MP4, the narration
    WAV, a WebVTT text track and `script.json` with every version, verdict and measured length.
