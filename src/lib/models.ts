@@ -7,6 +7,9 @@ export const MODELS = {
   flash: "google/gemini-3.8-flash",
 } as const;
 
+/** How Gemini is reached, as shown on the deck, video and README. Change it here and nowhere else. */
+export const GEMINI_ACCESS_LABEL = "via OpenRouter (development)";
+
 export type Effort = "low" | "medium" | "high";
 
 /**
