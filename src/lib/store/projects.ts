@@ -109,7 +109,7 @@ export async function writeAnalysis(
   await writeFile(join(projectDir(id), "analysis.json"), JSON.stringify(analysis, null, 2));
 }
 
-/** Finished runs, newest first. A run without script.json failed or is still running. */
+/** Finished runs, newest first. Both the script and its final event must be available. */
 export async function listRuns(projectId: string): Promise<RunListing[]> {
   const root = join(projectDir(projectId), "runs");
   if (!(await exists(root))) return [];
@@ -118,11 +118,13 @@ export async function listRuns(projectId: string): Promise<RunListing[]> {
     if (!ID_PATTERN.test(runId)) continue;
     const script = join(root, runId, "script.json");
     if (!(await exists(script))) continue;
+    // A reload must not put a run in finishedRunIds before its final event can be displayed.
+    const snapshot = await readRunSnapshot(projectId, runId);
+    if (snapshot.status !== "done") continue;
     const parsed = JSON.parse(await readFile(script, "utf8"));
     const edit = parsed.humanEdits?.at(-1);
-    const started = JSON.parse(
-      (await readFile(join(root, runId, "events.jsonl"), "utf8")).split("\n")[0],
-    );
+    const started = snapshot.events.find((event) => event.type === "run_started");
+    if (!started) continue;
     listings.push({
       runId,
       language: started.language,
@@ -152,10 +154,19 @@ export interface RunOwner {
 }
 
 async function readEvents(file: string): Promise<TimedRunEvent[]> {
-  return (await readFile(file, "utf8"))
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line) as TimedRunEvent);
+  const lines = (await readFile(file, "utf8")).split("\n");
+  const events: TimedRunEvent[] = [];
+  for (const [index, line] of lines.entries()) {
+    if (!line) continue;
+    try {
+      events.push(JSON.parse(line) as TimedRunEvent);
+    } catch (error) {
+      // A reader can catch appendFile halfway through the last record. Keep all completed
+      // events and pick up the rest on the next poll; corruption in a completed line still fails.
+      if (index !== lines.length - 1) throw error;
+    }
+  }
+  return events;
 }
 
 function withinTimeLimit(since: Date | string, now: number): boolean {
@@ -163,24 +174,43 @@ function withinTimeLimit(since: Date | string, now: number): boolean {
 }
 
 /**
- * State of one run from its files: script.json means done, a run_failed event means failed, and a
- * run with neither is running until the time limit passes, then interrupted (its process is gone).
+ * Events and status from the same read. A result is done only once that snapshot includes its
+ * final event and script.json exists, so polling cannot stop before it receives the result.
  */
+export async function readRunSnapshot(
+  projectId: string,
+  runId: string,
+  now = Date.now(),
+): Promise<{ events: TimedRunEvent[]; status: RunStatus }> {
+  const dir = runDir(projectId, runId);
+  const eventsFile = join(dir, "events.jsonl");
+  const ownerFile = join(dir, RUN_OWNER_FILE);
+  let events: TimedRunEvent[];
+  try {
+    events = await readEvents(eventsFile);
+  } catch (error) {
+    // executeRun writes the owner before starting the event log. This is a real run, even
+    // when a reload reaches it before run_started has been written.
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT" || !(await exists(ownerFile)))
+      throw error;
+    events = [];
+  }
+  if (events.some((e) => e.type === "run_done") && (await exists(join(dir, "script.json"))))
+    return { events, status: "done" };
+  if (events.some((e) => e.type === "run_failed")) return { events, status: "failed" };
+  // Runs started without an owner (scripts, older runs): no run lasts past the limit after its last event.
+  const since = (await exists(ownerFile))
+    ? (JSON.parse(await readFile(ownerFile, "utf8")) as RunOwner).startedAt
+    : (await stat(eventsFile)).mtime;
+  return { events, status: withinTimeLimit(since, now) ? "running" : "interrupted" };
+}
+
 export async function runStatus(
   projectId: string,
   runId: string,
   now = Date.now(),
 ): Promise<RunStatus> {
-  const dir = runDir(projectId, runId);
-  if (await exists(join(dir, "script.json"))) return "done";
-  const eventsFile = join(dir, "events.jsonl");
-  if ((await readEvents(eventsFile)).some((e) => e.type === "run_failed")) return "failed";
-  const ownerFile = join(dir, RUN_OWNER_FILE);
-  // Runs started without an owner (scripts, older runs): no run lasts past the limit after its last event.
-  const since = (await exists(ownerFile))
-    ? (JSON.parse(await readFile(ownerFile, "utf8")) as RunOwner).startedAt
-    : (await stat(eventsFile)).mtime;
-  return withinTimeLimit(since, now) ? "running" : "interrupted";
+  return (await readRunSnapshot(projectId, runId, now)).status;
 }
 
 /** Unfinished runs this viewer started, still within the time limit, newest first. */
@@ -196,14 +226,13 @@ export async function listActiveRuns(
     if (!ID_PATTERN.test(runId)) continue;
     const dir = join(root, runId);
     const ownerFile = join(dir, RUN_OWNER_FILE);
-    if (!(await exists(ownerFile)) || (await exists(join(dir, "script.json")))) continue;
+    if (!(await exists(ownerFile))) continue;
     const owner = JSON.parse(await readFile(ownerFile, "utf8")) as RunOwner;
     if (owner.ownerHash !== viewerHash || !withinTimeLimit(owner.startedAt, now)) continue;
     // The owner file is written just before the first event, so a very young run has none yet.
     const eventsFile = join(dir, "events.jsonl");
     const written = await exists(eventsFile);
-    const events = written ? await readEvents(eventsFile) : [];
-    if (events.some((e) => e.type === "run_failed" || e.type === "run_done")) continue;
+    if ((await runStatus(projectId, runId, now)) !== "running") continue;
     active.push({
       runId,
       language: owner.language,

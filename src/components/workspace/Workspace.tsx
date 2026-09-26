@@ -77,16 +77,19 @@ export function Workspace({
     timers.current = [];
   }, []);
 
+  useEffect(() => stopReplay, [stopReplay]);
+
   useEffect(() => {
     if (mode === "live") return;
     stopReplay();
     setMode("idle");
     setSelected(null);
-    if (!current) {
-      setEvents(null);
-      setView(null);
-      return;
-    }
+    // A result that is still loading (or fails to load) must not keep the previous run's
+    // media, downloads and editor under the newly selected version or language.
+    setEvents(null);
+    setView(null);
+    setError(null);
+    if (!current) return;
     let cancelled = false;
     fetchRun(project.id, current.runId)
       .then(({ events: loaded }) => {
@@ -95,6 +98,7 @@ export function Workspace({
         setView(foldRun(loaded, project.clipSeconds));
       })
       .catch((e: unknown) => {
+        if (cancelled) return;
         console.error(e);
         setError(t.live.loadFailed);
       });
@@ -219,6 +223,7 @@ export function Workspace({
   const editNote = final?.runId ? notes[final.runId] : null;
 
   function select(id: string) {
+    if (editing) return;
     setSelected(id);
     setAnnouncement(
       fill(t.workspace.selected, { line: fill(t.line.title, { n: numbers.get(id) ?? id }) }),
@@ -266,6 +271,7 @@ export function Workspace({
               lineNumbers={numbers}
               currentTime={time}
               selectedCueId={selected}
+              disabled={editing}
               onSeek={(s) => player.current?.seek(s)}
               onSelect={select}
             />
@@ -299,6 +305,7 @@ export function Workspace({
               <button
                 type="button"
                 className="button ghost small back"
+                disabled={editing}
                 onClick={() => setSelected(null)}
               >
                 <span aria-hidden="true">←</span> {t.line.close}

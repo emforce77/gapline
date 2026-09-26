@@ -33,7 +33,7 @@ export function coverSlide(): string {
 <div class="cv-side" style="top:${TEXT_TOP}px">
   <p class="cv-theme">${team}AI Builder Cup 2026 · ${esc(THEME)} · ${esc(CATEGORY)}</p>
   <p class="cv-tag">Descriptions that fit between the lines.</p>
-  <p class="cv-what">Upload a film clip and press Generate: Scene writes, checks, voices and mixes the audio description by itself. You can still change any line.</p>
+  <p class="cv-what">Upload a film clip and press Generate: Scene writes, checks, voices and mixes an audio description that fits between the dialogue.</p>
 </div>`,
   });
 }

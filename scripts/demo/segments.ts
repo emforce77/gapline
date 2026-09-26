@@ -24,7 +24,7 @@ import {
 import {
   cameraAt,
   cameraFilters,
-  cameraKeys,
+  cameraForBeat,
   movesDuring,
   pieces,
   settledAt,
@@ -276,7 +276,7 @@ function fadeEnds(e: AssEvent, from: number, to: number): number[] {
  * move while it is lit would leave it behind: the build fails.
  */
 export function overlayEvents(rec: BeatRecord): AssEvent[] {
-  const keys = cameraKeys(rec.shots);
+  const keys = cameraForBeat(rec);
   const play = playbackExcerpt(rec, rec.seconds);
   return rec.overlays.flatMap((o): AssEvent[] => {
     if (o.kind === "tag") {
@@ -353,7 +353,7 @@ async function beatSegment(s: SegmentInput): Promise<void> {
   const assFile = join(s.workDir, `${s.scene.id}.ass`);
   await writeFile(assFile, assDocument([...s.captions, ...overlayEvents(rec)]));
   const after = [
-    ...cameraFilters(cameraKeys(rec.shots)),
+    ...cameraFilters(cameraForBeat(rec)),
     `pad=${WIDTH}:${HEIGHT}:0:0:color=${BAND}`,
     subtitlesFilter(assFile),
     ...fade(s.scene),

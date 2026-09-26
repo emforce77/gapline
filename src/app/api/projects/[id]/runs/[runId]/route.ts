@@ -1,7 +1,5 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { ApiErrorBody, RequestErrorCode } from "@/lib/api-contract";
-import { runDir, runStatus } from "@/lib/store/projects";
+import { assertSafeId, readRunSnapshot } from "@/lib/store/projects";
 import { accessibleProject } from "@/lib/store/access";
 
 export const runtime = "nodejs";
@@ -19,19 +17,18 @@ export async function GET(
     Response.json({ error: "not_found" } satisfies ApiErrorBody<RequestErrorCode>, {
       status: 404,
     });
-  if (!(await accessibleProject(id))) return notFound();
-  let text: string;
   try {
-    text = await readFile(join(runDir(id, runId), "events.jsonl"), "utf8");
+    assertSafeId(runId);
   } catch {
     return notFound();
   }
-  const events = text
-    .split("\n")
-    .filter(Boolean)
-    .map((line) => JSON.parse(line));
-  return Response.json(
-    { events, status: await runStatus(id, runId) },
-    { headers: { "Cache-Control": "private, no-store" } },
-  );
+  if (!(await accessibleProject(id))) return notFound();
+  let snapshot: Awaited<ReturnType<typeof readRunSnapshot>>;
+  try {
+    snapshot = await readRunSnapshot(id, runId);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return notFound();
+    throw error;
+  }
+  return Response.json(snapshot, { headers: { "Cache-Control": "private, no-store" } });
 }

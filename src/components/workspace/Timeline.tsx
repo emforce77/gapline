@@ -54,6 +54,7 @@ export function Timeline({
   lineNumbers,
   currentTime,
   selectedCueId,
+  disabled = false,
   onSeek,
   onSelect,
 }: {
@@ -65,6 +66,7 @@ export function Timeline({
   lineNumbers: Map<string, number>;
   currentTime: number;
   selectedCueId: string | null;
+  disabled?: boolean;
   onSeek: (seconds: number) => void;
   onSelect: (cueId: string) => void;
 }) {
@@ -174,6 +176,7 @@ export function Timeline({
               <button
                 key={cue.id}
                 type="button"
+                disabled={disabled}
                 data-cue-id={cue.id}
                 className={`cue ${state}${cue.id === selectedCueId ? " selected" : ""}${speaking ? " speaking" : ""}`}
                 style={

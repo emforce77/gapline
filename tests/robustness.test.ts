@@ -319,7 +319,7 @@ describe("runs in progress", () => {
         '{"type":"run_failed","code":"internal","error":"internal","t":3}',
       ]);
       await makeRun("r-old", "me", RUN_TIME_LIMIT_SECONDS + 5, [started("r-old")]);
-      await makeRun("r-done", "me", 30, [started("r-done")], true);
+      await makeRun("r-done", "me", 30, [started("r-done"), '{"type":"run_done","t":30}'], true);
       await makeRun("r-script", null, 0, [started("r-script")]);
       await utimes(join(runDir(project, "r-script"), "events.jsonl"), now / 1000, now / 1000);
 

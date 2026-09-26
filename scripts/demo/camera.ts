@@ -10,7 +10,7 @@
  */
 import type { Rect } from "./ass";
 import { CONTENT_HEIGHT, CSS_TO_OUT, FPS, WIDTH } from "./config";
-import type { Shot } from "./recorder-kit";
+import type { BeatRecord, Shot } from "./recorder-kit";
 
 /** Space kept around a target, in CSS pixels. */
 const PAD_CSS = 22;
@@ -108,6 +108,17 @@ export function cameraKeys(shots: Shot[]): Key[] {
     prev = state;
     return { at: s.at, move, state, drift: s.drift !== undefined };
   });
+}
+
+/**
+ * Hold the replay's dense stage list still while it is read. A tiny continuous scale/crop rounds
+ * to whole pixels in FFmpeg and makes the text and overlay edges visibly jitter. Apply this when
+ * building too, so cached recordings get the same stable hold without recording a new run.
+ */
+export function cameraForBeat(rec: Pick<BeatRecord, "beat" | "shots">): Key[] {
+  return cameraKeys(
+    rec.beat === "replay" ? rec.shots.filter((shot) => shot.drift === undefined) : rec.shots,
+  );
 }
 
 const progress = (k: Key, t: number) => (k.move > 0 ? ease((t - k.at) / k.move) : 1);

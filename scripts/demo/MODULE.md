@@ -68,8 +68,10 @@ evidence, close.
 - Camera (`camera.ts`, `beats.ts`): moves take 1.2 s. Close-ups are placed so that no line of text
   is cut at any edge of the picture, the column beside the element included
   (`frameAround` in `recorder-kit.ts`: moved up or down, or up to 15% more page; failing that, only
-  the element's own column is kept whole at top and foot). Wherever a scene holds still, a slow
-  push-in ("drift", at most 8% closer) runs about the point that lets it go furthest (the element's
+  the element's own column is kept whole at top and foot). The replay's dense stage list holds
+  still while its status changes: tiny scale/crop steps made its text shimmer near 1:22. This hold
+  also applies when rebuilding cached recordings. Other reading shots use a slow
+  push-in ("drift", at most 8% closer) about the point that lets it go furthest (the element's
   centre, or an edge or corner of the view), which spotlights and chips follow frame by frame and
   which keeps whole every line the shot showed whole. The upload section is framed for the page
   before and after the card's status line pushes the next section down. The edit scene opens on the
@@ -135,6 +137,11 @@ neither a caption nor film sound, a recording made where `/api/live-status` said
 OpenRouter) on the cloud page. It never ticks the human watch-through.
 
 ## Debug log
+
+- [2026-09-26] The replay's 4% push-in over 11–14 seconds made small text and service chips
+  visibly jitter as FFmpeg rounded the scale and crop to pixels. Removed that drift while keeping
+  the move to the finished timeline. Both the picture and overlay use the same camera policy,
+  including when rebuilding the existing recordings; no new model run is needed.
 
 - [2026-09-23] CDP screencast frames were 1440×720 in v2 whatever deviceScaleFactor was set; Chrome's
   `--force-device-scale-factor=2` gives 2880×1440 (the recorder checks the first frame's size).

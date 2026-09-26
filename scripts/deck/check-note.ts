@@ -57,7 +57,7 @@ export function writeCheckNote(r: CheckNoteInput): void {
     ...r.problems.map((p) => `  - **${p}**`),
     `- [x] words of visible text per page (count/budget), min ${Math.min(...counted)}, max ${Math.max(...counted)}:`,
     ...r.words.map((w, i) => wordLine(w, i + 1)),
-    `- ${box(editBody.length <= 1)} the optional edit is on the cover and told on one other slide at most: ${
+    `- ${box(editBody.length <= 1)} the optional edit is told on one slide at most beyond the cover: ${
       editPages.length === 0
         ? "no slide mentions editing"
         : editPages.map((w) => `${w.name} (${w.edits})`).join(", ")

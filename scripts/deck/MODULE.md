@@ -9,8 +9,12 @@ itself, reviewer, measured, Scene listens twice, Google Cloud, how Scene differs
 will test next, close. Page numbers and notes groups follow a slide's position there, not its file
 name (`08-editor.ts` is slide 5, the product).
 `npm run deck` writes `runtime/deck/`: `scene-deck.pdf`, `slides/NN-name.png`, `contact-sheet.png`,
-`scene-deck.html` and `scene-deck_check.md` (what the build checked, with word counts per page). It
-replaces `scripts/demo/presentation.ts`.
+`scene-deck.html` and `scene-deck_check.md` (what the build checked, with word counts per page).
+The HTML opens as an offline presentation fitted to the window: arrows or Space advance,
+Home/End jump to the first/last page, and Sources opens the notes. Escape or Back to slides returns
+from the notes; source markers jump to the matching note. The current page survives a reload.
+Printing includes all 18 pages at full resolution. The build uses `?export` to inspect every slide
+at its original 1920x1080 size; `presenter.ts` keeps this viewer separate from the slide designs.
 `npm run deck -- --final` also refuses to build while `SUBMISSION` in `facts.ts` lacks the repo,
 video or team, or `GEMINI_ACCESS_LABEL` still names OpenRouter; without `--final` those are listed
 as open items in the check note and on the console.
@@ -121,6 +125,13 @@ every `[lang=ko]` text on the deck (compared without whitespace).
 
 ## Debug log
 
+- [2026-09-26] Kept the Screening room design and added fitted offline presentation controls.
+  The cover now leads with the fit-between-dialogue benefit; optional editing is explained only
+  on the product slide. The close shows the recorded demonstration date instead of labelling the
+  recorded service URL as live. The service diagram says "Recorded service check" and the audience
+  validation slide says "test" rather than "prove". Prior final artifacts were copied to
+  `runtime/deck/backups/20260926-152452-before-polish/` before rebuilding.
+
 - [2026-09-23] Deck moved from `DECK_TRACK` (an edit chain whose lines an editor finished) to the
   automatic sample; `data/showcase.ts`, `data/demo.ts`, `scripts/demo/sample.ts` and the honesty
   slide (`09-honest.ts`) removed, the deck re-ordered to 14 slides. Measured: speech sum 31.08 s vs
@@ -214,10 +225,10 @@ every `[lang=ko]` text on the deck (compared without whitespace).
 
 ## Status
 
-Last built 2026-09-23 with `npm run deck` (no `--screens`), after the polish round logged above:
+Last built 2026-09-26 with `npm run deck` (no `--screens`), after the polish round logged above:
 18 pages (14 slides, 4 notes pages, 48 endnotes), 0 check problems, the Korean PDF text check
 passed, visible words 39–99 per slide (all within their caps; how Scene differs 99, business 97,
-constraint and Google Cloud 95), the optional edit told on one slide. The product crops are the ones
+constraint 95, Google Cloud 96), the optional edit told on one slide. The product crops are the ones
 the 22:15 build captured with `--screens` from the rebuilt local production server
 (`SCENE_APP_URL=http://127.0.0.1:21961`, run 350b05, Line 5 chosen, the Generate crop reading
 "Generate"); that build also had 0 check problems and 39–99 words. The polish round changed wording
@@ -229,7 +240,9 @@ line the final check sent back". The app's verdict chip is changing to "Sent bac
 check, then passed after a rewrite": capture the crops again with `--screens` against 21961 once the
 app is rebuilt (`screens.ts` finds the chip by its class, not its words). 4 submission items open
 (see `runtime/deck/scene-deck_check.md`): the development Gemini label, repo URL, video URL and
-team. The close slide's URL is the one the 22 Sep live check recorded; the service was taken down
-on 23 Sep, so it answers only after a redeploy. The 1080p master stays in `runtime/deck/cache/`
+team. The close slide shows the 22 Sep demonstration date; its source note retains the historical
+service URL without claiming current availability. The service was taken down on 23 Sep.
+Presenter smoke checks passed for arrow navigation, reload, endnote links and return, 390px window
+bounds, all 18 pages visible in print, and zero browser errors. The 1080p master stays in `runtime/deck/cache/`
 (584 MB) for `--stills`; delete it when the stills are final. Tests: `tests/deck-data.test.ts`
 (needs the gitignored `runtime/`).

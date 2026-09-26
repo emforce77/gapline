@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { Page } from "playwright-core";
 import {
   cameraAt,
+  cameraForBeat,
   cameraKeys,
   MOVE_SECONDS,
   pieces,
@@ -174,6 +175,22 @@ describe("the recorder's clock", () => {
 
 describe("the camera", () => {
   const box = { x: 1055, y: 231, w: 342, h: 378 };
+
+  it("keeps a cached replay's reading hold still and preserves the move to the timeline", () => {
+    const keys = cameraForBeat({
+      beat: "replay",
+      shots: [
+        { at: 0, rect: box, maxZoom: 1.8, move: 0 },
+        { at: 1.4, rect: box, maxZoom: 1.8, move: 12, drift: 1.04 },
+        { at: 14, rect: null },
+      ],
+    });
+    const held = cameraAt(keys, 0);
+    for (let frame = 0; frame < 14 * 30; frame++)
+      assert.deepEqual(cameraAt(keys, frame / 30), held);
+    assert.ok(cameraAt(keys, 14.6).z < held.z, "the deliberate exit move is kept");
+    assert.equal(cameraAt(keys, 15.2).z, 1);
+  });
 
   it("cuts at once, and waits for a move but not for a drift", () => {
     const keys = cameraKeys([

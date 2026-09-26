@@ -86,20 +86,19 @@ export const Player = forwardRef<
     },
   }));
 
-  // The server-rendered <video> may load its metadata before React attaches handlers.
-  useEffect(() => {
-    const el = video.current;
-    if (el && el.readyState >= 1) setDuration(el.duration);
-  }, []);
-
-  // Remember where we were before the source changes, restore it once the new source is ready.
-  const previousSrc = useRef(src);
+  // Set the source here so we can capture playback before the browser resets it. A JSX `src`
+  // changes during React's commit, before an effect can read the old time and play state.
+  const previousSrc = useRef<string | null>(null);
   useEffect(() => {
     if (previousSrc.current === src) return;
-    previousSrc.current = src;
     const el = video.current;
     if (!el) return;
-    resume.current = { time: el.currentTime, playing: !el.paused };
+    if (previousSrc.current !== null) {
+      // Another toggle can arrive before metadata for the previous switch finishes loading.
+      resume.current ??= { time: el.currentTime, playing: !el.paused };
+    }
+    previousSrc.current = src;
+    el.src = src;
   }, [src]);
 
   useEffect(() => {
@@ -131,7 +130,6 @@ export const Player = forwardRef<
       <div className="player-frame">
         <video
           ref={video}
-          src={src}
           poster={posterUrl}
           playsInline
           preload="auto"
@@ -143,7 +141,8 @@ export const Player = forwardRef<
             const saved = resume.current;
             resume.current = null;
             if (!saved) return;
-            if (saved.time > RESUME_MIN_SECONDS) e.currentTarget.currentTime = saved.time;
+            if (saved.time > RESUME_MIN_SECONDS)
+              e.currentTarget.currentTime = Math.min(saved.time, e.currentTarget.duration);
             if (saved.playing) void e.currentTarget.play();
           }}
           onTimeUpdate={(e) => {

@@ -87,9 +87,11 @@ export function useLiveRun({
       let runs: RunListing[] | null = null;
       try {
         const list = await fetchRunList(projectId);
+        if (own !== generation.current) return;
         runs = list.runs;
         setActive(list.active);
       } catch (error) {
+        if (own !== generation.current) return;
         console.error("run list unavailable after a run", error);
         latest.current.onError(t.live.loadFailed);
       }
@@ -121,6 +123,7 @@ export function useLiveRun({
           if (runStatus === "interrupted") latest.current.onError(t.live.interrupted);
           await end(runStatus === "done" ? runId : null);
         } catch (error) {
+          if (own !== generation.current) return;
           if (error instanceof RunRequestError && error.status === 404) {
             latest.current.onError(t.live.notFound);
             await end(null);
@@ -155,6 +158,7 @@ export function useLiveRun({
   );
 
   async function start(body: { language: Language; density: Density }) {
+    const own = generation.current;
     latest.current.onBegin();
     setConnection("stream");
     // Filled from inside the event callback (an object, so the type checker sees the updates).
@@ -164,6 +168,7 @@ export function useLiveRun({
     };
     try {
       await streamRun(projectId, body, (event) => {
+        if (own !== generation.current) return;
         if (event.type === "run_started") {
           seen.runId = event.runId;
           setFollowed(event.runId);
@@ -177,6 +182,7 @@ export function useLiveRun({
         latest.current.onEvent(event);
       });
     } catch (error) {
+      if (own !== generation.current) return;
       if (error instanceof RunRequestError) {
         latest.current.onError(runErrorMessage({ ...error.body, code: error.body.error }, t, lang));
         await end(null, false);
@@ -190,6 +196,7 @@ export function useLiveRun({
         return;
       }
     }
+    if (own !== generation.current) return;
     if (seen.outcome) {
       await end(seen.outcome === "done" ? seen.runId : null);
       return;

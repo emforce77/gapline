@@ -169,7 +169,7 @@ ${box(BROWSER, "Browser", ["you"])}
 <p class="cl-edge" style="left:${BROWSER.x + BROWSER.w + 12}px;top:${midY(BROWSER) - 62}px">clip</p>
 <p class="cl-edge" style="left:${BROWSER.x + BROWSER.w + 12}px;top:${midY(BROWSER) + 34}px">progress</p>
 <div class="cl-live" style="left:${API_X}px;top:${LIVE_TOP}px;width:${API_W}px">
-  <p class="label">Live service${live}</p>
+  <p class="label">Recorded service check${live}</p>
   <p class="cl-check">${PASS_MARK}Progress streams live</p>
   <p class="cl-check">${PASS_MARK}Your uploads stay private</p>
 </div>`,

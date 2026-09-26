@@ -12,7 +12,8 @@
  *   edit    — a word typed into another line, WITHOUT submitting it: the optional path.
  * Camera shots and overlays are logged on the scene's clock as the page is driven. Every box is read
  * once the page has stopped moving, and every spotlight is read again as it lights up. Where a
- * picture is held while its caption is read, the camera drifts slowly in on it.
+ * picture is held while its caption is read, the camera drifts slowly in on it, except the dense
+ * replay stage list, whose text stays fixed while its live statuses change.
  */
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -20,7 +21,7 @@ import type { Locator, Page } from "playwright-core";
 import { dictionary } from "../../src/i18n";
 import type { Language } from "../../src/lib/pipeline/schemas";
 import type { Rect } from "./ass";
-import { DRIFT_PUSH, MOVE_SECONDS, shotView } from "./camera";
+import { MOVE_SECONDS, shotView } from "./camera";
 import { BASE_URL, CACHE_DIR, CLIP_FILE, PROJECT_ID, SAMPLE_RUN } from "./config";
 import { film } from "./facts";
 import { EDIT_WORD, labels, type ServiceStage } from "./labels";
@@ -433,9 +434,8 @@ const replay: BeatScript = async (page, clock, plan, lang) => {
   const stages = await settledRect(page, boxesOf([list]));
   const framed = await frameWhole(page, stages, LIST_ZOOM);
   const badge = await rectOf(page.locator(".replay-badge"));
-  for (const push of [1, DRIFT_PUSH])
-    if (sharedArea(badge, shotView(framed, LIST_ZOOM, push)) > 0)
-      throw new Error("replay: the replay badge would be in the stage list's shot");
+  if (sharedArea(badge, shotView(framed, LIST_ZOOM)) > 0)
+    throw new Error("replay: the replay badge would be in the stage list's shot");
   clock.shot(framed, LIST_ZOOM, 0, 0);
   clock.spotlight("the stage list", s1 + LIST_LIGHT_S, listEnd, stages, boxesOf([list]));
   // Each stage's service beside it; the stages the sample reused get one chip saying where from.
@@ -460,8 +460,8 @@ const replay: BeatScript = async (page, clock, plan, lang) => {
       text: words.reused,
       rect: unionRect(await Promise.all((await reused.all()).map(rectOf))),
     });
-  // A slow push-in on the list while its stages run, so it is never a still picture.
-  await clock.drift(framed, LIST_ZOOM, s1 + CHIPS_LIGHT_S + DRIFT_LEAD_S, doneAt - DRIFT_TAIL_S);
+  // Hold the dense stage list still while it is read. The live stage updates provide motion;
+  // a slow scale/crop here made text and service chips jitter around the film's 1:22 mark.
   // The chips sit on rows measured once: the list must not have moved under them (before()).
   const unmoved = async () => {
     const now = await rectOf(list);

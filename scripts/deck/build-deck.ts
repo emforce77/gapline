@@ -29,6 +29,7 @@ import {
 } from "./paths";
 import { SUBMISSION } from "./facts";
 import { allNotes } from "./notes";
+import { PRESENTER_CONTROLS, PRESENTER_CSS, PRESENTER_SCRIPT } from "./presenter";
 import { captureScreens } from "./screens";
 import { renderSpectrograms } from "./spectrogram";
 import { buildSlides, DECK_CSS } from "./slides/index";
@@ -66,9 +67,9 @@ function copyFonts(): void {
 
 function writeHtml(slides: string[]): void {
   const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><title>Scene — AI Builder Cup 2026</title>
-<style>${BASE_CSS}\n${DECK_CSS}</style></head>
-<body>${slides.join("\n")}</body></html>`;
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Scene — AI Builder Cup 2026</title>
+<style>${BASE_CSS}\n${DECK_CSS}\n${PRESENTER_CSS}</style></head>
+<body><main id="deck-stage">${slides.join("\n")}</main>${PRESENTER_CONTROLS}<script>${PRESENTER_SCRIPT}</script></body></html>`;
   writeFileSync(DECK_HTML, html);
 }
 
@@ -148,7 +149,7 @@ async function main(): Promise<void> {
     });
     const consoleErrors: string[] = [];
     page.on("console", (m) => m.type() === "error" && consoleErrors.push(m.text()));
-    await page.goto(pathToFileURL(DECK_HTML).href, { waitUntil: "load" });
+    await page.goto(`${pathToFileURL(DECK_HTML).href}?export`, { waitUntil: "load" });
     await page.evaluate(() => document.fonts.ready.then(() => undefined));
     // Errors while the deck loads count; the DevTools CSS domain used by the checks logs its own.
     const loadErrors = [...consoleErrors];

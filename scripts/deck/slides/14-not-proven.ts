@@ -60,12 +60,12 @@ export function notProvenSlide(): string {
     name: "not-proven",
     kind: "exhibit",
     body: `
-<div class="intro"><h1 class="headline" style="max-width:1728px">Next we prove it with blind viewers and professional describers.</h1></div>
+<div class="intro"><h1 class="headline" style="max-width:1728px">Next we test it with blind viewers and professional describers.</h1></div>
 <table class="np-table" style="left:${MARGIN}px;top:${TABLE_TOP}px;width:${W - 2 * MARGIN}px">
   <tbody>${rows}</tbody>
 </table>
 <div class="np-band" style="left:${MARGIN}px;top:${BAND_TOP}px;width:${W - 2 * MARGIN}px">
-  <div><p class="label">Today</p><p>One Cloud Run service, up to ${MAX_INSTANCES} instances; clips up to ${MAX_UPLOAD_SECONDS}${NBSP}s, one request each.${today}</p></div>
+  <div><p class="label">Prototype limits</p><p>One Cloud Run service, up to ${MAX_INSTANCES} instances; clips up to ${MAX_UPLOAD_SECONDS}${NBSP}s, one request each.${today}</p></div>
   <div><p class="label">Next, for whole films</p><p>Split at shot boundaries; one Cloud Run job per scene, same checks.${path}</p></div>
 </div>`,
   });
