@@ -18,8 +18,6 @@ const EV = { head: 52, col: 206 };
  */
 const FACT_STEP_S = 0.25;
 const FACT_FADE_S = 0.4;
-/** The page is read for seconds once every figure is in: it drifts this much closer meanwhile. */
-const EV_DRIFT = 0.02;
 
 export function evidencePage(timing: PageTiming): string {
   const lang = timing.lang;
@@ -97,9 +95,6 @@ export function evidencePage(timing: PageTiming): string {
 ${reuse}`;
   const render = `
 const S = D.S, L = D.L;
-const stage = $('.stage');
-stage.style.transformOrigin = '50% 45%';
-stage.style.transform = 'scale(' + (1 + ${EV_DRIFT} * ease(t / D.T)) + ')';
 reveal($('#ev-head'), prog(t, 0, 0.7));
 reveal($('#ev-a'), prog(t, S[0], 0.6));
 const n = Math.floor(lin(t, S[0] + 0.6, Math.max(1.5, L[0] - 1.2)) * ${l.written} + 0.001);

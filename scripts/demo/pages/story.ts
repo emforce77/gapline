@@ -120,22 +120,20 @@ const head = ${AX.x0} + draw * ${AX.x1 - AX.x0};
 $('.st-axis').style.width = (head - ${AX.x0}) + 'px';
 $$('.st-tick').forEach((el) => { el.style.opacity = prog(t, S[0] + 0.2, 0.5); });
 $$('.st-dot').forEach((el) => { el.style.opacity = head >= Number(el.dataset.x) ? 1 : 0; });
-$$('.st-ev').forEach((el) => reveal(el, head >= Number(el.dataset.x) ? 1 : 0, 0));
+$$('.st-ev').forEach((el) => { el.style.opacity = head >= Number(el.dataset.x) ? 1 : 0; });
 reveal($('#st-b'), prog(t, S[1], 0.6));
 const n = Math.floor(lin(t, S[1] + 0.8, Math.max(1.5, L[1] - 1.5)) * ${HAND_MADE.specialists} + 0.001);
 $$('.st-people i').forEach((el, i) => el.classList.toggle('on', i < n));`;
   return pageHtml({ lang, css, body, render, data: timing });
 }
 
-/** The camera pushes in this far on the shortest silence while it is named. */
-const SHORTEST_ZOOM = 1.12;
 /** Every silence is outlined within this share of the sentence that counts them. */
 const GAPS_BY = 0.4;
 /** Where in that sentence the shortest is named. */
 const SHORTEST_AT = 0.6;
 const GAP_FADE_S = 0.4;
-/** The push-in eases back out over this long once the lines arrive. */
-const ZOOM_OUT_S = 0.8;
+/** The footnote follows the first voice bars, once the viewer has seen their fit. */
+const FOOTNOTE_DELAY_S = 0.8;
 const C = {
   x0: 330,
   x1: STAGE.w - M,
@@ -196,8 +194,8 @@ export async function constraintPage(timing: PageTiming): Promise<string> {
         `<div class="clip ad ct-bar" data-w="${l.voiced * pps}" style="left:${x(l.start) - C.x0}px;width:0"></div>`,
     )
     .join("");
-  const shortest = o.gaps.find((g) => g.id === o.shortestId);
-  if (!shortest) throw new Error(`shortest gap ${o.shortestId} is not among the gaps`);
+  if (!o.gaps.some((g) => g.id === o.shortestId))
+    throw new Error(`shortest gap ${o.shortestId} is not among the gaps`);
   const ticks = [0, 10, 20, 30, 40, 50, 60]
     .map(
       (s) =>
@@ -213,8 +211,8 @@ export async function constraintPage(timing: PageTiming): Promise<string> {
 .ct-lane { left:${C.x0}px; width:${C.x1 - C.x0}px; }
 #ct-speech { top:${C.dlg}px; height:${C.dlgH}px; clip-path:inset(0 100% 0 0); }
 .ct-gap { background:rgba(236,233,227,.1); box-shadow:inset 0 0 0 2px rgba(236,233,227,.55); border-radius:3px; opacity:0; }
-.ct-gl { top:${C.gl}px; transform:translateX(-50%); transform-origin:50% 0; font-family:var(--mono); font-size:26px; color:var(--ink-300); white-space:nowrap; text-align:center; opacity:0; }
-.ct-gl.short { color:var(--ink-100); }
+.ct-gl { top:${C.gl}px; transform:translateX(-50%); font-family:var(--mono); font-size:26px; color:var(--ink-300); white-space:nowrap; text-align:center; opacity:0; }
+.ct-gl.short { font-size:30px; color:var(--ink-100); }
 .ct-gl span { display:block; font-family:var(--sans); font-size:24px; color:var(--ink-300); }
 .ct-room { opacity:0; }
 #ct-play { top:${C.thumbs - 16}px; width:2px; height:${C.axis - C.thumbs + 16}px; background:var(--ink-100); opacity:0; }
@@ -282,17 +280,10 @@ $$('.ct-gap').forEach((el, i) => { el.style.opacity = prog(t, gapAt(i), ${GAP_FA
 $$('.ct-gl').forEach((el, i) => { el.style.opacity = prog(t, gapAt(i), ${GAP_FADE_S}); });
 const mark = prog(t, S[1] + L[1] * ${SHORTEST_AT}, 0.5);
 $('.ct-gl.short span').style.opacity = mark;
-$('.ct-gl.short').style.transform = 'translateX(-50%) scale(' + (1 + 0.3 * mark) + ')';
 $('.ct-gap.short').style.boxShadow = 'inset 0 0 0 ' + (2 + 2 * mark) + 'px rgba(236,233,227,' + (0.55 + 0.45 * mark) + ')';
-// A push-in on the shortest silence while it is named, back out as the lines arrive.
-const zoom = prog(t, S[1] + L[1] * ${SHORTEST_AT}, 0.9) * (1 - prog(t, S[2], ${ZOOM_OUT_S}));
-const stage = $('.stage');
-stage.style.transformOrigin = '${x((shortest.start + shortest.end) / 2)}px ${C.dlg}px';
-stage.style.transform = 'scale(' + (1 + ${(SHORTEST_ZOOM - 1).toFixed(2)} * zoom) + ')';
 $$('.ct-room').forEach((el, i) => { el.style.opacity = prog(t, S[2] + i * 0.12, 0.4); });
 $$('.ct-bar').forEach((el, i) => { el.style.width = Number(el.dataset.w) * prog(t, S[2] + 0.3 + i * 0.18, 0.7) + 'px'; });
 reveal($('#ct-result'), prog(t, S[2] + 1.4, 0.6));
-// The footnote waits for the push-in to ease back: pushed in, it would sit half under the captions.
-$('.src').style.opacity = prog(t, S[2] + ${ZOOM_OUT_S}, 0.6);`;
+$('.src').style.opacity = prog(t, S[2] + ${FOOTNOTE_DELAY_S}, 0.6);`;
   return pageHtml({ lang, css, body, render, data: timing });
 }

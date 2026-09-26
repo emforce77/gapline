@@ -3,6 +3,7 @@ import { describe, it } from "node:test";
 import type { Page } from "playwright-core";
 import {
   cameraAt,
+  cameraFilters,
   cameraForBeat,
   cameraKeys,
   MOVE_SECONDS,
@@ -176,20 +177,34 @@ describe("the recorder's clock", () => {
 describe("the camera", () => {
   const box = { x: 1055, y: 231, w: 342, h: 378 };
 
-  it("keeps a cached replay's reading hold still and preserves the move to the timeline", () => {
-    const keys = cameraForBeat({
-      beat: "replay",
-      shots: [
-        { at: 0, rect: box, maxZoom: 1.8, move: 0 },
-        { at: 1.4, rect: box, maxZoom: 1.8, move: 12, drift: 1.04 },
-        { at: 14, rect: null },
-      ],
+  for (const beat of ["upload", "replay", "review", "result", "edit"] as const) {
+    it(`holds every ${beat} close-up still and cuts directly between targets`, () => {
+      const keys = cameraForBeat({
+        beat,
+        shots: [
+          { at: 0.003, rect: box, maxZoom: 1.8, move: 1.2 },
+          { at: 1.4, rect: box, maxZoom: 1.8, move: 12, drift: 1.04 },
+          { at: 14, rect: null, move: 1.2 },
+        ],
+      });
+      const held = cameraAt(keys, 0);
+      assert.ok(held.z > 1.5, "the first frame is already framed; no wide-shot flash");
+      for (let frame = 0; frame < 14 * 30; frame++)
+        assert.deepEqual(cameraAt(keys, frame / 30), held);
+      assert.equal(cameraAt(keys, 14).z, 1, "the next target is reached on its cut");
+      assert.ok(keys.every((key) => key.move === 0 && !key.drift));
+      assert.doesNotMatch(cameraFilters(keys).join(","), /cos\(/, "no interpolated rescale");
     });
-    const held = cameraAt(keys, 0);
-    for (let frame = 0; frame < 14 * 30; frame++)
-      assert.deepEqual(cameraAt(keys, frame / 30), held);
-    assert.ok(cameraAt(keys, 14.6).z < held.z, "the deliberate exit move is kept");
-    assert.equal(cameraAt(keys, 15.2).z, 1);
+  }
+
+  it("records new targets as fixed cuts", () => {
+    const clock = new BeatClock(fakePage, "result", 5);
+    clock.shot(box, 1.8, 0);
+    clock.shot(null, undefined, 3);
+    assert.deepEqual(clock.rec.shots, [
+      { at: 0, rect: box, maxZoom: 1.8, move: 0 },
+      { at: 3, rect: null, maxZoom: undefined, move: 0 },
+    ]);
   });
 
   it("cuts at once, and waits for a move but not for a drift", () => {
@@ -232,7 +247,7 @@ describe("the camera", () => {
     late: [],
   });
 
-  it("draws a spotlight where its element is through a drift", () => {
+  it("holds a spotlight fixed when an older recording contains decorative drift", () => {
     const events = overlayEvents(
       rec([
         { at: 0, rect: box, maxZoom: 1.8, move: 0 },
@@ -240,13 +255,12 @@ describe("the camera", () => {
       ]),
     );
     const frames = events.filter((e) => e.layer === 2);
-    const size = (e: { text: string }) => Number(/ l (\d+) 0/.exec(e.text)![1]);
-    assert.ok(frames.length > 60, `${frames.length} pieces`);
-    assert.ok(size(frames.at(-1)!) > size(frames[0]), "the frame grows with the push-in");
-    assert.ok(!frames.some((e) => e.text.includes("\\fad(")), "fades are set piece by piece");
+    assert.equal(frames.length, 1, "one fixed rectangle for the whole reading hold");
+    assert.equal(frames[0].start, 0.5);
+    assert.equal(frames[0].end, 4);
   });
 
-  it("fails a spotlight the camera would move away from", () => {
+  it("fails a spotlight the camera would cut away from", () => {
     assert.throws(
       () =>
         overlayEvents(

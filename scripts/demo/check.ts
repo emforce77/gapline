@@ -335,6 +335,7 @@ export async function writeCheck(input: {
         `  - ${h.label}: planned ${h.planned.toFixed(3)} s, heard ${h.heard.toFixed(3)} s (${ms(h.heard - h.planned)}, match ${h.match.toFixed(3)})`,
     ),
     `- ${box(lastsFilm)} sound runs the whole film: sound ${sync.audio.toFixed(3)} s, picture ${sync.video.toFixed(3)} s`,
+    `- Framing: app close-ups and explanation pages intentionally hold still, with cuts between app shots. The low-motion detections below include these reading holds; check the named intervals visually before treating them as stalled playback.`,
     `- ${box(longest <= MAX_FROZEN_S)} longest frozen stretch in the picture area: ${r1(longest)} s (limit ${MAX_FROZEN_S} s; ${frozen.length} stretches of 2 s or more)`,
     ...frozen
       .slice(0, 5)

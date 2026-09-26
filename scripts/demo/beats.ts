@@ -11,9 +11,8 @@
  *   result  — that line's measured fit, and playback;
  *   edit    — a word typed into another line, WITHOUT submitting it: the optional path.
  * Camera shots and overlays are logged on the scene's clock as the page is driven. Every box is read
- * once the page has stopped moving, and every spotlight is read again as it lights up. Where a
- * picture is held while its caption is read, the camera drifts slowly in on it, except the dense
- * replay stage list, whose text stays fixed while its live statuses change.
+ * once the page has stopped moving, and every spotlight is read again as it lights up. Every
+ * camera target is a fixed close-up reached by a clean cut; no reading hold drifts or zooms.
  */
 import { copyFile, mkdir } from "node:fs/promises";
 import { join } from "node:path";
@@ -96,9 +95,6 @@ const LIGHT_S = 0.5;
 const LIGHT_GAP_S = 0.1;
 /** The check's fix is lit alone at least until this far into its sentence, before the rewrite joins it. */
 const FIX_ALONE_S = 2.2;
-/** A drift starts this long after the camera has arrived, and ends this long before the next move. */
-const DRIFT_LEAD_S = 0.1;
-const DRIFT_TAIL_S = 0.2;
 /** "Play from here" is pressed this long before the listen pause, so the film starts inside it. */
 const PLAY_LEAD_S = 0.9;
 /** "Play from here" starts the page this long before its line (PLAY_LEAD_IN_SECONDS, Workspace.tsx). */
@@ -184,21 +180,18 @@ function lastLineAt(plan: ScenePlan, k: number): number {
 }
 
 /**
- * Frames `rect` (taking in the lines of text its frame would otherwise cut) from picture time `at`;
- * once the camera has arrived, it drifts slowly in on it until `until`, so the picture keeps moving
- * while its caption is read.
+ * Cuts to `rect` (taking in the lines of text its frame would otherwise cut) at picture time `at`,
+ * then holds that framing until the next editorial shot.
  */
 async function frameAndHold(
   page: Page,
   clock: BeatClock,
   rect: Rect,
   maxZoom: number,
-  until: number,
   at = clock.now(),
 ): Promise<void> {
   const framed = await frameWhole(page, rect, maxZoom);
   clock.shot(framed, maxZoom, at);
-  await clock.drift(framed, maxZoom, at + MOVE_SECONDS + DRIFT_LEAD_S, until - DRIFT_TAIL_S);
 }
 
 /** Whether `box` is wholly inside `view` or wholly out of it: never cut at the frame's edge. */
@@ -391,7 +384,7 @@ const upload: BeatScript = async (page, clock, plan, lang) => {
     );
   const generate = page.getByRole("button", { name: t.workspace.generate, exact: true }).first();
   const button = await settledRect(page, boxesOf([generate]));
-  await frameAndHold(page, clock, button, GENERATE_ZOOM, plan.seconds - 0.2, changed);
+  await frameAndHold(page, clock, button, GENERATE_ZOOM, changed);
   clock.spotlight("Generate", s1 + 0.4, plan.seconds - 0.2, button, boxesOf([generate]));
   clock.overlay({
     kind: "chip",
@@ -436,7 +429,7 @@ const replay: BeatScript = async (page, clock, plan, lang) => {
   const badge = await rectOf(page.locator(".replay-badge"));
   if (sharedArea(badge, shotView(framed, LIST_ZOOM)) > 0)
     throw new Error("replay: the replay badge would be in the stage list's shot");
-  clock.shot(framed, LIST_ZOOM, 0, 0);
+  clock.shot(framed, LIST_ZOOM, 0);
   clock.spotlight("the stage list", s1 + LIST_LIGHT_S, listEnd, stages, boxesOf([list]));
   // Each stage's service beside it; the stages the sample reused get one chip saying where from.
   const reused = page.locator(".stages li").filter({ hasText: t.stages.reused });
@@ -520,7 +513,7 @@ const review: BeatScript = async (page, clock, plan) => {
   await scrollInspectorTo(page, failed, 60);
   const ruleEnd = s1 - SCROLL_LEAD_S - SPOTLIGHT_CLEAR_S;
   const rule = await spotlight(page, clock, "the rejection", rejection, s0 + LIGHT_S, ruleEnd);
-  await frameAndHold(page, clock, rule, TEXT_ZOOM, ruleEnd);
+  await frameAndHold(page, clock, rule, TEXT_ZOOM);
   // 2. The check's fix, then the rewrite built from it, brought in when the caption names it.
   await clock.at(s1 - SCROLL_LEAD_S, "the check's fix");
   const fix = failed.locator(".fix");
@@ -544,7 +537,7 @@ const review: BeatScript = async (page, clock, plan) => {
     rewriteAt,
     fixEnd,
   );
-  await frameAndHold(page, clock, both, LIST_ZOOM, fixEnd);
+  await frameAndHold(page, clock, both, LIST_ZOOM);
   // 3. How the line ended: its history in one sentence, and its measured fit.
   await clock.at(s2 - SCROLL_LEAD_S, "the line's verdict");
   await page.evaluate(() =>
@@ -559,7 +552,7 @@ const review: BeatScript = async (page, clock, plan) => {
     s2 + LIGHT_S,
     leave - SPOTLIGHT_CLEAR_S,
   );
-  await frameAndHold(page, clock, verdict, TEXT_ZOOM, leave);
+  await frameAndHold(page, clock, verdict, TEXT_ZOOM);
   clock.shot(null, undefined, leave);
   await clock.at(plan.seconds, "end of review");
 };
@@ -573,8 +566,7 @@ const result: BeatScript = async (page, clock, plan, lang) => {
   const title = words.resultLine.split(" · ")[0];
   if (!(await head.innerText()).startsWith(title))
     throw new Error(`result: the line picked is not "${title}"`);
-  // One push from the whole page to the meter, from the scene's first frame, in a whole camera move
-  // (it went in two, the first cut short to 0.83 s); the meter lights once the camera is there.
+  // Open on the fixed close-up of the meter; retain the spotlight's established reading time.
   const fit = page.locator(".fit");
   const meterEnd = s1 - SPOTLIGHT_CLEAR_S;
   const meter = await spotlight(
@@ -585,7 +577,7 @@ const result: BeatScript = async (page, clock, plan, lang) => {
     MOVE_SECONDS + LIGHT_GAP_S,
     meterEnd,
   );
-  await frameAndHold(page, clock, meter, FIT_ZOOM, meterEnd, 0);
+  await frameAndHold(page, clock, meter, FIT_ZOOM, 0);
   // The player with the strip and the controls under it, framed across the whole workspace: the
   // zoom's spare width lands in the page's margins, never inside the inspector beside it.
   const main = await rectOf(page.locator(".ws-main"));
@@ -646,7 +638,7 @@ const edit: BeatScript = async (page, clock, plan, lang) => {
   const typedEnd = s1 - SPOTLIGHT_CLEAR_S;
   const box = form.locator("textarea");
   const field = form.locator("label").filter({ has: page.locator("textarea") });
-  await frameAndHold(page, clock, await settledRect(page, boxesOf([field])), TEXT_ZOOM, typedEnd);
+  await frameAndHold(page, clock, await settledRect(page, boxesOf([field])), TEXT_ZOOM);
   await clickLike(page, box);
   const before = await box.inputValue();
   if (!before.endsWith(EDIT_BEFORE))
@@ -676,7 +668,7 @@ const edit: BeatScript = async (page, clock, plan, lang) => {
     s1 + 0.2,
     plan.seconds - 0.2,
   );
-  await frameAndHold(page, clock, button, TEXT_ZOOM, plan.seconds - 0.2, s1);
+  await frameAndHold(page, clock, button, TEXT_ZOOM, s1);
   await clock.at(s1 + REST_BESIDE_S, "rest beside the button");
   const end = await rectOf(submit);
   await moveCursor(page, end.x + end.w + BESIDE_CSS, end.y + end.h / 2);

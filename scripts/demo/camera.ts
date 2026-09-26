@@ -1,12 +1,12 @@
 /**
- * The virtual camera over a recording: eased zooms and pans to the elements the recorder logged. The
+ * The virtual camera over a recording: fixed close-ups of the elements the recorder logged. The
  * FFmpeg chain scales each 2880×1320 frame to 1920·Z × 880·Z and crops the 1920×880 picture area out
  * of it. Crop bounds are written as explicit 1920·Z / 880·Z expressions because crop keeps the first
  * frame's input size.
- * A shot is reached in MOVE_SECONDS, or cut to at once; a drift is a slow push-in on the element in
- * shot, so the picture never stands still for long, about the page point it keeps in place (its
- * anchor: the element's centre unless the recorder chose an edge). The same state function places
- * overlays in picture pixels: a spotlight lands on its element, and follows it through a drift.
+ * cameraForBeat applies the film's stable-camera policy to all recordings: no decorative drift,
+ * and each editorial zoom or pan is a clean cut. The same state function places overlays in
+ * picture pixels, keeping their edges fixed on the element. The lower-level geometry still reads
+ * older recordings' camera metadata, but the film never interpolates between their targets.
  */
 import type { Rect } from "./ass";
 import { CONTENT_HEIGHT, CSS_TO_OUT, FPS, WIDTH } from "./config";
@@ -111,14 +111,18 @@ export function cameraKeys(shots: Shot[]): Key[] {
 }
 
 /**
- * Hold the replay's dense stage list still while it is read. A tiny continuous scale/crop rounds
- * to whole pixels in FFmpeg and makes the text and overlay edges visibly jitter. Apply this when
- * building too, so cached recordings get the same stable hold without recording a new run.
+ * Every app scene uses fixed framing and clean cuts. Continuous scale/crop rounds to whole pixels
+ * in FFmpeg and makes text and overlay edges jitter, including the fit panel around 1:50. Apply
+ * the policy to all cached shots as well as new recordings, preserving their targets and timing.
  */
 export function cameraForBeat(rec: Pick<BeatRecord, "beat" | "shots">): Key[] {
-  return cameraKeys(
-    rec.beat === "replay" ? rec.shots.filter((shot) => shot.drift === undefined) : rec.shots,
+  const keys = cameraKeys(
+    rec.shots.filter((shot) => shot.drift === undefined).map((shot) => ({ ...shot, move: 0 })),
   );
+  // The recorder can stamp its opening target a few milliseconds after zero. Frame it from the
+  // first output frame, rather than flashing the default wide shot before cutting to a close-up.
+  if (keys[0] && keys[0].at <= 1 / FPS) keys[0].at = 0;
+  return keys;
 }
 
 const progress = (k: Key, t: number) => (k.move > 0 ? ease((t - k.at) / k.move) : 1);
@@ -161,9 +165,9 @@ export function settledAt(keys: Key[], t: number): number {
   return k ? Math.max(t, k.at + k.move) : t;
 }
 
-/** Moves other than drifts under way between `from` and `to`: an overlay lit then would slide off. */
+/** Camera changes inside an overlay's span would leave it behind, including instantaneous cuts. */
 export const movesDuring = (keys: Key[], from: number, to: number): Key[] =>
-  keys.filter((k) => !k.drift && k.move > 0 && k.at < to && k.at + k.move > from);
+  keys.filter((k) => !k.drift && k.at < to && (k.move > 0 ? k.at + k.move > from : k.at > from));
 
 /**
  * `from`–`to` in pieces, each drawn with the camera at its `at`: one piece where the camera holds

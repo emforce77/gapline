@@ -3,7 +3,7 @@
  * draws first; then one line runs through the run's stages in order, each stage lighting as the line
  * reaches it, with the Google model it calls under its name and the two loops that send a line back;
  * last, Cloud Storage under the service and the progress stream back to the browser. No looping
- * pulses: every mark is drawn once, and a slow push-in keeps the picture alive while it is read.
+ * pulses: every mark is drawn once and stays fixed while it is read.
  * Settings come from deploy/cloud-run.sh (via the deck's data/deploy.ts); the Gemini access wording is
  * GEMINI_ACCESS_LABEL (src/lib/models.ts), the one place it may change.
  */
@@ -28,8 +28,6 @@ const LOOP_DEPTH = 50;
 const NODE_X0 = BOX.x + 96;
 const NODE_X1 = BOX.x + BOX.w - 96;
 const SHELF = { x: BOX.x, y: BOX.y + BOX.h + 36, w: BOX.w, h: 80 };
-/** The whole page drifts this much closer over the scene. */
-const DRIFT = 0.022;
 /** Share of the services sentence the line takes to cross every stage. */
 const CROSS_SHARE = 0.8;
 
@@ -221,9 +219,6 @@ function draw(path, p) {
   tip.setAttribute('transform', 'translate(' + b.x + ' ' + b.y + ') rotate(' + (Math.atan2(b.y - a.y, b.x - a.x) * 180 / Math.PI) + ')');
   tip.style.opacity = p > 0.03 ? 1 : 0;
 }
-const stage = $('.stage');
-stage.style.transformOrigin = '50% 45%';
-stage.style.transform = 'scale(' + (1 + ${DRIFT} * ease(t / D.T)) + ')';
 reveal($('#cz-head'), prog(t, 0, 0.7));
 // 1. The service: its outline draws, then its settings.
 const box = $('.cz-box'); const bl = box.getTotalLength();

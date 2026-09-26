@@ -32,7 +32,7 @@ export interface Shot {
   rect: Rect | null;
   /** Largest zoom allowed for this shot. */
   maxZoom?: number;
-  /** Seconds the camera takes to get there (camera.ts MOVE_SECONDS unless set; 0 cuts). */
+  /** Legacy transition duration; new recordings always write 0 for a clean cut. */
   move?: number;
   /** A drift: a slow push-in on `rect`, this much closer than its shot, that lit overlays follow. */
   drift?: number;
@@ -119,8 +119,7 @@ export const MIN_SPOT_OVERLAP = 0.9;
 export const MAX_STRETCH = 5;
 /** Warps shorter than this difference are not worth a warp. */
 const WARP_EPS_S = 0.02;
-/** A drift shorter than this, or pushing in less than MIN_PUSH, is not worth one. */
-const MIN_DRIFT_S = 1.5;
+/** Minimum push accepted by the legacy drift geometry helper. New recordings do not use drift. */
 const MIN_PUSH = 1.01;
 const PUSH_STEP = 0.005;
 /** A line of text may reach this far (CSS px) past a frame's edge and still count as inside it. */
@@ -276,22 +275,9 @@ export class BeatClock {
     this.overlay({ kind: "tag", at: startOut, until: out + tail, text: label });
   }
 
-  /** Frames `rect` from picture time `at`, reached in `move` seconds (camera.ts; 0 cuts). */
-  shot(rect: Rect | null, maxZoom?: number, at = this.now(), move?: number): void {
-    this.rec.shots.push(move === undefined ? { at, rect, maxZoom } : { at, rect, maxZoom, move });
-  }
-
-  /**
-   * A slow push-in on the shot's `rect` from `from` to `until`, so a held picture keeps moving
-   * while its caption is read; lit overlays follow it. It keeps whole every line of text the shot
-   * shows whole (driftFor), and is skipped when the hold is too short to need one or there is no
-   * room to push in.
-   */
-  async drift(rect: Rect, maxZoom: number | undefined, from: number, until: number): Promise<void> {
-    if (until - from < MIN_DRIFT_S) return;
-    const found = driftFor(rect, maxZoom, await textLines(this.page));
-    if (!found) return;
-    this.rec.shots.push({ at: from, rect, maxZoom, move: until - from, ...found });
+  /** Cuts to `rect` at picture time `at` and holds that framing until the next shot. */
+  shot(rect: Rect | null, maxZoom?: number, at = this.now()): void {
+    this.rec.shots.push({ at, rect, maxZoom, move: 0 });
   }
 
   overlay(o: Overlay): void {

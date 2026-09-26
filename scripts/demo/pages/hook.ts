@@ -13,8 +13,6 @@ import { esc, note, pageHtml, pick, secs, STAGE, still, type PageTiming } from "
 
 const M = STAGE.margin;
 
-/** How much closer the words held after the film's sound drift, over the rest of the scene. */
-const DRIFT = 0.06;
 /** The display words ("Close your eyes.") in Korean: Pretendard, since the serif has no Hangul. */
 const KO_DISPLAY_CSS = "font-family:var(--sans); font-style:normal; font-weight:600;";
 
@@ -77,9 +75,6 @@ const s = lin(f, D.h.locked.end, D.h.freaky.start - D.h.locked.end);
 const on = prog(f, D.h.locked.end, 0.3) * (1 - prog(t, D.S[0] - 0.5, 0.4));
 reveal($('#sum'), prog(t, D.S[0], 0.6) * (1 - prog(t, D.S[1] - 0.1, 0.4)), 16);
 reveal($('#open'), prog(t, D.S[1] + 0.2, 0.5) * (1 - prog(t, D.T - 0.25, 0.25)), 10);
-// A slow push on the words held after the film's sound, so the picture keeps moving while they are read.
-const drift = (el, from) => { el.style.transform += ' scale(' + (1 + ${DRIFT} * lin(t, from, D.T - from)) + ')'; };
-drift($('#sum'), D.S[0]); drift($('#open'), D.S[1]);
 const w = s * ${width};
 $('#meter').style.width = w + 'px';
 $('#meter').style.opacity = on;
@@ -176,7 +171,7 @@ export async function sevenPage(timing: PageTiming): Promise<string> {
   const css = `
 .u { font-family:var(--sans); }
 .sv-shot { top:${SEVEN.strip}px; height:${SEVEN.stripH}px; overflow:hidden; opacity:0; }
-.sv-shot img { width:100%; height:100%; object-fit:cover; transform-origin:50% 50%; }
+.sv-shot img { width:100%; height:100%; object-fit:cover; }
 .sv-sub { top:${SEVEN.sub}px; font-size:36px; line-height:1.25; opacity:0; }
 .sv-sub .box { display:inline-block; padding:6px 16px 8px; border-radius:4px; background:rgba(9,9,10,.72); }
 .sv-sub .gloss { font-size:26px; }
@@ -235,8 +230,7 @@ ${note(
   const render = `
 const S = D.S, L = D.L;
 reveal($('#sv-head'), prog(t, 0, 0.7));
-$$('.sv-shot').forEach((el, i) => { el.style.opacity = prog(t, 0.05 + i * 0.15, 0.6);
-  el.firstChild.style.transform = 'scale(' + (1.0 + 0.035 * t / D.T) + ')'; });
+$$('.sv-shot').forEach((el, i) => { el.style.opacity = prog(t, 0.05 + i * 0.15, 0.6); });
 $$('.sv-lane, .sv-edge, .sv-ko').forEach((el) => { el.style.opacity = prog(t, 0.2, 0.6); });
 reveal($('.sv-span'), prog(t, 0.5, 0.6), 0);
 $$('.sv-room').forEach((el, i) => { el.style.opacity = prog(t, S[0] + 0.2 + i * 0.3, 0.5); });

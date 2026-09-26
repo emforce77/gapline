@@ -47,7 +47,8 @@ evidence, close.
   is drawn in hairlines: the Cloud Run outline, one line lighting the run's stages in order (Hear,
   Watch, Write, Review, Voice, Check, Fix, Mix) with the model each calls, the loops that send a line
   back, then Cloud Storage and the live progress stream; arrowheads ride the drawn end of each line,
-  and a slow push-in keeps the picture moving while it is read.
+  and the page stays fixed while it is read. All explanation pages use fixed text and image scales;
+  timed reveals, measured bars and diagram drawing provide the meaningful changes.
 - App scenes are recorded at device scale 2 (2880×1320 frames, 1440×660 CSS viewport, the picture
   area's aspect). The recorder logs element boxes, camera shots and overlays in film time
   (`recorder-kit.ts`); `camera.ts` turns them into eased scale+crop filters; overlays (spotlight,
@@ -65,15 +66,15 @@ evidence, close.
   that, the page is scrolled up by the few pixels that put the sticky inspector at its place, so the
   timeline growing during the replay moves nothing in it; the page goes back down once the replay
   is done.
-- Camera (`camera.ts`, `beats.ts`): moves take 1.2 s. Close-ups are placed so that no line of text
+- Camera (`camera.ts`, `beats.ts`): every app scene uses fixed framing and clean cuts. All decorative
+  drift and animated zoom/pan are removed centrally by `cameraForBeat`, including from cached
+  recordings, and new recordings write cuts only. The opening shot is effective from frame zero
+  when its recorded timestamp falls in the first frame, avoiding a brief wide-shot flash. Both the
+  picture and overlays use these same keys; a cut inside a lit overlay's span fails the build.
+  Close-ups retain their target and timing and are placed so that no line of text
   is cut at any edge of the picture, the column beside the element included
   (`frameAround` in `recorder-kit.ts`: moved up or down, or up to 15% more page; failing that, only
-  the element's own column is kept whole at top and foot). The replay's dense stage list holds
-  still while its status changes: tiny scale/crop steps made its text shimmer near 1:22. This hold
-  also applies when rebuilding cached recordings. Other reading shots use a slow
-  push-in ("drift", at most 8% closer) about the point that lets it go furthest (the element's
-  centre, or an edge or corner of the view), which spotlights and chips follow frame by frame and
-  which keeps whole every line the shot showed whole. The upload section is framed for the page
+  the element's own column is kept whole at top and foot). The upload section is framed for the page
   before and after the card's status line pushes the next section down. The edit scene opens on the
   whole workspace and types in a close-up of the line's box: a close-up of the whole editor is as
   tall as the player's caption strip and controls beside it, and cuts their labels. The recording's
@@ -137,6 +138,12 @@ neither a caption nor film sound, a recording made where `/api/live-status` said
 OpenRouter) on the cloud page. It never ticks the human watch-through.
 
 ## Debug log
+
+- [2026-09-26] The first fix only held the replay still and missed the same jitter on the review
+  panel near 1:50 (EN drift 109.61–112.02 s; KO 108.72–111.20 s). All five app beats now discard
+  decorative drift and use fixed close-ups with instantaneous editorial cuts. This covers all
+  eight cached drift shots per language and every animated camera transition, while keeping the
+  existing recording, scene lengths, caption timing and audio. A regression covers every beat.
 
 - [2026-09-26] The replay's 4% push-in over 11–14 seconds made small text and service chips
   visibly jitter as FFmpeg rounded the scale and crop to pixels. Removed that drift while keeping
