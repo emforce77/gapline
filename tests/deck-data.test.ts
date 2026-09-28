@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
-import { cost, analysis } from "../scripts/deck/data/analysis";
 import { launchCall } from "../scripts/deck/data/recognizers";
 import { overlap, stagesOf, unionOf } from "../scripts/deck/data/runs";
 import { line, missing, opening, run } from "../scripts/deck/data/sample";
@@ -53,8 +52,6 @@ describe("the pinned sample, as the deck and the film read it", () => {
     assert.equal(film.line.cueId, line.cueId);
     assert.equal(film.line.gloss, line.rewrite.gloss);
     assert.equal(film.line.rejectedBy, "final check");
-    assert.equal(film.analysis.costUsd, analysis.costUsd);
-    assert.equal(cost.allInCostUsd, cost.runCostUsd + cost.analysisCostUsd);
     assert.ok(missing.every((m) => m.gloss.length > 0));
     // The launch call: the before-run spoke over it, the sample has no line there.
     assert.ok(overlap(launchCall.before.gap, launchCall.heard) > 0);

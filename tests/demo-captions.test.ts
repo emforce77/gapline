@@ -198,7 +198,7 @@ describe("the film's storyboard", () => {
 
 describe("motion pages in the Korean film", () => {
   // Pages that cut no stills (the seven and constraint pages call FFmpeg for theirs).
-  const PAGE_IDS: PageId[] = ["dark", "stakes", "cloud", "evidence", "close"];
+  const PAGE_IDS: PageId[] = ["dark", "stakes", "cloud", "close"];
   const words = (s: string) => s.match(/[A-Za-z][\w.\-/()&']*/g) ?? [];
   const hook = film.hook;
   const allowed = new Set(

@@ -9,10 +9,10 @@
  * optional edit once, as an offer. The words drawn over the app live in labels.ts.
  */
 import type { Language } from "../../src/lib/pipeline/schemas";
-import { film, minutesSeconds } from "./facts";
+import { film } from "./facts";
 
 export type Beat = "upload" | "replay" | "review" | "edit" | "result";
-export type PageId = "dark" | "seven" | "stakes" | "constraint" | "cloud" | "evidence" | "close";
+export type PageId = "dark" | "seven" | "stakes" | "constraint" | "cloud" | "close";
 
 export type Part =
   /**
@@ -104,8 +104,6 @@ export function buildStoryboard(): Scene[] {
   const rewrite = film.line.rewrite.text;
   /** The rewrite quoted inside a sentence: its closing full stop would come before the particle. */
   const rewriteWords = rewrite.replace(/\.$/, "");
-  const l = film.loops;
-  const sample = film.original;
   return [
     {
       id: "dark",
@@ -379,37 +377,6 @@ export function buildStoryboard(): Scene[] {
         ),
       ],
       hold: 0.4,
-    },
-    {
-      id: "evidence",
-      show: { page: "evidence" },
-      parts: [
-        cap(
-          `In ${l.runs} finished test runs, ${l.voiced} of ${l.written} lines made it into the finished tracks.`,
-          `끝까지 마친 시험 실행 ${l.runs}회에서 ${l.written}문장 중 ${l.voiced}문장이 완성 트랙에 들어갔습니다.`,
-          {
-            ko: [
-              [
-                `끝까지 마친 시험 실행 ${l.runs}회에서 ${l.written}문장 중`,
-                `${l.voiced}문장이 완성 트랙에 들어갔습니다.`,
-              ],
-            ],
-          },
-        ),
-        cap(
-          `The sample: ${sample.lines} lines in ${minutesSeconds(sample.seconds, "en")}, for $${sample.costUsd.toFixed(2)} in API fees.`,
-          `샘플은 ${sample.lines}문장이고, 만드는 데 ${minutesSeconds(sample.seconds, "ko")}, API 비용 ${sample.costUsd.toFixed(2)}달러가 들었습니다.`,
-          {
-            ko: [
-              [
-                `샘플은 ${sample.lines}문장이고, 만드는 데 ${minutesSeconds(sample.seconds, "ko")},`,
-                `API 비용 ${sample.costUsd.toFixed(2)}달러가 들었습니다.`,
-              ],
-            ],
-          },
-        ),
-      ],
-      hold: 0.5,
     },
     {
       id: "close",

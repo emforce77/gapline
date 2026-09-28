@@ -1,18 +1,15 @@
 /**
  * Every number the film prints or says. The sample's numbers come from the one automatic run that
- * runtime/showcase.json pins for the app, the film and the deck (scripts/deck/data/sample.ts, with the
- * reused hearing and watching in data/analysis.ts); the evaluation's from the deck's other checked data
- * modules; outside facts (court, prices) from scripts/deck/facts.ts with their source lines.
+ * runtime/showcase.json pins for the app, the film and the deck (scripts/deck/data/sample.ts); outside
+ * facts (court, prices) from scripts/deck/facts.ts with their source lines.
  */
 import { readFileSync } from "node:fs";
 import { MAX_UPLOAD_SECONDS } from "../../src/lib/api-contract";
 import { GUIDELINE_RULES } from "../../src/lib/pipeline/guidelines";
 import { GEMINI_ACCESS_LABEL, MODELS } from "../../src/lib/models";
-import { analysis } from "../deck/data/analysis";
 import { liveCheck } from "../deck/data/live-check";
-import { loopCounts } from "../deck/data/loops";
 import { pin } from "../deck/data/runs";
-import { finalFix, line, notes, opening, runId, seven, summary } from "../deck/data/sample";
+import { line, notes, opening, runId, seven, summary } from "../deck/data/sample";
 import { CATEGORY, FILM_CREDIT, HAND_MADE, LAWSUIT, THEME } from "../deck/facts";
 import { PROJECT_ID, REPO, SAMPLE_RUN } from "./config";
 
@@ -57,22 +54,15 @@ export const film = {
   /** The line the review and result scenes follow: passed review, sent back by the final check,
    * rewritten from its fix, passed and voiced. `gloss` is the shipped line's English. */
   line: { ...line, rejectedBy },
-  finalFix,
-  /** The earlier run of the clip whose hearing and watching the sample reused: its cost and time. */
-  analysis: { runId: analysis.runId, costUsd: analysis.costUsd, seconds: analysis.seconds },
   original: {
     seconds: summary.seconds,
-    costUsd: summary.costUsd,
     clipSeconds: summary.clipSeconds,
-    lines: summary.lines,
     qualityStatus: summary.qualityStatus,
-    analysisReused: summary.analysisReused,
     day: summary.day,
   },
   /** What the final check still lists: its notes, and how many are moments with no silence left. */
   notes,
   rules: GUIDELINE_RULES.length,
-  loops: loopCounts,
   evaluatedAt,
   court: { date: new Date(court.date), source: court.source },
   handMade: HAND_MADE,

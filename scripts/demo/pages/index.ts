@@ -2,7 +2,7 @@
 import type { PageId } from "../storyboard";
 import { darkPage, sevenPage } from "./hook";
 import { cloudPage } from "./cloud";
-import { closePage, evidencePage } from "./proof";
+import { closePage } from "./close";
 import { constraintPage, stakesPage } from "./story";
 import type { PageTiming } from "./shell";
 
@@ -12,6 +12,5 @@ export const PAGES: Record<PageId, (timing: PageTiming) => string | Promise<stri
   stakes: stakesPage,
   constraint: constraintPage,
   cloud: cloudPage,
-  evidence: evidencePage,
   close: closePage,
 };

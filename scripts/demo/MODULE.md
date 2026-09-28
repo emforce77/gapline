@@ -10,13 +10,13 @@ captions) into `runtime/demo-v3/<lang>/`: `scene-demo-<lang>.mp4`, `_check.md`, 
 now, the constraint, the product in the app (upload, and one press of Generate running every step;
 the saved automatic run replayed; a line the final check sent back and Scene rewrote from the
 check's fix; the measured fit and playback; the optional edit, offered once), Google Cloud,
-evidence, close.
+close. There is no evidence scene: one sample run's totals (lines, minutes, API fees) and the
+evaluation's small counts read as a benchmark they are not (owner, 2026-09-28).
 
 - The app scenes show the one automatic run `runtime/showcase.json` pins for the app, the film and
   the deck (`SAMPLE_RUN` in `config.ts`, read through `scripts/deck/data/runs.ts`). `facts.ts` reads
-  the sample from `scripts/deck/data/sample.ts` (with the reused hearing and watching in
-  `data/analysis.ts`), the evaluation from the deck's other data modules and the outside facts from
-  `scripts/deck/facts.ts`; it checks that the film's line is the one the final check sent back.
+  the sample from `scripts/deck/data/sample.ts` and the outside facts from `scripts/deck/facts.ts`;
+  it checks that the film's line is the one the final check sent back.
   Nothing on screen or in a caption is typed by hand. "One press" is a product claim: the sample was
   started from the command line through the same path as Generate. The Gemini access wording is
   `GEMINI_ACCESS_LABEL` (src/lib/models.ts).
@@ -138,6 +138,16 @@ neither a caption nor film sound, a recording made where `/api/live-status` said
 OpenRouter) on the cloud page. It never ticks the human watch-through.
 
 ## Debug log
+
+- [2026-09-28] The evidence scene is gone (owner: one sample's "7 lines, 8 min 6 s, $0.32" and the
+  evaluation's "18 of 20 lines" read cheap). The storyboard runs cloud straight into close;
+  `pages/proof.ts` became `pages/close.ts`, and `film.loops`, `film.analysis`, `film.finalFix` and the
+  sample's cost and line count left `facts.ts`. The replay tag "Saved run: 8 min 6 s of processing,
+  sped up" stays: it discloses the time-lapse, not a benchmark. Rebuilt from the existing recordings
+  (no app scene changed): EN 157.4 s (166.8 before), KO 156.5 s (167.3 planned before). Both check
+  notes keep the longest frozen stretch they had before this change (EN 6.0 s at 85.5 s, KO 5.5 s),
+  from the still framing of 2026-09-27; KO lost the 4.5 s stretch the evidence page held. Before:
+  `runtime/demo-v3/backups/20260928-before-cut/`.
 
 - [2026-09-26] The first fix only held the replay still and missed the same jitter on the review
   panel near 1:50 (EN drift 109.61–112.02 s; KO 108.72–111.20 s). All five app beats now discard
@@ -265,6 +275,11 @@ OpenRouter) on the cloud page. It never ticks the human watch-through.
     now found by the app's own hint text.
 
 ## Status
+
+2026-09-28: rebuilt without the evidence scene (debug log): EN 157.4 s, KO 156.5 s; every check box
+as before (frozen stretch and the development Gemini label open, the watch-through not yet done).
+The upload scene shows the app's landing, which still carries its "−54%" TV-subsidy figure
+(`src/`, not this module); the deck dropped that figure.
 
 2026-09-23: the films in `runtime/demo-v3/` were recorded at 13:03Z (EN) and 13:10Z (KO) and built
 right after: EN 165.3 s, KO 166.1 s, as planned. Their check notes read every film excerpt +5 ms
