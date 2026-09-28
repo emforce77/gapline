@@ -41,26 +41,23 @@ export default async function ProjectPage({
   } catch {
     notFound();
   }
-  const [runs, analysis, showcase, korean] = await Promise.all([
+  const [runs, analysis, showcase] = await Promise.all([
     listRuns(project.id),
     readAnalysis(project.id),
     loadShowcase(lang),
-    loadShowcase("ko"),
   ]);
   // The sample's cost and time quote the same run as the landing page: the original automatic run
-  // behind the pinned Korean result the story follows, whatever the viewer's language.
-  const measured = (korean && originalRun(korean.runs, korean.preview?.runId)) ?? null;
-  // The sample opens on that same pinned Korean result in either language, so "Open the sample"
-  // shows the run the landing page, the film and the deck describe.
+  // behind the pinned result in the viewer's language.
+  const measured = (showcase && originalRun(showcase.runs, showcase.preview?.runId)) ?? null;
+  // The sample opens on that same pinned result, so "Open the sample" shows the run the landing page
+  // describes (in English, the run the film and the deck describe).
   return (
     <I18nProvider lang={lang} t={dictionary(lang)}>
       <Workspace
         project={project}
         initialRunId={
           (await searchParams).run ??
-          (showcase?.project.id === project.id
-            ? (korean?.preview?.runId ?? showcase.preview?.runId)
-            : undefined)
+          (showcase?.project.id === project.id ? showcase.preview?.runId : undefined)
         }
         initialRuns={runs}
         analysis={analysis}

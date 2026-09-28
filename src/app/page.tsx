@@ -55,8 +55,8 @@ export default async function LandingPage() {
   const t = dictionary(lang);
   const [english, korean] = await Promise.all([loadShowcase("en"), loadShowcase("ko")]);
   const showcase = lang === "ko" ? korean : english;
-  // The story follows the pinned Korean result: the line the final check sent back and Gapline rewrote.
-  const featured = korean?.preview ?? showcase?.preview ?? null;
+  // The story follows the pinned result in the viewer's language (runtime/showcase.json), else the other.
+  const featured = showcase?.preview ?? (lang === "ko" ? english : korean)?.preview ?? null;
   const project = showcase?.project ?? null;
   const analysis = project ? await readAnalysis(project.id) : null;
   const gaps =
@@ -73,7 +73,7 @@ export default async function LandingPage() {
     : [];
   const story = featured ? featuredLine(featured.cues) : null;
   // An edited result measures only its edit; the run's figures come from the run it was made from.
-  const runs = korean?.runs ?? [];
+  const runs = showcase?.runs ?? [];
   const original = originalRun(runs, featured?.runId);
   const measured = original?.summary ?? null;
   // A run that reused hearing and watching did not pay for them; the figures say so next to them.
