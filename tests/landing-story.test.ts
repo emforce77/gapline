@@ -31,7 +31,7 @@ const markup = (text: string) => text.replaceAll("'", "&#x27;");
 
 /**
  * Line 5 of the pinned automatic sample (20260923t065852164-ko-standard-350b05, script.json): the
- * draft passed review and was voiced (2.32 s), the final check failed it, and Scene's rewrite passed
+ * draft passed review and was voiced (2.32 s), the final check failed it, and Gapline's rewrite passed
  * and was voiced in 1.74 s of 2.63 s.
  */
 const line5 = cue("L5", 47.2, [
@@ -66,7 +66,7 @@ const line8 = cue(
   ],
   "dropped",
 );
-/** An earlier edited track: Scene dropped the line, a person typed the version that shipped. */
+/** An earlier edited track: Gapline dropped the line, a person typed the version that shipped. */
 const rescued = cue("L4", 54.2, [
   { text: "a", by: "write", model: "m", review: fail("f") },
   { text: "b", by: "revise", model: "m", review: fail("f") },
@@ -101,7 +101,7 @@ describe("landing rejection story", () => {
     assert.equal(nextStep(line5.versions[1], undefined), null);
   });
 
-  it("ends Scene's own rewrite with its measured fit, and says who sent the draft back", () => {
+  it("ends Gapline's own rewrite with its measured fit, and says who sent the draft back", () => {
     for (const [t, lang, fitted] of [
       [en, "en", "Voiced in 1.7 s of the 2.6 s available"],
       [ko, "ko", "주어진 2.6초 가운데 1.7초 동안 읽음"],

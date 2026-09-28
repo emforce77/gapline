@@ -1,6 +1,6 @@
 /**
  * The frame every motion scene is drawn in: the deck's "Screening room" look (scripts/deck/theme.ts:
- * fonts, colour tokens, lanes, amber for Scene's words only) on the 1920×880 picture area above the
+ * fonts, colour tokens, lanes, amber for Gapline's words only) on the 1920×880 picture area above the
  * caption band, plus the small animation kit the pages' render(t) functions use. Every word a page
  * draws follows the film's language (`lang`); product names, the URL, the film's credit and its own
  * dialogue stay in English. Fonts and film stills are copied next to the pages once, so the pages

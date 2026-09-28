@@ -1,7 +1,7 @@
 /**
  * 06. The reviewer, followed through one line of the sample (Line 5, 47.2 s): the draft passed its
  * review and was voiced, the final check read the whole voiced track and sent it back for viewer
- * framing, and Scene rewrote it from the check's own fix: it passed and was voiced again, in the same
+ * framing, and Gapline rewrote it from the check's own fix: it passed and was voiced again, in the same
  * run. The frame beside the headline shows the on-screen words the rewrite reads. The rule's source
  * in the guideline is the one note.
  */
@@ -62,7 +62,7 @@ export function reviewerSlide(): string {
   ${verdict(REJECT_MARK, rule.title.en, cite)}`,
     `<p class="rv-step">The check’s fix</p>
   <p class="rv-fix">${esc(line.draft.fixGloss)}</p>`,
-    `<p class="rv-step">Scene’s rewrite</p>
+    `<p class="rv-step">Gapline’s rewrite</p>
   <p class="rv-line amber" lang="ko">${esc(line.rewrite.text)}</p>
   <p class="rv-gloss">${esc(line.rewrite.gloss)}</p>
   ${verdict(PASS_MARK, "Passed and voiced")}`,
@@ -87,7 +87,7 @@ export function reviewerSlide(): string {
     kind: "exhibit",
     filmCredit: true,
     body: `
-${intro("The final check names the broken rule, and Scene rewrites the line.", undefined, HEADLINE_W)}
+${intro("The final check names the broken rule, and Gapline rewrites the line.", undefined, HEADLINE_W)}
 ${frame}
 ${cols}
 ${arrows}`,

@@ -1,6 +1,6 @@
 /**
- * 01. The film is the hero: Scene's own line for this shot, set as an amber subtitle. Under it the
- * name, the tagline and what Scene does, in one plain sentence.
+ * 01. The film is the hero: Gapline's own line for this shot, set as an amber subtitle. Under it the
+ * name, the tagline and what Gapline does, in one plain sentence.
  */
 import { coverLine } from "../data/city";
 import { CATEGORY, SUBMISSION, THEME } from "../facts";
@@ -23,11 +23,11 @@ export function coverSlide(): string {
     body: `
 <img class="still" src="${stillUrl("cover")}" alt="" style="left:0;top:0;width:1920px;height:${PICTURE_H}px">
 <p class="sub on-film cv-sub" style="bottom:${1080 - PICTURE_H + SUB_ABOVE_EDGE}px">${esc(coverLine.text)}</p>
-<h1 class="cv-name" style="top:${TEXT_TOP - 4}px">Scene</h1>
+<h1 class="cv-name" style="top:${TEXT_TOP - 4}px">Gapline</h1>
 <div class="cv-side" style="top:${TEXT_TOP}px">
   <p class="cv-theme">${team}AI Builder Cup 2026 · ${esc(THEME)} · ${esc(CATEGORY)}</p>
   <p class="cv-tag">Descriptions that fit between the lines.</p>
-  <p class="cv-what">Upload a film clip and press Generate: Scene writes, checks, voices and mixes an audio description that fits between the dialogue.</p>
+  <p class="cv-what">Upload a film clip and press Generate: Gapline writes, checks, voices and mixes an audio description that fits between the dialogue.</p>
 </div>`,
   });
 }

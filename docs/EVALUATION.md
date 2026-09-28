@@ -2,14 +2,14 @@
 
 ## In short
 
-**What we tested.** On 22 September 2026 we ran Scene on six openly licensed clips: three scenes from
+**What we tested.** On 22 September 2026 we ran Gapline on six openly licensed clips: three scenes from
 the open movie _Tears of Steel_, two excerpts of a Korean-language interview, and a synthetic clip of
 coloured squares and beeps. Two of the six were held back and run only after the other four had
 decided the reviewer setting. For each clip we wrote down a short list of essential facts in advance
 (for example "40 YEARS LATER marks the change to a laboratory") and checked the finished track against
 that list, sampled frames, subtitles and an independent speech recognizer.
 
-**Since then.** On 23 September Scene gained a fix stage after the final check and a third review
+**Since then.** On 23 September Gapline gained a fix stage after the final check and a third review
 round ([architecture](ARCHITECTURE.md#the-loop-that-makes-each-line)). The results below predate both
 and have not been re-run. _Review needed_ is what a result with open findings was called then; it now
 reads _Final check · notes_. The automatic sample runs of 23 September are under
@@ -18,8 +18,8 @@ reads _Final check · notes_. The automatic sample runs of 23 September are unde
 **What we learned.**
 
 - 4 of 6 clips produced a described track. The other 2 stopped because the speech recognizer returned
-  words whose start and end times were identical. Scene stopped instead of guessing where the
-  silences were. Since then, Scene treats such words as speech and carries on (see "How we checked").
+  words whose start and end times were identical. Gapline stopped instead of guessing where the
+  silences were. Since then, Gapline treats such words as speech and carries on (see "How we checked").
 - All 18 lines in the four finished tracks fit their room by measured audio, and none overlaps the
   speech Chirp 3 recognized. One of them, in the opening, still talks over dialogue: Chirp 3 had put
   the launch call about 2 s early (see "The opening's launch call").
@@ -75,7 +75,7 @@ After seeing the first two rows, we did not run the cheaper setting on the held-
   at the frames afterwards showed the street outside turning into a sunny canal town. We kept the
   original reference and the correction, and did not score omissions for this clip.
 - **Speech overlap.** "No overlap with the recognized speech" is measured against Chirp 3, the
-  recognizer Scene uses. As a cross-check we ran faster-whisper 1.2.1 (small model, CPU, int8), and
+  recognizer Gapline uses. As a cross-check we ran faster-whisper 1.2.1 (small model, CPU, int8), and
   subtitles where they exist, and listed each disagreement as a line to check rather than a confirmed
   overlap.
 - **The opening's launch call.** On 23 September we checked the flag in the opening. Chirp 3 had
@@ -85,9 +85,9 @@ After seeing the first two rows, we did not run the cheaper setting on the held-
   4.40–6.16 s, and 6.7–10.0 s returns "Four, three, two, one." A spectrogram shows voice at 4.8–6.3 s.
   So Chirp 3 put the call about 2 s early. It placed the countdown after it correctly ("4 3 2" at
   6.84–8.92 s, "1" at 9.28–9.76 s). The line "망고 오픈 무비 프로젝트." (The Mango Open Movie Project.),
-  voiced at 4.50–6.39 s in a silence Scene had found at 4.21–6.59 s from Chirp 3's timings, talks
+  voiced at 4.50–6.39 s in a silence Gapline had found at 4.21–6.59 s from Chirp 3's timings, talks
   over the call. The sample track's other lines overlap neither recognizer's words.
-- **What we changed.** Scene now recognizes every usable silence a second time, on its own
+- **What we changed.** Gapline now recognizes every usable silence a second time, on its own
   ([architecture](ARCHITECTURE.md#what-runs-on-google-cloud)). A test replays this clip's recorded
   first pass with the call at 4.40–6.16 s and checks that the silence at 4.21–6.59 s closes and the
   line can no longer be placed there. On 23 September the re-listen ran on the real audio, in run
@@ -99,7 +99,7 @@ After seeing the first two rows, we did not run the cheaper setting on the held-
 - **The two stopped runs.** The held-out Korean excerpt starts in the middle of a sentence. One
   diagnostic request showed Chirp 3 returning its first three words, "어쩔 수 없고요" ("can't be
   helped"), with start and end both at zero. The synthetic clip, which has no speech, failed the same
-  check. Scene now blocks each stretch of untimed words as speech, from the previous timed word to the
+  check. Gapline now blocks each stretch of untimed words as speech, from the previous timed word to the
   next one, instead of stopping. Replaying the saved response for the Korean excerpt through the
   current code blocks its first 1.24 s and leaves three silences, 5.95 s in total. We have not re-run
   the paid evaluation with this change.
@@ -170,7 +170,7 @@ after the fix stage and the third review round were added. It was started from t
   naming.
 - The final check sent one line back: "홀로그램 재생창이 뜬다." (A hologram playback window comes up.),
   which had passed review and been voiced in 2.32 s, as viewer framing. Its fix suggested reading the
-  words on screen instead ("MEMORY PLAYBACK - GLOBAL" at 48.5 s), and Scene rewrote the line to
+  words on screen instead ("MEMORY PLAYBACK - GLOBAL" at 48.5 s), and Gapline rewrote the line to
   "전체 기억 재생." (Full memory playback.). The rewrite passed review and was voiced in 1.74 s of
   2.63 s of room.
 - The fix stage added no line (`finalFix`: 1 failing, 3 missing, 1 rewritten, 0 added), and the check

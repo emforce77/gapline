@@ -1,7 +1,7 @@
 /**
  * 04. The constraint, drawn from the sample track on a plain seconds axis: picture, dialogue (every
- * segment Scene heard, overlaps drawn once) with the usable silences outlined and labelled, and
- * Scene's lines as measured voice inside each line's slot. The launch call that only the second listen
+ * segment Gapline heard, overlaps drawn once) with the usable silences outlined and labelled, and
+ * Gapline's lines as measured voice inside each line's slot. The launch call that only the second listen
  * heard is drawn as dialogue, where it closed a silence; the listens-twice slide tells that story.
  */
 import { launchCall } from "../data/recognizers";
@@ -138,7 +138,7 @@ export function constraintSlide(): string {
 ${thumbs}
 <div class="ct-head" style="top:${Y.thumbs}px;height:${Y.thumbsH}px"><p class="label">Picture</p></div>
 <div class="ct-head" style="top:${Y.dlg}px;height:${Y.dlgH}px"><p class="label">Dialogue</p></div>
-<div class="ct-head" style="top:${Y.lines}px;height:${Y.linesH}px"><p class="label">Scene’s lines</p></div>
+<div class="ct-head" style="top:${Y.lines}px;height:${Y.linesH}px"><p class="label">Gapline’s lines</p></div>
 <p class="ct-note right" style="right:${px(W - x(hook.end))};top:${Y.notes}px">the seven seconds</p>
 <div class="ct-leader" style="left:${px(x((hook.start + hook.end) / 2) - 1)};top:${Y.notes + LEADER_TOP}px;height:${Y.dlg - Y.notes - LEADER_TOP}px"></div>
 <div class="lane" style="left:${X0}px;width:${px(X1 - X0)};top:${Y.dlg}px;height:${Y.dlgH}px">${gaps}${speech}</div>
@@ -147,7 +147,7 @@ ${inLane}
 ${gapLabels}
 <div class="ct-axis" style="top:${Y.axis}px"></div>
 <div style="position:absolute;left:0;width:${W}px;top:${Y.axis}px">${ticks}</div>
-<p class="body ct-result" style="left:${MARGIN}px;top:${Y.result}px">Scene maps the silences first, then writes each line to fit one of them.</p>`,
+<p class="body ct-result" style="left:${MARGIN}px;top:${Y.result}px">Gapline maps the silences first, then writes each line to fit one of them.</p>`,
   });
 }
 

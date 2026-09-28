@@ -38,7 +38,7 @@ export async function postEdit(
       body: JSON.stringify(body),
     });
   } catch (e) {
-    console.error("edit: no answer from Scene", e);
+    console.error("edit: no answer from Gapline", e);
     return { kind: "offline" };
   }
   const result = await readJson(response);

@@ -1,5 +1,5 @@
 /**
- * Where the sample's hearing and watching came from. Scene keeps
+ * Where the sample's hearing and watching came from. Gapline keeps
  * the last analysis of a clip and reuses it: the sample (data/sample.ts) took its speech, re-listen
  * and scene map from an earlier run of the same clip on the same day. That run's hear and watch calls
  * are the only record of what the analysis cost, so the build fails if its folder is gone.

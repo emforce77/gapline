@@ -1,4 +1,4 @@
-/** Writes runtime/deck/scene-deck_check.md: what the build checked and what it found. */
+/** Writes runtime/deck/gapline-deck_check.md: what the build checked and what it found. */
 import { writeFileSync } from "node:fs";
 import {
   MAX_HEADLINE_WORDS,
@@ -49,7 +49,7 @@ export function writeCheckNote(r: CheckNoteInput): void {
     "endnote markers, remote requests",
   ];
   const lines = [
-    `# scene-deck.pdf — check (${today})`,
+    `# gapline-deck.pdf — check (${today})`,
     "",
     `Built by \`npm run deck\` (scripts/deck/build-deck.ts) from runtime run records. ${r.slides.length} pages: ${r.slides.join(", ")}.`,
     "",

@@ -42,7 +42,7 @@ const PAGES: DeckPage[] = [
   { file: "05-how", make: howSlide, css: HOW_CSS, numbered: true },
   { file: "06-reviewer", make: reviewerSlide, css: REVIEWER_CSS, numbered: true },
   { file: "07-measured", make: measuredSlide, css: MEASURED_CSS, numbered: true },
-  // Scene listens twice: the launch call.
+  // Gapline listens twice: the launch call.
   { file: "10-caught", make: caughtSlide, css: CAUGHT_CSS, numbered: true },
   { file: "11-cloud", make: cloudSlide, css: CLOUD_CSS, numbered: true },
   { file: "12-different", make: differentSlide, css: DIFFERENT_CSS, numbered: true },

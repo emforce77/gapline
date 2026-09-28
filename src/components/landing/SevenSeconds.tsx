@@ -22,7 +22,7 @@ type Version = "original" | "described";
 
 /**
  * The landing's proof: one short window of the sample, played as the film's own soundtrack or with
- * Scene's description, from the same media the workspace uses. Playback stops at the window's end.
+ * Gapline's description, from the same media the workspace uses. Playback stops at the window's end.
  */
 export function SevenSeconds({
   originalUrl,

@@ -1,8 +1,8 @@
 /**
- * Builds the pitch deck from Scene's run records:
+ * Builds the pitch deck from Gapline's run records:
  *   npm run deck                  html, one PNG per slide, the PDF, a contact sheet and a check note
  *   npm run deck -- --stills      cut the film stills again from the 1080p master
- *   npm run deck -- --screens     take fresh product screenshots from a running Scene (SCENE_APP_URL)
+ *   npm run deck -- --screens     take fresh product screenshots from a running Gapline (SCENE_APP_URL)
  *   npm run deck -- --final       also refuse a deck that still lacks a submission link or still names
  *                                 the development route to Gemini (see openItems)
  * Output: runtime/deck/. The build stops on any failed check instead of writing a doubtful deck.
@@ -69,7 +69,7 @@ function copyFonts(): void {
 
 function writeHtml(slides: string[]): void {
   const html = `<!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Scene — AI Builder Cup 2026</title>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Gapline — AI Builder Cup 2026</title>
 <style>${BASE_CSS}\n${DECK_CSS}\n${PRESENTER_CSS}</style></head>
 <body><main id="deck-stage">${slides.join("\n")}</main>${PRESENTER_CONTROLS}<script>${PRESENTER_SCRIPT}</script></body></html>`;
   writeFileSync(DECK_HTML, html);

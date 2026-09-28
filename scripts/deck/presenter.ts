@@ -37,7 +37,7 @@ export const PRESENTER_SCRIPT = `
   const notes = document.querySelector('[data-deck="notes"]');
   const position = document.querySelector('.deck-position');
   const firstNote = slides.findIndex(slide => slide.dataset.kind === 'notes');
-  const storeKey = 'scene-deck:slide';
+  const storeKey = 'gapline-deck:slide';
   let current = 0;
   let returnTo = 0;
   slides.forEach((slide, index) => {

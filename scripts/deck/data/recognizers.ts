@@ -1,11 +1,11 @@
 /**
  * What a second recognizer (faster-whisper small) hears in the opening, on the whole clip and on
- * short slices recognized on their own (scripts/deck/probe/slice_asr.py), set against Scene's runs.
+ * short slices recognized on their own (scripts/deck/probe/slice_asr.py), set against Gapline's runs.
  *
  * The launch call, before and after. Chirp 3's first pass timed "We have main engine start." two
  * seconds early, so the call itself fell in what looked like a silence. Before: the evaluation's
  * default run of this clip (22 Sep 2026) wrote a line into that silence, and it played over the call.
- * After: since 23 Sep Scene recognizes each silence again on its own; the re-listen heard the call and
+ * After: since 23 Sep Gapline recognizes each silence again on its own; the re-listen heard the call and
  * closed that silence, so the sample has no silence and no line there. Runs are compared by time
  * spans, never by gap ids, which each run numbers on its own.
  *
@@ -169,7 +169,7 @@ const wholeCall = {
 if (overlap(wholeCall, call) < TOLERANCE_S)
   throw new Error("the second recognizer puts the call elsewhere on the whole clip");
 
-/** Scene's own watch pass heard a voice here too, but filed it as ambience, which blocks nothing. */
+/** Gapline's own watch pass heard a voice here too, but filed it as ambience, which blocks nothing. */
 const watchLabel = opening.sounds.find((s) => s.start <= call.start && s.end >= call.end);
 if (!watchLabel || watchLabel.kind === "protect")
   throw new Error("the watch pass's label over the launch call changed; the note describes it");

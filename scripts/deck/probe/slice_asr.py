@@ -1,10 +1,10 @@
 """Recognize short slices of the Tears of Steel opening on their own, for the deck's evidence.
 
 Why: Chirp 3's first pass on the whole clip put "We have main engine start." at 2.32-3.96 s, and
-the gap it left at 4.21-6.59 s held Scene's line L6. Recognizing each slice alone shows where the
+the gap it left at 4.21-6.59 s held Gapline's line L6. Recognizing each slice alone shows where the
 words are. The same check covers the deck's "seven seconds" (53.72-60.88 s).
 
-In:  runtime/projects/tos-opening/clip.mp4 (the clip Scene heard), ffmpeg from $FFMPEG_PATH.
+In:  runtime/projects/tos-opening/clip.mp4 (the clip Gapline heard), ffmpeg from $FFMPEG_PATH.
 Out: runtime/deck/evidence/slice-asr.json -- per slice: its clip range and each word's clip time.
 Model: faster-whisper "small" on CPU (int8), English, word timestamps, no VAD, no carried-over
 text; the settings of the first probe (2026-09-23). Free and local.

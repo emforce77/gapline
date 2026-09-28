@@ -3,16 +3,16 @@ import { enEditor } from "./editor";
 /** English UI strings. The Korean catalog must provide every key (checked by the Dictionary type). */
 export const en = {
   meta: {
-    title: "Scene — audio description that fits between the lines",
+    title: "Gapline — audio description that fits between the lines",
     description:
-      "Scene makes audio description for film that fits between the lines. One press of Generate writes each line to fit a silence, checks it against Korea's published guideline, voices and measures it, rewrites what the final check sends back and mixes the track. You can still edit any line.",
-    project: "{title} — Scene",
+      "Gapline makes audio description for film that fits between the lines. One press of Generate writes each line to fit a silence, checks it against Korea's published guideline, voices and measures it, rewrites what the final check sends back and mixes the track. You can still edit any line.",
+    project: "{title} — Gapline",
   },
-  nav: { home: "Scene", language: "한국어", skip: "Skip to content" },
+  nav: { home: "Gapline", language: "한국어", skip: "Skip to content" },
   landing: {
     eyebrow: "Audio description for blind and low-vision viewers",
     title: "Descriptions that fit between the lines.",
-    lede: "One press of Generate runs every step: Scene writes each line to fit a real silence, checks it against Korea's published guideline, voices and measures it, rewrites any line its final check sends back, and mixes the track. Want different words? You can still edit any line; Scene re-voices just that one and checks the track again.",
+    lede: "One press of Generate runs every step: Gapline writes each line to fit a real silence, checks it against Korea's published guideline, voices and measures it, rewrites any line its final check sends back, and mixes the track. Want different words? You can still edit any line; Gapline re-voices just that one and checks the track again.",
     ctaSample: "Open the sample",
     ctaUpload: "Try your own clip",
     seven: {
@@ -30,7 +30,7 @@ export const en = {
     },
     timelineTitle: "Narration may only speak where nobody else does.",
     timelineLede:
-      "The sample's 65 seconds as Scene sees them. Every description is written for one silence, and its measured voice has to end before the next line of dialogue.",
+      "The sample's 65 seconds as Gapline sees them. Every description is written for one silence, and its measured voice has to end before the next line of dialogue.",
     timelineRows: {
       picture: "Picture",
       dialogue: "Dialogue",
@@ -98,14 +98,14 @@ export const en = {
       suggestion: "Suggested fix",
       /** What became of a rejected version, by who made the next one. */
       next: {
-        revise: "Scene rewrote the line from this suggestion and reviewed it again.",
+        revise: "Gapline rewrote the line from this suggestion and reviewed it again.",
         final:
-          "This draft had passed review and been voiced. The final check, which reviews the whole voiced track, sent it back, so Scene rewrote the line from the suggestion.",
+          "This draft had passed review and been voiced. The final check, which reviews the whole voiced track, sent it back, so Gapline rewrote the line from the suggestion.",
         human:
-          "Its rewrites still broke a rule, so Scene dropped the line instead of voicing it. The next version was written by hand.",
+          "Its rewrites still broke a rule, so Gapline dropped the line instead of voicing it. The next version was written by hand.",
       },
       fitted: "Voiced in {spoken} of the {room} available",
-      human: "Scene reviews and voices an editor's words, but never rewrites them.",
+      human: "Gapline reviews and voices an editor's words, but never rewrites them.",
     },
     rulesSummary: "All {n} review rules and where they come from",
     measuredTitle: "Measured on the sample",
@@ -141,7 +141,8 @@ export const en = {
     uploadChoose: "Choose a video",
     uploadWorking: "Preparing the clip…",
     uploadTooLong: "This clip is longer than 90 seconds. Trim it to one scene and try again.",
-    uploadFailed: "Scene could not read this video. Export it again as MP4 (H.264) and try again.",
+    uploadFailed:
+      "Gapline could not read this video. Export it again as MP4 (H.264) and try again.",
     footerFilm:
       "Sample film: Tears of Steel, (CC) Blender Foundation | mango.blender.org, CC BY 3.0.",
     footerGuides:
@@ -154,19 +155,19 @@ export const en = {
     preparing: "Converting and measuring the clip. This usually takes under a minute.",
     errors: {
       too_large:
-        "This file is {size}; Scene takes up to {max}. Export it at 720p, or trim it to one scene, and try again.",
+        "This file is {size}; Gapline takes up to {max}. Export it at 720p, or trim it to one scene, and try again.",
       too_long:
-        "This clip runs {length}; Scene takes up to {max}. Trim it to one scene and try again.",
+        "This clip runs {length}; Gapline takes up to {max}. Trim it to one scene and try again.",
       not_video: "That file is not a video. Choose an MP4, MOV or WebM file.",
       no_video_stream:
-        "This file has sound but no picture. Scene describes what is on screen, so it needs a video.",
+        "This file has sound but no picture. Gapline describes what is on screen, so it needs a video.",
       missing_file: "No file arrived. Choose the video again.",
       forbidden:
         "The upload was refused because it did not come from this page. Reload the page and try again.",
       internal:
         "Something broke on our side while preparing the clip. Try again in a minute, or try another file.",
-      network: "The upload did not reach Scene. Check your connection and try again.",
-      unexpected: "Scene answered with an error (HTTP {status}). Try again in a minute.",
+      network: "The upload did not reach Gapline. Check your connection and try again.",
+      unexpected: "Gapline answered with an error (HTTP {status}). Try again in a minute.",
     },
     status: {
       budget_busy:
@@ -182,7 +183,7 @@ export const en = {
     active: "You started a description in {language} at {time}. It is still being made.",
     follow: "Follow it",
     unreachable:
-      "Scene cannot be reached. Check your connection, then reload this page to see how the run ended.",
+      "Gapline cannot be reached. Check your connection, then reload this page to see how the run ended.",
     interrupted:
       "The run stopped without finishing, so no result was saved. You can generate again.",
     notStarted: "The run did not start. Try again.",
@@ -191,7 +192,7 @@ export const en = {
     renews: "It renews at {time} ({wait}).",
     reference: "Reference: {runId}.",
     littleRoom:
-      "This clip has {room} without speech; Scene needs at least {needed} to describe much. Descriptions only go where nobody speaks, so constant dialogue or voice-over leaves few or no lines. A scene with pauses works better.",
+      "This clip has {room} without speech; Gapline needs at least {needed} to describe much. Descriptions only go where nobody speaks, so constant dialogue or voice-over leaves few or no lines. A scene with pauses works better.",
     status: {
       budget_busy:
         "Another visitor's description is being made right now. A new one can start when it finishes, usually within 10 minutes.",
@@ -219,16 +220,16 @@ export const en = {
       not_found: "This clip is not here any more. Reload the page.",
       invalid_request: "The request was not understood. Reload the page and try again.",
       connection:
-        "Scene could not be reached, so the run did not start. Check your connection and try again.",
+        "Gapline could not be reached, so the run did not start. Check your connection and try again.",
       unknown: "The run stopped before finishing. Try again.",
     },
   },
   notFound: {
-    metaTitle: "Page not found — Scene",
+    metaTitle: "Page not found — Gapline",
     title: "This page is not here.",
     body: "Uploaded clips are private to the browser that uploaded them. A link opened on another device, or shared with someone else, ends up here.",
     sample: "Open the sample",
-    home: "Back to Scene",
+    home: "Back to Gapline",
   },
   failure: {
     title: "Something broke while opening this clip.",
@@ -358,7 +359,7 @@ export const en = {
       rewritten: "then passed after a rewrite",
       shortened: "shortened to fit",
     },
-    evidence: "Scene notes from the model (not narrated)",
+    evidence: "Gapline notes from the model (not narrated)",
     pickHint:
       "Select a narration line on the timeline to see how it was written, reviewed and voiced.",
     play: "Play from here",

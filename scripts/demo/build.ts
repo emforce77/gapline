@@ -3,7 +3,7 @@
  * recorded at), renders one segment per scene, joins them without re-encoding, mixes the sound and
  * writes the check note, the contact sheet and an SRT of the film's captions.
  *
- * Output: runtime/demo-v3/<lang>/scene-demo-<lang>.mp4, _check.md, _contact.jpg, .srt
+ * Output: runtime/demo-v3/<lang>/gapline-demo-<lang>.mp4, _check.md, _contact.jpg, .srt
  */
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -135,7 +135,7 @@ export async function buildFilm(input: {
   const list = join(workDir, "segments.ffconcat");
   await writeFile(list, `ffconcat version 1.0\n${segments.map((s) => `file '${s}'`).join("\n")}\n`);
   const sound = await mixSound(placed, total, workDir);
-  const out = join(outDir, `scene-demo-${lang}.mp4`);
+  const out = join(outDir, `gapline-demo-${lang}.mp4`);
   await runFfmpeg([
     "-y",
     "-f",
@@ -163,7 +163,7 @@ export async function buildFilm(input: {
     out,
   ]);
   await writeFile(
-    join(outDir, `scene-demo-${lang}.${lang}.srt`),
+    join(outDir, `gapline-demo-${lang}.${lang}.srt`),
     captions.srt
       .sort((a, b) => a.start - b.start)
       .map((c, i) => `${i + 1}\n${srtTime(c.start)} --> ${srtTime(c.end)}\n${c.text}\n`)

@@ -18,7 +18,7 @@ export function sentBackByFinalCheck(version: CueVersion): boolean {
 
 /**
  * The line the landing walks through: the earliest shipped line the final check sent back, else the
- * earliest shipped line rejected at least once (rewritten by Scene, or on an edited track by hand),
+ * earliest shipped line rejected at least once (rewritten by Gapline, or on an edited track by hand),
  * else the earliest line rejected at all.
  */
 export function featuredLine(cues: Cue[]): Cue | null {

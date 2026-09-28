@@ -1,6 +1,6 @@
 /**
  * 13. Business case, stated as our bet: who would pay, who runs it and who benefits (in Korea and
- * across Asia-Pacific), beside what description costs per minute today, on a log scale. Scene's own
+ * across Asia-Pacific), beside what description costs per minute today, on a log scale. Gapline's own
  * cost is not on the chart: one sample run is no price. Sources are notes.
  */
 import { AUDIENCE, KOFIC_2025, PRICE_POINTS } from "../facts";
@@ -66,7 +66,7 @@ export function businessSlide(): string {
     name: "business",
     kind: "exhibit",
     body: `
-<div class="intro"><h1 class="headline" style="max-width:1500px">Our bet: whoever supplies a film’s description file would pay Scene to make it.</h1></div>
+<div class="intro"><h1 class="headline" style="max-width:1500px">Our bet: whoever supplies a film’s description file would pay Gapline to make it.</h1></div>
 <dl class="bz-who-list" style="left:${MARGIN}px;top:${CHART.top - 30}px">
   <dt>Would pay</dt><dd>Foreign-film distributors and streaming services${pays}</dd>
   <dd class="bz-why">A public program covers Korean films${program}</dd>

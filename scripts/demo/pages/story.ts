@@ -1,7 +1,7 @@
 /**
  * "stakes": why now (the Supreme Court ruling and what hand-made description costs), and
- * "constraint": the sample's 65 seconds as Scene sees them (deck slide 4), built up in the order the
- * captions name them: word timings, then the usable silences, then Scene's lines inside them.
+ * "constraint": the sample's 65 seconds as Gapline sees them (deck slide 4), built up in the order the
+ * captions name them: word timings, then the usable silences, then Gapline's lines inside them.
  */
 import { MIN_GAP_SECONDS, SPEECH_GUARD_SECONDS } from "../../../src/lib/pipeline/gaps";
 import { HAND_MADE, LAWSUIT } from "../../deck/facts";
@@ -238,7 +238,7 @@ ${row(
 )}
 ${row(
   C.lines - 6,
-  pick(lang, { en: "Scene’s lines", ko: "씬의 문장" }),
+  pick(lang, { en: "Gapline’s lines", ko: "갭라인의 문장" }),
   pick(lang, {
     en: `${secs(o.narrationTotal, lang)} of voice`,
     ko: `낭독 ${secs(o.narrationTotal, lang)}`,

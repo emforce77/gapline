@@ -1,5 +1,5 @@
 /**
- * Fresh screenshots of the product, taken at device scale 2 from a running Scene server on the pinned
+ * Fresh screenshots of the product, taken at device scale 2 from a running Gapline server on the pinned
  * sample run (runtime/showcase.json), so the deck shows the current UI sharply. The product slide
  * shows four crops of the workspace at 1:1 of the capture, so the app's own text stays legible: the
  * Generate button, the player's switches (Eyes closed), the timeline around the chosen line, and
@@ -25,7 +25,7 @@ export const DEVICE_SCALE = 2;
 export const WORKSPACE_VIEWPORT = { width: 1440, height: 900 };
 const SETTLE_MS = 1500;
 const PAID = /\/(runs|edits)(\/|$|\?)/;
-/** The line's history: the draft the final check sent back, and Scene's rewrite that passed. */
+/** The line's history: the draft the final check sent back, and Gapline's rewrite that passed. */
 const HISTORY_VERSIONS = 2;
 /** Space kept around each crop, in CSS pixels, so no control touches the crop's edge. */
 const CROP_PAD = 8;

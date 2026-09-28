@@ -299,7 +299,7 @@ function wordingProblems(texts: PageText[]): string[] {
     const flat = t.all.replace(/\s+/g, " ");
     for (const rule of DEFENSIVE_NEGATIVES) {
       const m = flat.match(rule);
-      if (m) out.push(`${t.name}: defensive negative ${quote(m)}; state what Scene does instead`);
+      if (m) out.push(`${t.name}: defensive negative ${quote(m)}; state what Gapline does instead`);
     }
     if (t.kind === "notes") continue;
     const english = t.english.replace(/\s+/g, " ");

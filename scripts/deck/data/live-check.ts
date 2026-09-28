@@ -1,6 +1,6 @@
 /**
  * The checks run against the live Cloud Run service on 22 Sep 2026 (runtime/demo-v2/live-check.json):
- * one line of an earlier track of the opening was edited there, and Scene re-voiced and re-checked
+ * one line of an earlier track of the opening was edited there, and Gapline re-voiced and re-checked
  * only that line. It is the measured cost of the optional edit, and it proves the service's behaviour
  * (an edit sent twice makes one version; private files answer 404 to other visitors). It is checked
  * against the edit's own run record, not against the sample, which nobody edited.

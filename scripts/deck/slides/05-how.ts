@@ -1,5 +1,5 @@
 /**
- * 05. How Scene checks itself: the pipeline as run.ts runs it (hear and watch, then
+ * 05. How Gapline checks itself: the pipeline as run.ts runs it (hear and watch, then
  * write, review, voice, measure, the final check, fix, and mix last), with the three checks drawn
  * heavier and what each does with a line that fails: rewrite it from the reviewer's fix, read it
  * faster or shorten it, or hand it to the fix stage. Under each loop, what happens next.

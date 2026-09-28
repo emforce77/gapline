@@ -2,14 +2,16 @@
 
 ## Direction
 
+Product name: Gapline (renamed from Scene on 2026-09-28; entries before that date use the old name).
+
 Builds the AI Builder Cup deck (14 slides plus "Sources and notes" pages, 1920x1080) from Scene's
 own run records, so every number, timeline and bar on a slide is computed, not typed. The order is
 `PAGES` in `slides/index.ts`: cover, seven seconds, why now, fit the silence, product, how it checks
 itself, reviewer, measured, Scene listens twice, Google Cloud, how Scene differs, business, what we
 will test next, close. Page numbers and notes groups follow a slide's position there, not its file
 name (`08-editor.ts` is slide 5, the product).
-`npm run deck` writes `runtime/deck/`: `scene-deck.pdf`, `slides/NN-name.png`, `contact-sheet.png`,
-`scene-deck.html` and `scene-deck_check.md` (what the build checked, with word counts per page).
+`npm run deck` writes `runtime/deck/`: `gapline-deck.pdf`, `slides/NN-name.png`, `contact-sheet.png`,
+`gapline-deck.html` and `gapline-deck_check.md` (what the build checked, with word counts per page).
 The HTML opens as an offline presentation fitted to the window: arrows or Space advance,
 Home/End jump to the first/last page, and Sources opens the notes. Escape or Back to slides returns
 from the notes; source markers jump to the matching note. The current page survives a reload.
@@ -253,7 +255,7 @@ dollar figures are the competitors' prices and the price axis. The product crops
 `--screens` capture of run 350b05 (unchanged). Presenter checked with Playwright over a local
 server: Home/End reach pages 1 and 15, a source marker opens its note on the notes page, Escape
 returns to the slide (`.playwright-mcp/2026-09-28_1440_deck-cut/`). 5 submission items open (see
-`runtime/deck/scene-deck_check.md`): the development Gemini label, demo URL, repo URL, video URL and
+`runtime/deck/gapline-deck_check.md`): the development Gemini label, demo URL, repo URL, video URL and
 team. The service was taken down on 23 Sep; set `SUBMISSION.demoUrl` after the redeploy. The 1080p
 master stays in `runtime/deck/cache/` (584 MB) for `--stills`; delete it when the stills are final.
 Tests: `tests/deck-data.test.ts` (needs the gitignored `runtime/`).

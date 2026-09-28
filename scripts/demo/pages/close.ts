@@ -1,5 +1,5 @@
 /**
- * "close": Scene's name set between the two lines of dialogue from the hook (the caption says the
+ * "close": Gapline's name set between the two lines of dialogue from the hook (the caption says the
  * tagline, so the card does not repeat it), and where to try it: the live URL, and the code once it
  * is public.
  */
@@ -9,7 +9,7 @@ import { labels } from "../labels";
 import { esc, pageHtml, pick, STAGE, type PageTiming } from "./shell";
 
 /** The product's name: English in both films, like the other product names. */
-const NAME = "Scene";
+const NAME = "Gapline";
 
 export function closePage(timing: PageTiming): string {
   const lang = timing.lang;

@@ -9,7 +9,7 @@ import { pin } from "../deck/data/runs";
 export const DEMO_SRC = dirname(fileURLToPath(import.meta.url));
 export const REPO = resolve(DEMO_SRC, "../..");
 
-/** Output: runtime/demo-v3/<lang>/scene-demo-<lang>.mp4, its check note, SRT and contact sheet. */
+/** Output: runtime/demo-v3/<lang>/gapline-demo-<lang>.mp4, its check note, SRT and contact sheet. */
 export const OUT = join(REPO, "runtime/demo-v3");
 export const PAGES_DIR = join(OUT, "pages");
 export const CACHE_DIR = join(OUT, "cache");

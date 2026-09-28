@@ -2,7 +2,7 @@
  * The hook's two drawn scenes. "dark": "Close your eyes." on a black screen, then the film's own sound
  * with its dialogue shown and a line that measures the silence as it passes; the measured total is
  * shown once, after the meter has gone. "seven": the same seconds drawn to scale (deck slide 2), with
- * Scene's two lines growing to their measured length inside their silence, their measurements named
+ * Gapline's two lines growing to their measured length inside their silence, their measurements named
  * with the sentence that says so, then Generate and what one press of it runs (a product claim).
  */
 import { dictionary } from "../../../src/i18n";
@@ -136,7 +136,7 @@ export async function sevenPage(timing: PageTiming): Promise<string> {
     )
     .join("");
   const lines = h.lines;
-  // Scene's Korean line on its shot; the English film adds the translation under it.
+  // Gapline's Korean line on its shot; the English film adds the translation under it.
   const subs = lines
     .map((l) => {
       const shot = shots.find((s) => l.start >= s.a && l.start < s.b);

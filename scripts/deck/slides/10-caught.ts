@@ -1,10 +1,10 @@
 /**
- * 10. Scene listens twice: the first eleven seconds of the opening, drawn to one seconds scale. From the
+ * 10. Gapline listens twice: the first eleven seconds of the opening, drawn to one seconds scale. From the
  * top: the soundtrack's spectrogram (the voice is visible), with the launch call's true place carried
- * down as a band; Scene's first listen of the whole clip, which mistimed the call and left a silence
- * over it; listening once (the evaluation's run, 22 Sep), the line Scene wrote into that silence,
+ * down as a band; Gapline's first listen of the whole clip, which mistimed the call and left a silence
+ * over it; listening once (the evaluation's run, 22 Sep), the line Gapline wrote into that silence,
  * spoken over the call; listening twice (23 Sep), the second listen, which heard the call and closed
- * the silence, so no line lies there. Under it, what Scene does. The band comes from the second
+ * the silence, so no line lies there. Under it, what Gapline does. The band comes from the second
  * recognizer the build runs (data/recognizers), which stays a build check and is not named on the slide.
  */
 import { analysis } from "../data/analysis";
@@ -89,14 +89,14 @@ export function caughtSlide(): string {
     name: "caught",
     kind: "exhibit",
     body: `
-${intro("The first listen mistimed the launch call, so Scene listens twice.", undefined, 1500)}
+${intro("The first listen mistimed the launch call, so Gapline listens twice.", undefined, 1500)}
 ${spectrogram}
 ${head(Y.spec, LAUNCH_SPECTROGRAM.height, "Sound", "voice band")}
 ${callBand}
 <p class="cg-said" style="left:${px(x(call.start))};top:${Y.words}px">${esc(call.text)}</p>
-${head(Y.chirp, LANE_H, "Scene’s first listen", "whole clip")}
+${head(Y.chirp, LANE_H, "Gapline’s first listen", "whole clip")}
 ${lane(Y.chirp, firstLane)}
-${head(Y.before, LANE_H, "Listening once", "Scene’s line")}
+${head(Y.before, LANE_H, "Listening once", "Gapline’s line")}
 ${lane(Y.before, beforeLane)}
 <p class="verdict cg-v" style="left:${px(verdictX)};top:${Y.before}px;line-height:${LANE_H}px">${REJECT_MARK}<span>spoken over the call</span></p>
 ${head(Y.after, LANE_H, "Listening twice", "second listen")}
@@ -105,7 +105,7 @@ ${lane(Y.after, speechBlock(heardAgain))}
 <div class="cg-axis" style="top:${Y.axis}px"></div>
 <div style="position:absolute;left:0;width:${W}px;top:${Y.axis}px">${ticks}</div>
 <div class="cg-now" style="left:${MARGIN}px;top:${Y.now}px;width:${W - 2 * MARGIN}px">
-  <p class="body">Before it writes into a silence, Scene listens to it again on its own. Here that caught the launch call and kept the line out.</p>
+  <p class="body">Before it writes into a silence, Gapline listens to it again on its own. Here that caught the launch call and kept the line out.</p>
 </div>`,
   });
 }

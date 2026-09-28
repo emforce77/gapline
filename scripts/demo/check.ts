@@ -1,5 +1,5 @@
 /**
- * Writes scene-demo-<lang>_check.md next to the film: length, picture, loudness, where each film
+ * Writes gapline-demo-<lang>_check.md next to the film: length, picture, loudness, where each film
  * excerpt is actually heard, the pacing limits (longest frozen stretch, caption reading pace,
  * caption line length, blank caption band), what the recording captured (and whether a live run
  * could start where it was recorded), and whether the cloud page still shows the development Gemini
@@ -305,7 +305,7 @@ export async function writeCheck(input: {
     (h) => Math.abs(h.heard - h.planned) <= MAX_SYNC_ERROR_S && h.match >= MIN_MATCH,
   );
   const lastsFilm = sync.audio >= sync.video - 1 / FPS;
-  const contact = join(outDir, `scene-demo-${lang}_contact.jpg`);
+  const contact = join(outDir, `gapline-demo-${lang}_contact.jpg`);
   const cols = 6;
   const rows = Math.ceil(duration / CONTACT_EVERY_S / cols);
   await runFfmpeg([
@@ -322,7 +322,7 @@ export async function writeCheck(input: {
   ]);
 
   const lines = [
-    `# scene-demo-${lang}.mp4 — check (${new Date().toLocaleDateString("en-CA")})`,
+    `# gapline-demo-${lang}.mp4 — check (${new Date().toLocaleDateString("en-CA")})`,
     "",
     `Built by \`npm run demo -- ${lang} build\` (scripts/demo/build.ts). App scenes recorded from ${source.baseUrl} at ${source.recordedAt}.`,
     "",
@@ -370,7 +370,7 @@ export async function writeCheck(input: {
     `Contact sheet: ${contact.split("/").pop()} (one frame every ${CONTACT_EVERY_S} s).`,
     "",
   ];
-  const note = join(outDir, `scene-demo-${lang}_check.md`);
+  const note = join(outDir, `gapline-demo-${lang}_check.md`);
   await writeFile(note, lines.join("\n"));
   return { note, failures: sync.failures };
 }

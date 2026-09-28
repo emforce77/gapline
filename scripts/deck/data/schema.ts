@@ -1,5 +1,5 @@
 /**
- * The parts of Scene's run records the deck and the film read. Parsing with these schemas makes a
+ * The parts of Gapline's run records the deck and the film read. Parsing with these schemas makes a
  * missing file or field stop the build with its path, instead of drawing a slide from an undefined.
  */
 import { readFileSync } from "node:fs";

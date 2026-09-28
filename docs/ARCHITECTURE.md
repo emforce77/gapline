@@ -1,6 +1,6 @@
 # Architecture
 
-Scene is one Next.js 16 application with FFmpeg in the same container, deployed on Cloud Run. A clip
+Gapline is one Next.js 16 application with FFmpeg in the same container, deployed on Cloud Run. A clip
 of up to 90 seconds goes in; a described film, a narration track, a text track and a full review log
 come out. This page covers what runs where, the loop that makes each line, how an optional edit or
 removal is applied, and how work and money are protected.
@@ -47,12 +47,12 @@ flowchart LR
   volume. Projects, saved analysis and runs are plain files there. The two records that must never be
   written twice, the daily allowance and edit claims, go through the Cloud Storage API with
   generation preconditions (`ifGenerationMatch`), because a mounted bucket has no file locks.
-- **Speech-to-Text v2, Chirp 3.** Scene sends the soundtrack as 16 kHz mono FLAC in pieces of 55
+- **Speech-to-Text v2, Chirp 3.** Gapline sends the soundtrack as 16 kHz mono FLAC in pieces of 55
   seconds that overlap by 5 seconds, because synchronous recognition takes about a minute of audio per
   request. Each overlap is split at its midpoint. Calls go to the `us` multi-region endpoint
   ([`src/lib/pipeline/hear.ts`](../src/lib/pipeline/hear.ts)), since Chirp 3 is served from the `us`
   and `eu` multi-regions.
-- **Re-listen, also Chirp 3.** After that first pass, Scene finds the silences from speech alone and
+- **Re-listen, also Chirp 3.** After that first pass, Gapline finds the silences from speech alone and
   recognizes every one of at least 1.2 s again on its own: FFmpeg cuts it out with 0.5 s of padding
   on each side (a longer silence in parts, so no slice exceeds 55 s), and the same request goes out
   for each slice, three at a time
@@ -67,7 +67,7 @@ flowchart LR
   words: "We have main engine start" at 3.71–6.47 s, which closed the 4.21–6.59 s silence (2.38 s).
   `npm run relisten -- tos-opening` repeats that check without changing the project.
 - **Text-to-Speech, Chirp 3 HD.** One narrator per language, `ko-KR-Chirp3-HD-Charon` and
-  `en-US-Chirp3-HD-Charon`, as 24 kHz mono WAV. Scene trims silence below −45 dBFS and takes the
+  `en-US-Chirp3-HD-Charon`, as 24 kHz mono WAV. Gapline trims silence below −45 dBFS and takes the
   remaining length as the spoken length.
 - **Gemini 3.8 Flash.** Every call streams, returns JSON that must match a schema, and is validated
   again on arrival; an answer that does not is asked for once more. Reasoning is set per stage:
@@ -193,7 +193,7 @@ flowchart TD
 2. Only the edited line is voiced, at normal speed. If it runs past its room, the edit is refused with
    the exact seconds needed and available.
 3. The whole final script is reviewed again with measured end times. If the new line breaks a rule,
-   the edit is refused with the reviewer's reason and fix. Scene never rewrites words typed by hand.
+   the edit is refused with the reviewer's reason and fix. Gapline never rewrites words typed by hand.
 4. An accepted edit becomes a new run that points to its parent. The other lines' WAV files are
    reused byte for byte, the mix and text track are rebuilt, and the before and after text is recorded.
    The original run is kept.

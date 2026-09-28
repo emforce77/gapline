@@ -342,7 +342,7 @@ describe("framing a close-up against the page's right edge", () => {
 });
 
 describe("words keyed to sound", () => {
-  it("shows each of Scene's lines in the reveal from its first spoken sound", () => {
+  it("shows each of Gapline's lines in the reveal from its first spoken sound", () => {
     const { from, to } = film.hook;
     const events = revealEvents("en", from, to, to - from);
     for (const l of film.hook.lines) {

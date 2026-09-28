@@ -2,8 +2,11 @@
 
 ## Direction
 
+Product name: Gapline (renamed from Scene on 2026-09-28; entries before that date use the old name).
+The demo's film-scene type is still `Scene` in code; it names a scene of the film, not the product.
+
 Builds the under-3-minute English submission film and a Korean review copy (same picture, Korean
-captions) into `runtime/demo-v3/<lang>/`: `scene-demo-<lang>.mp4`, `_check.md`, `_contact.jpg` and
+captions) into `runtime/demo-v3/<lang>/`: `gapline-demo-<lang>.mp4`, `_check.md`, `_contact.jpg` and
 `.srt`. There is no presenter voice (the owner found the synthetic narration worse than none,
 2026-09-23): captions tell the story and the only sound is the film's own. The story follows the deck
 (`scripts/deck`, direction "Screening room"): hook with eyes closed, the same seconds with Scene, why

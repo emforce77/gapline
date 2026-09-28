@@ -34,9 +34,9 @@ export function Metrics({ summary }: { summary: RunSummary }) {
 }
 
 /**
- * The final check's outcome: what Scene fixed on its own after it, and what it still notes, each list
+ * The final check's outcome: what Gapline fixed on its own after it, and what it still notes, each list
  * under its own lead so a note reads as a note. A listed moment with no free silence left says so:
- * Scene could not add a line there without talking over dialogue. Older results have no final check;
+ * Gapline could not add a line there without talking over dialogue. Older results have no final check;
  * they get no badge rather than a sentence that sounds like a failure.
  */
 export function QualityNote({

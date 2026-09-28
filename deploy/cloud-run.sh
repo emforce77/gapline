@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploys Scene to Cloud Run (asia-northeast3) from source via Cloud Build.
+# Deploys Gapline to Cloud Run (asia-northeast3) from source via Cloud Build.
 # Prerequisites (created once, see docs/DEPLOY.md): bucket, service account, secret.
 # Usage: GCP_PROJECT_ID=<project> bash deploy/cloud-run.sh
 set -euo pipefail

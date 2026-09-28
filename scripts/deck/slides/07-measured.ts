@@ -1,6 +1,6 @@
 /**
  * 07. Measured, not estimated: the newspaper line of the English city run fits its room by word
- * count and overruns it when spoken; shortened and read faster, it still overruns, so Scene drops it.
+ * count and overruns it when spoken; shortened and read faster, it still overruns, so Gapline drops it.
  * Three bars on one seconds scale against the room: the estimate, the first voice, and the closest
  * of the shortened takes. The word budget's source is the one note.
  */
@@ -39,7 +39,7 @@ export function measuredSlide(): string {
   const roomX = CHART.left + n.room * pps;
 
   const budget = note(
-    `${n.wordsPerSecond} words a second is MediaScribe’s published budget and Scene’s own writing budget.`,
+    `${n.wordsPerSecond} words a second is MediaScribe’s published budget and Gapline’s own writing budget.`,
   );
   const rows: Row[] = [
     {
@@ -84,7 +84,7 @@ ${intro(`The word count said it fit; the voice took ${secs(draft.voiced)}.`, und
 <p class="ms-draft" style="left:${MARGIN}px;top:${PIC.top + PIC.h + 28}px;width:${PIC.w}px">“${esc(inner(draft.text))}”</p>
 <p class="ms-roomlabel" style="left:${px(roomX - 1)};top:${CHART.top - 52}px">Room: ${secs(n.room)}</p>
 ${bars}
-<p class="body ms-body" style="left:${CHART.left}px;top:${bottom + 20}px;width:${BODY_W}px">Scene times the real voice, not a word count. Shortened and sped up, the line still ran long, so Scene dropped it rather than run into the next line.</p>`,
+<p class="body ms-body" style="left:${CHART.left}px;top:${bottom + 20}px;width:${BODY_W}px">Gapline times the real voice, not a word count. Shortened and sped up, the line still ran long, so Gapline dropped it rather than run into the next line.</p>`,
   });
 }
 

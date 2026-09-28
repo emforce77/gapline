@@ -1,7 +1,7 @@
 /**
  * Facts from outside the repo, typed by hand from the checked phase-1 research (impact.md,
  * landscape.md, 2026-09-23). Each carries the short source line printed under it. Numbers measured by
- * Scene itself are not here: they come from runtime/ through data/.
+ * Gapline itself are not here: they come from runtime/ through data/.
  */
 
 export interface DatedEvent {
@@ -149,7 +149,7 @@ export const COMPETITORS: { name: string; kind: string; cells: CompetitorCell[] 
     ],
   },
 ];
-/** Scene's own row. Guideline names are said in words: the slide face carries no acronyms. */
+/** Gapline's own row. Guideline names are said in words: the slide face carries no acronyms. */
 export const SCENE_ROW: CompetitorCell[] = [
   { support: "yes", note: "speed, shorten, drop" },
   { support: "yes", note: "rewrites, shortenings, fixes" },

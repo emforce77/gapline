@@ -1,9 +1,9 @@
-# Scene
+# Gapline
 
 **Descriptions that fit between the lines.**
 
-Scene makes audio description, the narration that tells blind and low-vision viewers what is on
-screen. One press of Generate runs every step: Scene writes each line for one silence between the
+Gapline makes audio description, the narration that tells blind and low-vision viewers what is on
+screen. One press of Generate runs every step: Gapline writes each line for one silence between the
 dialogue, checks it against a published audio-description guideline, voices it and measures the voice,
 rewrites any line a final check sends back, and mixes the track. It works in Korean and English.
 
@@ -15,7 +15,7 @@ rewrites any line a final check sends back, and mixes the track. It works in Kor
 
 Built for AI Builder Cup 2026, theme _Media, Content & Digital Experiences_.
 
-![The Scene workspace on the sample film](docs/images/workspace.png)
+![The Gapline workspace on the sample film](docs/images/workspace.png)
 
 ## The problem
 
@@ -26,7 +26,7 @@ Making one Korean film accessible still takes about three months, about ten spec
 ₩14 million (about US$10,000) for description and captions together
 ([Barrier-Free Film Committee](https://barrierfreefilms.or.kr/board_hrgp25/682), [2019 interview](https://futurechosun.com/archives/43832)).
 
-## What Scene does
+## What Gapline does
 
 - **Finds the room to speak.** Speech recognition times every spoken word, then listens to each
   silence again on its own. The silences between lines of dialogue, away from story-critical sounds,
@@ -36,22 +36,22 @@ Making one Korean film accessible still takes about three months, about ten spec
   accessible-broadcasting guideline and Netflix's audio-description style guide. Every rejection names
   its rule and the page it comes from.
 - **Voices, measures and fixes.** A Google voice speaks each line, and the length of that audio, not a
-  word count, decides whether it fits. A final check reviews exactly what will be heard; Scene rewrites
+  word count, decides whether it fits. A final check reviews exactly what will be heard; Gapline rewrites
   the lines it sends back and can add a line where a silence still has free room, then mixes the
   track.
 - **Leaves every line open.** Want different words? You can still edit any line on the timeline;
-  Scene re-voices just that one and checks the track again.
+  Gapline re-voices just that one and checks the track again.
 
 ## Try it in 60 seconds
 
-![The Scene landing page](docs/images/landing.png)
+![The Gapline landing page](docs/images/landing.png)
 
 1. Open the [live demo](https://scene-ad-958994530029.asia-northeast3.run.app). It starts with seven
    seconds of _Tears of Steel_ where nobody speaks. Play **Original sound**, then **With description**,
    and turn on **Hide the picture** to hear it the way a blind viewer would.
 2. Choose **Open the sample** for the full 65 seconds, with Korean and English tracks. Press play, turn
    on **Eyes closed**, and switch **Description off** and on to compare. The Korean track came from
-   one automatic run: seven lines, each inside its silence, one of them rewritten by Scene after the
+   one automatic run: seven lines, each inside its silence, one of them rewritten by Gapline after the
    final check sent it back.
 3. Select a narration line on the timeline. You see what the model saw in the scene, every draft, the
    rule that rejected a draft with its guideline page, and the voiced length against the room it had.
@@ -79,13 +79,13 @@ how long it takes to say, and when to stop trying.
    rules below and lists important moments no line covers. A rejected line is rewritten from the
    reviewer's own fix and reviewed again, up to twice. If it fails a third review, or a rewrite changes
    nothing, it is dropped.
-7. **Voice and measure.** Text-to-Speech (Chirp 3 HD) speaks each line and Scene measures the audio it
+7. **Voice and measure.** Text-to-Speech (Chirp 3 HD) speaks each line and Gapline measures the audio it
    gets back. A line that is too long but would fit at up to 1.15× speed is voiced again that much
    faster. Otherwise Gemini shortens it (at most twice), the shorter line goes back through review with
    one rewrite left, and it is voiced again. A line that still does not fit is dropped.
 8. **Final check.** The reviewer audits exactly the lines that will be heard, once. It lists lines that
    break a rule and moments the finished track still misses.
-9. **Apply the check.** Scene rewrites each failing line from the check's fix, and can write a new
+9. **Apply the check.** Gapline rewrites each failing line from the check's fix, and can write a new
    line for a missing moment where its silence still has free room: from 0.3 s after the last voiced
    line before it, at least 1.0 s. Both are reviewed and voiced like any other line. The track is not
    audited a second time; the check's list is updated with the fixes. What it still lists, such as a
@@ -96,7 +96,7 @@ how long it takes to say, and when to stop trying.
     verdict.
 11. **Edit (optional).** You can rewrite or move any line, bring back one the loop dropped, or remove
     one. A rewritten line is voiced at normal speed and the whole track is reviewed again. If it runs
-    long or breaks a rule, Scene returns the reason and leaves your words as they are. A removal voices
+    long or breaks a rule, Gapline returns the reason and leaves your words as they are. A removal voices
     nothing: the other lines keep their audio byte for byte, and the final check runs again on what is
     left, so anything only that line covered is listed as missing. Every edit makes a new version and
     keeps the old one.
@@ -115,12 +115,12 @@ screen reads "MEMORY PLAYBACK":
 | ----------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Draft       | "홀로그램 재생창이 뜬다." (A hologram playback window comes up.) | Passed review and was voiced in 2.32 s.                                                                                                                                   |
 | Final check | the same line                                                    | Sent back, _Viewer or camera framing_ (KMCC p.8–9): "뜬다" (comes up) frames it from the screen's side. Fix: read the text that appears on screen, like "전체 기억 재생." |
-| Fix         | "전체 기억 재생." (Full memory playback.)                        | Rewritten by Scene from the check's fix. Passed review and was voiced in 1.74 s of its 2.63 s of room, before the mix.                                                    |
+| Fix         | "전체 기억 재생." (Full memory playback.)                        | Rewritten by Gapline from the check's fix. Passed review and was voiced in 1.74 s of its 2.63 s of room, before the mix.                                                    |
 
 Not every fix works. At 63.0 s the reviewer rejected "화면이 암전된다." (The screen goes black.) and
 "암전된다." (Goes black.) as viewer framing, then "남자가 뇌를 응시한다." (The man gazes at the brain.) as
 redundant and inconsistently named. Its last fix repeated the words it had rejected one round
-earlier, although it is told that every fix must itself pass all eight rules. After two rewrites Scene
+earlier, although it is told that every fix must itself pass all eight rules. After two rewrites Gapline
 dropped the line rather than voice it.
 
 ### The review rules
@@ -143,7 +143,7 @@ KMCC is the Korea Media and Communications Commission guideline for accessible b
 ([장애인방송 프로그램 제공 가이드라인](https://www.kmcc.go.kr/download.do?fileSeq=62457), section 2,
 audio description, pages 6–10). Netflix is the
 [Audio Description Style Guide v2.5](https://partnerhelp.netflixstudios.com/hc/en-us/articles/215510667).
-Most KMCC clauses are recommendations, so Scene uses them as a review checklist.
+Most KMCC clauses are recommendations, so Gapline uses them as a review checklist.
 
 ## Architecture on Google Cloud
 
@@ -172,12 +172,12 @@ flowchart LR
 
 **Gemini access:** Gemini 3.8 Flash — currently via OpenRouter during development; moving to the Gemini API (Google AI Studio).
 
-| Service                                   | What it does in Scene                                                                                                                                                                                                 |
+| Service                                   | What it does in Gapline                                                                                                                                                                                                 |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cloud Run (second-generation environment) | Runs the Next.js app and FFmpeg in one container. Streams each run's progress to the browser.                                                                                                                         |
 | Speech-to-Text v2, Chirp 3                | Times every spoken word. Called at the `us` multi-region, where Chirp 3 is served.                                                                                                                                    |
 | Gemini 3.8 Flash                          | Watches the clip, writes and rewrites lines, reviews them and runs the final check, with a reasoning level set per stage.                                                                                             |
-| Text-to-Speech, Chirp 3 HD                | Speaks each line with one narrator per language. Scene measures the returned audio.                                                                                                                                   |
+| Text-to-Speech, Chirp 3 HD                | Speaks each line with one narrator per language. Gapline measures the returned audio.                                                                                                                                   |
 | Cloud Storage                             | Holds clips, saved analysis and every run, mounted into Cloud Run as a volume. The daily allowance and edit requests use conditional writes, so two instances cannot spend the same money or run the same edit twice. |
 | Secret Manager                            | Holds the model API key.                                                                                                                                                                                              |
 | Cloud Build and Artifact Registry         | Build the container from source on every deploy.                                                                                                                                                                      |
@@ -186,7 +186,7 @@ More detail, including the review, fit and fix loops, is in [docs/ARCHITECTURE.m
 
 ## Results
 
-On 22 September 2026 we ran Scene on six openly licensed clips with its default settings. These runs
+On 22 September 2026 we ran Gapline on six openly licensed clips with its default settings. These runs
 predate the fix step and the second automatic rewrite (added on 23 September), and we have not re-run
 them since.
 
@@ -200,8 +200,8 @@ them since.
 | Synthetic colour-and-beep clip, 30 s       | Korean    | Stopped safely | none                             | $0.01             |
 
 - **4 of 6 clips produced a described track.** On the other 2, the speech recognizer returned words
-  whose start and end times were identical, and Scene stopped instead of guessing where the silences
-  were. Scene now treats such a stretch as speech: the clip keeps less room to speak, and no silence is
+  whose start and end times were identical, and Gapline stopped instead of guessing where the silences
+  were. Gapline now treats such a stretch as speech: the clip keeps less room to speak, and no silence is
   invented.
 - **All 18 lines in the four finished tracks fit their room by measured audio**, and none overlaps the
   speech Chirp 3 recognized. One of them still talks over dialogue that Chirp 3 had placed elsewhere.
@@ -210,7 +210,7 @@ them since.
   call at 4.21–6.17 s over the whole clip and at 4.40–6.16 s when that stretch is recognized on its
   own, and a spectrogram shows voice at 4.8–6.3 s. Chirp 3 placed the countdown after it correctly. So
   the line "망고 오픈 무비 프로젝트." (The Mango Open Movie Project.), at 4.50–6.39 s, talks over the
-  call. Scene now re-listens to every usable silence (step 2 above). On 23 September it ran on the real
+  call. Gapline now re-listens to every usable silence (step 2 above). On 23 September it ran on the real
   audio: of 6 silences recognized again, one held 5 new words, "We have main engine start" at
   3.71–6.47 s, and that closed the 2.38 s silence at 4.21–6.59 s, so no line can be placed there. The
   seven lines in the current sample track overlap neither recognizer's words.
@@ -218,7 +218,7 @@ them since.
   reviewer setting lost the "40 years later" time jump in the opening without listing it as missing,
   and marked the Korean interview as checked while both of its essential facts were absent. We kept
   the stricter reviewer.
-- **Scene reports what it missed.** In all four finished tracks the final check listed moments still
+- **Gapline reports what it missed.** In all four finished tracks the final check listed moments still
   missing. Since 23 September a fix step (step 9 above) can add lines for that list where silence is
   still free, and keeps the rest in the result. On the sample track it rewrote one line and added
   none. Of the 3 moments it still lists, 2 have no free silence left. The credit at 2.0 s had 1.0 s
@@ -238,7 +238,7 @@ Fitting narration into dialogue gaps by measured voice length is not new:
 that overrun, and Microsoft's open-source
 [ai-audio-descriptions](https://github.com/microsoft/ai-audio-descriptions) speeds lines up to 1.15×
 and stops when they still overflow. [ViddyScribe](https://viddyscribe.com/), a 2024 Gemini API
-Developer Competition winner, already describes video in Korean. What Scene adds:
+Developer Competition winner, already describes video in Korean. What Gapline adds:
 
 1. **Every rejection cites a written rule.** The reviewer's eight rules come from Korea's
    accessible-broadcasting guideline and Netflix's style guide, and every rejected line shows the page
@@ -247,7 +247,7 @@ Developer Competition winner, already describes video in Korean. What Scene adds
    fixes made after the final check all pass the same review, and ship only if their measured audio
    fits.
 3. **It rewrites what the final check sends back, and lists what it could not fix.** The final check
-   reviews the finished track once. Scene rewrites the lines it fails and can add lines for missing
+   reviews the finished track once. Gapline rewrites the lines it fails and can add lines for missing
    moments where silence is still free; anything left, such as a moment with no free silence, stays
    listed in the result instead of being hidden behind a pass.
 
@@ -255,7 +255,7 @@ Competitor facts are from their public pages as of 23 September 2026.
 
 ## Known limitations
 
-- **Short clips only.** Scene takes clips up to 90 seconds and 30 MB and processes each one within a
+- **Short clips only.** Gapline takes clips up to 90 seconds and 30 MB and processes each one within a
   single request. Feature films would need a job queue.
 - **The reviewer is a model.** It is the same model as the writer, with its own prompt and rubric, and
   it can be wrong. That is why every result lists what the final check could not fix, and every

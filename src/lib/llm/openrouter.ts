@@ -139,7 +139,7 @@ async function callOnce<T>(
         Authorization: `Bearer ${apiKey()}`,
         "Content-Type": "application/json",
         "HTTP-Referer": "https://github.com/emforce77/scene-ad",
-        "X-Title": "Scene audio description",
+        "X-Title": "Gapline audio description",
       },
       body: JSON.stringify({
         model: call.model,

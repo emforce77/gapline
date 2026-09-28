@@ -28,7 +28,7 @@ const SUB_INSET = 24;
 const PAD_S = 0.3;
 /** Where each shot's crop sits in its frame, chosen by eye for the lettering and the brain. */
 const FOCUS = ["22% 40%", "50% 34%"];
-/** The body calls what a viewer hears in the silence "a hum": Scene's own sound label must say so. */
+/** The body calls what a viewer hears in the silence "a hum": Gapline's own sound label must say so. */
 const HUM = /\bhum/i;
 
 const domain = [seven.locked.start - PAD_S, seven.freaky.end + PAD_S] as const;
@@ -65,7 +65,7 @@ export function sevenSlide(): string {
     })
     .join("");
 
-  // What a viewer hears instead of words: Scene's own sound label over the silence.
+  // What a viewer hears instead of words: Gapline's own sound label over the silence.
   const hum = opening.sounds.find((s) => s.start < to && s.end > from && HUM.test(s.label));
   if (!hum) throw new Error("no sound label over the seven seconds says hum; the body does");
   const clips = seven.lines
@@ -83,7 +83,7 @@ export function sevenSlide(): string {
     filmCredit: true,
     body: `
 <div class="intro"><h1 class="headline" style="max-width:1728px">For seven seconds, a blind viewer hears no words.</h1></div>
-<p class="body sv-body" style="left:${MARGIN}px;top:${Y.body}px">Only a hum, then someone says <q>This is pretty freaky.</q> Scene fit two lines into that silence; each ends before the next word.</p>
+<p class="body sv-body" style="left:${MARGIN}px;top:${Y.body}px">Only a hum, then someone says <q>This is pretty freaky.</q> Gapline fit two lines into that silence; each ends before the next word.</p>
 <p class="sv-edge" style="left:${px(x(from))};top:${Y.edge}px">${secs(from)}</p>
 <p class="sv-edge" style="right:${px(W - x(to))};top:${Y.edge}px;text-align:right">${secs(to)}</p>
 <div class="sv-inout" style="left:${px(x(from))};width:${px(x(to) - x(from))};top:${Y.edge + 38}px"></div>

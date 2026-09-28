@@ -1,6 +1,6 @@
 /**
  * Direction A, "Screening room": a near-black room where the film is the only light. One accent, the
- * product's amber (src/styles/tokens.css), and it only ever means "words Scene adds to the film".
+ * product's amber (src/styles/tokens.css), and it only ever means "words Gapline adds to the film".
  * Rejections are ink: a strike and a labelled mark, never a second hue.
  */
 

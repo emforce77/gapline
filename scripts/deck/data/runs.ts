@@ -1,5 +1,5 @@
 /**
- * Reading Scene's run records, and the helpers every data module shares. The one sample run the app,
+ * Reading Gapline's run records, and the helpers every data module shares. The one sample run the app,
  * the film and the deck show is pinned in runtime/showcase.json; `pin` is read from there, so moving
  * the pin moves all three.
  */

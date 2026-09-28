@@ -1,8 +1,8 @@
 /**
  * Subtitle (ASS) documents for each scene: the film's captions in the band under the picture,
- * Scene's own lines as amber subtitles over the film, and the overlays drawn over recorded UI
+ * Gapline's own lines as amber subtitles over the film, and the overlays drawn over recorded UI
  * (labels, service chips, and a spotlight that dims everything but one element). The palette is the
- * deck's: ink on near-black, amber only for Scene's words.
+ * deck's: ink on near-black, amber only for Gapline's words.
  */
 import { COLOR } from "../deck/theme";
 import { CONTENT_HEIGHT, HEIGHT, WIDTH } from "./config";
@@ -50,7 +50,7 @@ const NUMBER =
 /**
  * Words that lead into the next one, so a line never ends with them: an English article, determiner,
  * preposition or conjunction (the, those, about, and), an English possessive (reviewer's), a Korean
- * determiner (이, 모든, 한) or a Korean genitive (씬의).
+ * determiner (이, 모든, 한) or a Korean genitive (갭라인의).
  */
 const LEADS = [
   /^(a|an|the|this|that|these|those|its|our|your|their|each|every|of|to|in|on|at|by|for|from|with|into|about|against|and|or|when|if|because|while)$/i,
@@ -298,7 +298,7 @@ export const sayEvent = (c: Caption): AssEvent => ({
 });
 
 /**
- * Scene's line over the film: Korean in amber, our English gloss under it in ink. An empty gloss
+ * Gapline's line over the film: Korean in amber, our English gloss under it in ink. An empty gloss
  * (the Korean film) writes no second line, so the line sits on `y` itself.
  */
 export const subEvent = (

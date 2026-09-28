@@ -19,7 +19,7 @@ export const enEditor = {
   remove: {
     open: "Remove this line",
     confirm:
-      "Remove this line from the narration? Scene makes a new result without it and checks again what the track still misses. The current result stays as it is.",
+      "Remove this line from the narration? Gapline makes a new result without it and checks again what the track still misses. The current result stays as it is.",
     yes: "Remove line",
     no: "Keep it",
     removing: "Removing and re-checking…",
@@ -27,7 +27,7 @@ export const enEditor = {
   history: "Result version",
   reviewNeeded: "Final check · notes",
   checked: "Final check passed",
-  autoFixed: "After the final check, Scene fixed {lines} on its own.",
+  autoFixed: "After the final check, Gapline fixed {lines} on its own.",
   lines: { one: "1 line", other: "{n} lines" },
   missingLead: "It also noted moments that have no line:",
   failingLead: "Lines it still flags:",
@@ -42,7 +42,7 @@ export const enEditor = {
     too_long:
       "Spoken, these words run past the {room} of room from {start}. Shorten them or start earlier.",
     review:
-      "The reviewer rejected these words. Scene does not rewrite an editor's words; change them and try again.",
+      "The reviewer rejected these words. Gapline does not rewrite an editor's words; change them and try again.",
     placement:
       "The start has to stay between {min} and {max} seconds, clear of the lines around it.",
     unchanged: "Change the words or the start time first.",
@@ -73,7 +73,7 @@ export const koEditor: Dictionary["editor"] = {
   history: "결과 버전",
   reviewNeeded: "최종 점검 · 참고",
   checked: "최종 점검 통과",
-  autoFixed: "최종 점검 뒤 씬이 {lines}을 스스로 고쳤습니다.",
+  autoFixed: "최종 점검 뒤 갭라인이 {lines}을 스스로 고쳤습니다.",
   lines: { one: "1문장", other: "{n}문장" },
   missingLead: "해설이 없는 순간도 적어 두었습니다:",
   failingLead: "여전히 지적된 문장:",
@@ -88,7 +88,7 @@ export const koEditor: Dictionary["editor"] = {
     too_long:
       "읽는 시간이 {start}부터 남은 자리({room})보다 깁니다. 문장을 줄이거나 더 일찍 시작해 주세요.",
     review:
-      "검수에서 반려되었습니다. 씬은 편집자의 문장을 대신 고치지 않으니, 직접 고친 뒤 다시 시도해 주세요.",
+      "검수에서 반려되었습니다. 갭라인은 편집자의 문장을 대신 고치지 않으니, 직접 고친 뒤 다시 시도해 주세요.",
     placement: "시작 시각은 앞뒤 문장과 겹치지 않게 {min}초에서 {max}초 사이여야 합니다.",
     unchanged: "문장이나 시작 시각을 바꾼 뒤 저장해 주세요.",
     busy: "이 수정은 아직 처리 중입니다. 잠시 후 페이지를 새로 고쳐 확인해 주세요.",

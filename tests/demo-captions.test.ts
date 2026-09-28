@@ -33,8 +33,8 @@ describe("captionGroups", () => {
 
   it("starts the second line with a conjunction rather than split a phrase", () => {
     assert.deepEqual(
-      captionGroups("Scene rewrites it from the reviewer's fix and reviews it again.", "en"),
-      [["Scene rewrites it from the reviewer's fix", "and reviews it again."]],
+      captionGroups("Gapline rewrites it from the review's fix and reviews it again.", "en"),
+      [["Gapline rewrites it from the review's fix", "and reviews it again."]],
     );
   });
 
@@ -204,7 +204,7 @@ describe("motion pages in the Korean film", () => {
   const allowed = new Set(
     words(
       [
-        "Tears of Steel Scene Cloud Run Storage Gemini Speech-to-Text v2 Text-to-Speech Chirp HD",
+        "Tears of Steel Gapline Cloud Run Storage Gemini Speech-to-Text v2 Text-to-Speech Chirp HD",
         "FFmpeg Next.js Secret Manager Build deploy/cloud-run.sh vCPU API AI Builder Cup",
         GEMINI_NAME,
         film.geminiAccess,

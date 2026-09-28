@@ -55,7 +55,7 @@ export default async function LandingPage() {
   const t = dictionary(lang);
   const [english, korean] = await Promise.all([loadShowcase("en"), loadShowcase("ko")]);
   const showcase = lang === "ko" ? korean : english;
-  // The story follows the pinned Korean result: the line the final check sent back and Scene rewrote.
+  // The story follows the pinned Korean result: the line the final check sent back and Gapline rewrote.
   const featured = korean?.preview ?? showcase?.preview ?? null;
   const project = showcase?.project ?? null;
   const analysis = project ? await readAnalysis(project.id) : null;

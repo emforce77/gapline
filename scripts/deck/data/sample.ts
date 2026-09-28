@@ -58,7 +58,7 @@ if (shipped.length !== run.summary.cuesShipped)
     `counted ${shipped.length} shipped lines, the run records ${run.summary.cuesShipped}`,
   );
 
-// The gaps must be exactly what Scene's own gap finder makes of this speech: that is what lets the
+// The gaps must be exactly what Gapline's own gap finder makes of this speech: that is what lets the
 // remainder be called guard margins and pauses too short to use.
 const recomputed = findGaps(
   {

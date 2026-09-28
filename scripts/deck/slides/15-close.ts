@@ -1,6 +1,6 @@
 /**
  * 15. Close, with the eyes closed: no picture, only what a blind viewer hears around the seven seconds
- * of the opening, with the tagline set where Scene's lines go, between "…locked." and "This is pretty
+ * of the opening, with the tagline set where Gapline's lines go, between "…locked." and "This is pretty
  * freaky."; then the invitation, the submission links (each shown once it is set in facts.ts) and the
  * credits.
  */

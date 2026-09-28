@@ -1,7 +1,7 @@
 /**
- * 12. Where Scene is different: a fair table with named alternatives, terse cells, a dash wherever a
- * vendor does not document something, and the column Scene loses (pausing the film) kept in. The
- * headline names what Scene adds: the others either fit the voice or check it by hand; Scene fits
+ * 12. Where Gapline is different: a fair table with named alternatives, terse cells, a dash wherever a
+ * vendor does not document something, and the column Gapline loses (pausing the film) kept in. The
+ * headline names what Gapline adds: the others either fit the voice or check it by hand; Gapline fits
  * every line and checks it against a guideline on its own.
  */
 import {
@@ -23,7 +23,7 @@ const WORD: Record<Support, string> = {
 };
 /** The column that carries the headline's claim. */
 const CLAIM_COLUMN = 1;
-/** Column widths: vendor names, the claim column (its Scene cell is the longest), the rest share. */
+/** Column widths: vendor names, the claim column (its Gapline cell is the longest), the rest share. */
 const NAME_COL = 260;
 const CLAIM_COL = 330;
 const TABLE_TOP = 268;
@@ -38,7 +38,7 @@ function cell(c: CompetitorCell, col: number): string {
 }
 
 export function differentSlide(): string {
-  const note = notesFor("How Scene differs");
+  const note = notesFor("How Gapline differs");
   if (
     COMPETITORS.some((c) => c.cells.length !== COMPARE_COLUMNS.length) ||
     SCENE_ROW.length !== COMPARE_COLUMNS.length
@@ -60,12 +60,12 @@ export function differentSlide(): string {
     name: "different",
     kind: "exhibit",
     body: `
-<div class="intro"><h1 class="headline" style="max-width:1600px">Others fit the voice or check by hand. Scene does both, automatically.</h1></div>
+<div class="intro"><h1 class="headline" style="max-width:1600px">Others fit the voice or check by hand. Gapline does both, automatically.</h1></div>
 <div class="df-wrap" style="left:${MARGIN}px;top:${TABLE_TOP}px;width:${W - 2 * MARGIN}px">
 <table class="df-table">
   <colgroup><col style="width:${NAME_COL}px">${COMPARE_COLUMNS.map((_, i) => (i === CLAIM_COLUMN ? `<col style="width:${CLAIM_COL}px">` : "<col>")).join("")}</colgroup>
   <thead><tr><th></th>${head}</tr></thead>
-  <tbody>${rows}<tr class="scene"><th>Scene</th>${SCENE_ROW.map(cell).join("")}</tr></tbody>
+  <tbody>${rows}<tr class="scene"><th>Gapline</th>${SCENE_ROW.map(cell).join("")}</tr></tbody>
 </table>
 <p class="df-legend">— = not published${vendors}</p>
 </div>`,

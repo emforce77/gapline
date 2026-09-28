@@ -1,7 +1,7 @@
 /**
  * One H.264 segment per scene, all encoded alike so they join without re-encoding:
  *   page   — a motion page rendered frame by frame (motion.ts);
- *   film   — the described film itself, centred in the picture area, with Scene's lines in the band;
+ *   film   — the described film itself, centred in the picture area, with Gapline's lines in the band;
  *   beat   — the app recording, retimed through its warps, with the camera and overlays. Where the
  *            recording plays the film, the film itself is laid over the player's picture.
  * The caption band under the picture carries the film's captions in every scene.
@@ -47,7 +47,7 @@ const BAND = COLOR.screen.replace("#", "0x");
 const FILM_H = 800;
 const FILM_TOP = (CONTENT_HEIGHT - FILM_H) / 2;
 /**
- * The reveal's words sit in the caption band, off the picture: the label near its top, Scene's line
+ * The reveal's words sit in the caption band, off the picture: the label near its top, Gapline's line
  * (and in English its translation) or the film's dialogue centred below it, every line ending at
  * least 54 px (title-safe) above the frame's foot.
  */
@@ -57,10 +57,10 @@ const TAG_POS = { x: 28, y: 26 };
 /** A tag about the film being played sits on the film's picture, this far in from its corner. */
 const TAG_INSET = 28;
 const CHIP_GAP = 18;
-/** A caption of dialogue is taken down just before Scene's next line starts. */
+/** A caption of dialogue is taken down just before Gapline's next line starts. */
 const DIALOGUE_CLEAR_S = 0.05;
 const DIALOGUE_HOLD_S = 0.6;
-/** Scene's line stays up this long after its voice ends. */
+/** Gapline's line stays up this long after its voice ends. */
 const LINE_HOLD_S = 0.3;
 const LABEL_START_S = 0.2;
 
@@ -158,7 +158,7 @@ async function pageSegment(s: SegmentInput): Promise<void> {
 /** An event's words centred on its position, whatever the style's own alignment. */
 const centred = (e: AssEvent): AssEvent => ({ ...e, text: `{\\an5}${e.text}` });
 
-/** The reveal's words in the band: the label, Scene's lines, and the film's own dialogue. */
+/** The reveal's words in the band: the label, Gapline's lines, and the film's own dialogue. */
 export function revealEvents(
   lang: Language,
   from: number,
@@ -183,7 +183,7 @@ export function revealEvents(
       h.freaky.text,
       ko?.freaky,
     ),
-    // The English film glosses Scene's Korean line; the Korean film shows the line alone. Each is
+    // The English film glosses Gapline's Korean line; the Korean film shows the line alone. Each is
     // up from its first spoken sound, not from its voice file's lead-in.
     ...h.lines.map((l) =>
       centred(

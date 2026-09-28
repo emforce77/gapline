@@ -194,7 +194,7 @@ describe("interface copy", () => {
         ? Object.values(value).flatMap(strings)
         : [];
   /**
-   * Scene's copy states what the default run does; it does not insist nobody touched a result
+   * Gapline's copy states what the default run does; it does not insist nobody touched a result
    * (owner decision, 23 Sep 2026). These phrasings kept coming back in drafts.
    */
   const DEFENSIVE =
@@ -220,9 +220,9 @@ describe("interface copy", () => {
     }
   });
 
-  it("keeps one Korean word for voicing and calls Scene by its Korean name", () => {
+  it("keeps one Korean word for voicing and calls Gapline by its Korean name", () => {
     for (const text of strings(ko)) {
-      assert.doesNotMatch(text, /녹음|재합성|재검수|목소리로 읽|Scene/, text);
+      assert.doesNotMatch(text, /녹음|재합성|재검수|목소리로 읽|Gapline/, text);
     }
   });
 

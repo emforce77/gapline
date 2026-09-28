@@ -1,6 +1,6 @@
 # Deploy your own
 
-This sets up Scene on Cloud Run in a Google Cloud project of your own: the APIs, a bucket, two service
+This sets up Gapline on Cloud Run in a Google Cloud project of your own: the APIs, a bucket, two service
 accounts and a secret, then one deploy command. Every step uses the gcloud CLI.
 
 ## You need
@@ -51,8 +51,8 @@ gcloud storage buckets create "gs://$BUCKET" --project "$PROJECT_ID" \
 source.
 
 ```sh
-gcloud iam service-accounts create scene-ad-run --project "$PROJECT_ID" --display-name "Scene service"
-gcloud iam service-accounts create scene-ad-build --project "$PROJECT_ID" --display-name "Scene build"
+gcloud iam service-accounts create scene-ad-run --project "$PROJECT_ID" --display-name "Gapline service"
+gcloud iam service-accounts create scene-ad-build --project "$PROJECT_ID" --display-name "Gapline build"
 
 # The service calls Speech-to-Text and Text-to-Speech, billed to this project.
 gcloud projects add-iam-policy-binding "$PROJECT_ID" \

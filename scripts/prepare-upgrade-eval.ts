@@ -78,7 +78,7 @@ const cases = [
     ],
     license: "CC0",
     url: "scripts/prepare-upgrade-eval.ts",
-    author: "Scene synthetic fixture",
+    author: "Gapline synthetic fixture",
   },
   {
     id: "eval-ko-holdout",

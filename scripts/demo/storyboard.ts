@@ -124,7 +124,7 @@ export function buildStoryboard(): Scene[] {
           },
         ),
         // Short: "Open your eyes." is up with it, and the reveal's label says the rest (in Korean).
-        cap("This time, with Scene's description.", "이번에는 씬의 화면해설과 함께."),
+        cap("This time, with Gapline's description.", "이번에는 갭라인의 화면해설과 함께."),
       ],
       hold: 0.2,
     },
@@ -140,11 +140,11 @@ export function buildStoryboard(): Scene[] {
       chapter: true,
       parts: [
         cap(
-          "Scene fit two lines into that silence, each measured to end before the next word.",
-          "씬은 이 침묵에 두 문장을 넣고, 실제 낭독 길이를 재서 둘 다 다음 대사 전에 끝냈습니다.",
+          "Gapline fit two lines into that silence, each measured to end before the next word.",
+          "갭라인은 이 침묵에 두 문장을 넣고, 실제 낭독 길이를 재서 둘 다 다음 대사 전에 끝냈습니다.",
           {
             ko: [
-              ["씬은 이 침묵에 두 문장을 넣고,"],
+              ["갭라인은 이 침묵에 두 문장을 넣고,"],
               ["실제 낭독 길이를 재서", "둘 다 다음 대사 전에 끝냈습니다."],
             ],
           },
@@ -197,8 +197,8 @@ export function buildStoryboard(): Scene[] {
       show: { page: "constraint" },
       parts: [
         cap(
-          "Description must never talk over dialogue, so Scene first times every spoken word.",
-          "해설은 대사와 겹치면 안 되기에, 씬은 먼저 말소리가 나오는 시점을 모두 잽니다.",
+          "Description must never talk over dialogue, so Gapline first times every spoken word.",
+          "해설은 대사와 겹치면 안 되기에, 갭라인은 먼저 말소리가 나오는 시점을 모두 잽니다.",
         ),
         cap(
           `This ${clip}-second clip has ${gaps} usable silences; the shortest is ${shortest} seconds.`,
@@ -296,13 +296,15 @@ export function buildStoryboard(): Scene[] {
           },
         ),
         cap(
-          "Scene rewrote it as the check suggested: it now reads the title on screen.",
-          `씬은 점검 의견대로 화면 속 영어 문구를 우리말로 옮겨 ‘${rewriteWords}’${euro(rewrite)} 다시 썼습니다.`,
+          "Gapline rewrote it as the check suggested: it now reads the title on screen.",
+          `갭라인은 점검 의견대로 화면 속 영어 문구를 우리말로 옮겨 ‘${rewriteWords}’${euro(rewrite)} 다시 썼습니다.`,
           {
-            en: [["Scene rewrote it as the check suggested:", "it now reads the title on screen."]],
+            en: [
+              ["Gapline rewrote it as the check suggested:", "it now reads the title on screen."],
+            ],
             // The first caption ends on a verb (옮겨), not on a modifier waiting for its noun.
             ko: [
-              ["씬은 점검 의견대로", "화면 속 영어 문구를 우리말로 옮겨"],
+              ["갭라인은 점검 의견대로", "화면 속 영어 문구를 우리말로 옮겨"],
               [`‘${rewriteWords}’${euro(rewrite)} 다시 썼습니다.`],
             ],
           },
@@ -337,11 +339,11 @@ export function buildStoryboard(): Scene[] {
         ),
         pause(EDIT_TYPING_S),
         cap(
-          "Scene re-voices just that line and checks the whole track again.",
-          "그러면 씬은 그 문장만 다시 낭독하고, 트랙 전체를 다시 점검합니다.",
+          "Gapline re-voices just that line and checks the whole track again.",
+          "그러면 갭라인은 그 문장만 다시 낭독하고, 트랙 전체를 다시 점검합니다.",
           {
-            en: [["Scene re-voices just that line", "and checks the whole track again."]],
-            ko: [["그러면 씬은 그 문장만 다시 낭독하고,", "트랙 전체를 다시 점검합니다."]],
+            en: [["Gapline re-voices just that line", "and checks the whole track again."]],
+            ko: [["그러면 갭라인은 그 문장만 다시 낭독하고,", "트랙 전체를 다시 점검합니다."]],
           },
         ),
       ],
@@ -384,10 +386,10 @@ export function buildStoryboard(): Scene[] {
       chapter: true,
       parts: [
         cap(
-          "Scene. Descriptions that fit between the lines.",
-          "씬. 대사와 대사 사이에 꼭 맞는 화면해설.",
+          "Gapline. Descriptions that fit between the lines.",
+          "갭라인. 대사와 대사 사이에 꼭 맞는 화면해설.",
           {
-            en: [["Scene.", "Descriptions that fit between the lines."]],
+            en: [["Gapline.", "Descriptions that fit between the lines."]],
           },
         ),
         cap("Try the sample with your eyes closed.", "눈을 감고 샘플을 들어 보세요."),
