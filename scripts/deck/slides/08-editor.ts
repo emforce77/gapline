@@ -2,9 +2,9 @@
  * 08. The product: one press of Generate makes the whole track.
  * Four crops of the workspace on the pinned sample run, each shown at 1:1 of the 2x capture so the
  * app's own text reads at slide size: the Generate button, the player's switches (Eyes closed), the
- * timeline around the chosen line, and the panel of the line the final check sent back and Gapline
- * rewrote. Each crop has its caption above it, and a ring marks what the caption names. The prose
- * tells the optional edit once.
+ * timeline around the chosen line, and the panel of the line the reviewer (or the final check) sent
+ * back and Gapline rewrote. Each crop has its caption above it, and a ring marks what the caption
+ * names. The prose tells the optional edit once.
  */
 import { line } from "../data/sample";
 import { intro, px, slide } from "../html";
@@ -65,8 +65,6 @@ export function editorSlide(): string {
     throw new Error(
       `the captured line is "${capture.lineHeading}", not the line at ${line.start} s`,
     );
-  if (line.rejectedBy !== "final check")
-    throw new Error("the caption says the final check sent the captured line back");
 
   // Right column: the line panel, then the prose. Left column: the switches, then the timeline.
   const lineSize = size("line");
@@ -115,7 +113,7 @@ ${caption("Eyes closed: listen as its audience will", controls.left, ROW_TOP, co
 ${crop(controls)}${ring(controls, callouts.eyesClosed.box)}
 ${caption("Each line in the silence it fits", timeline.left, timelineTop - CAPTION_H, timeline.width)}
 ${crop(timeline)}
-${caption("Gapline rewrote the line the final check sent back", lineShot.left, ROW_TOP, lineShot.width)}
+${caption(`Gapline rewrote the line the ${line.rejectedBy === "review" ? "reviewer" : "final check"} sent back`, lineShot.left, ROW_TOP, lineShot.width)}
 ${crop(lineShot)}${ring(lineShot, callouts.fixed.box)}
 <p class="body pd-body" style="left:${px(rightX)};top:${px(bodyTop)};width:${px(lineShot.width)}">Want different words? You can still edit any line; Gapline re-voices just that one and checks the track again.</p>`,
   });

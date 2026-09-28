@@ -2,7 +2,7 @@
  * What happens in each app scene, timed by the scene's caption sentences (see record.ts), with the
  * app in the film's language:
  *   upload  — a private upload of the sample clip (free: FFmpeg only), then the Generate button of
- *             the new workspace, set to Korean narration, the one press the rest follows from
+ *             the new workspace, set to the sample's narration language, the one press the rest follows from
  *             (hovered, never pressed);
  *   replay  — the automatic sample run's saved trace, replayed so each stage works under the
  *             sentence that names it, sped up overall under an honest label;
@@ -21,9 +21,10 @@ import { dictionary } from "../../src/i18n";
 import type { Language } from "../../src/lib/pipeline/schemas";
 import type { Rect } from "./ass";
 import { MOVE_SECONDS, shotView } from "./camera";
+import { SAMPLE_LANGUAGE } from "../deck/data/runs";
 import { BASE_URL, CACHE_DIR, CLIP_FILE, PROJECT_ID, SAMPLE_RUN } from "./config";
 import { film } from "./facts";
-import { EDIT_WORD, labels, type ServiceStage } from "./labels";
+import { EDIT, labels, type ServiceStage } from "./labels";
 import {
   BeatClock,
   boxesOf,
@@ -116,9 +117,9 @@ export type BeatScript = (
   lang: Language,
 ) => Promise<void>;
 
-/** What the edit scene types into Line 7, before its last word: one word added. Never submitted. */
-const EDIT_ADDED = `${EDIT_WORD.ko} `;
-const EDIT_BEFORE = "들여다본다.";
+/** What the edit scene types into its line, before its last word: one word added. Never submitted. */
+const EDIT_ADDED = `${EDIT.word} `;
+const EDIT_BEFORE = EDIT.before;
 /** The editor opens this soon after its sentence starts; the caret moves and the word is typed at these paces. */
 const EDITOR_OPEN_S = 0.2;
 const CARET_MS = 25;
@@ -341,7 +342,7 @@ const upload: BeatScript = async (page, clock, plan, lang) => {
   // Read after the wait; a failure is reported there, not as an unhandled rejection meanwhile.
   sectionFrame.catch(() => undefined);
   let left = 0;
-  const korean = page.locator('.run-options .segmented button[lang="ko"]');
+  const narration = page.locator(`.run-options .segmented button[lang="${SAMPLE_LANGUAGE}"]`);
   // No label tail: it would sit over the new page's header.
   await clock.squeeze(
     [
@@ -355,19 +356,20 @@ const upload: BeatScript = async (page, clock, plan, lang) => {
         },
       },
       {
-        // Cut out: the page change, the workspace's first paint, and its narration set to Korean,
-        // the language of the sample the film goes on to replay, so the page is first seen ready
-        // to generate Korean.
+        // Cut out: the page change, the workspace's first paint, and its narration set to the
+        // language of the sample the film goes on to replay, so the page is first seen ready to
+        // generate it.
         wait: async () => {
           await page.waitForURL("**/p/u-*", { timeout: UPLOAD_TIMEOUT_MS, waitUntil: "commit" });
           await page.locator(".ws-main").waitFor();
           await page.waitForLoadState("networkidle");
-          if ((await korean.getAttribute("aria-pressed")) !== "true") await korean.click();
+          if ((await narration.getAttribute("aria-pressed")) !== "true") await narration.click();
           await page.waitForFunction(
-            () =>
+            (lang) =>
               document
-                .querySelector('.run-options .segmented button[lang="ko"]')
+                .querySelector(`.run-options .segmented button[lang="${lang}"]`)
                 ?.getAttribute("aria-pressed") === "true",
+            SAMPLE_LANGUAGE,
           );
           await paintFrame(page, ".player-frame video");
           await moveCursor(page, REST.x, REST.y);
@@ -410,6 +412,8 @@ const stageRow = (page: Page, lang: Language, stage: ServiceStage, state?: strin
  * scrolled back down once the replay is done.
  */
 let replayLift = 0;
+/** CSS px the line picker is kept below the frame's foot when the replay's page scrolls back. */
+const PICKER_CLEAR_CSS = 4;
 
 const replay: BeatScript = async (page, clock, plan, lang) => {
   const words = labels(lang);
@@ -484,13 +488,29 @@ const replay: BeatScript = async (page, clock, plan, lang) => {
   // Every row done, the page goes back down to where the replay began (smoothly, as the camera
   // leaves the list): the timeline, with every line in place, whole in the picture, and the line
   // picker under it either whole or out of it.
-  await page.evaluate((lift) => window.scrollBy({ top: lift, behavior: "smooth" }), replayLift);
+  // A timeline one narration row short (no two lines overlapping) would leave the picker's top in
+  // the frame's foot: the page then stops that much higher, with the picker just out of the picture.
+  const lift = await page.evaluate(
+    ([lift, clear]) => {
+      const picker = document.querySelector(".cue-picker")?.getBoundingClientRect();
+      if (!picker) return lift;
+      const top = picker.top - lift;
+      const cut = top < innerHeight && top + picker.height > innerHeight;
+      return cut ? lift - (innerHeight - top) - clear : lift;
+    },
+    [replayLift, PICKER_CLEAR_CSS] as const,
+  );
+  await page.evaluate((top) => window.scrollBy({ top, behavior: "smooth" }), lift);
   const timeline = await settledRect(page, boxesOf([page.locator(".timeline")]));
   const view = shotView(timeline, TIMELINE_ZOOM);
   for (const part of [".timeline", ".cue-picker"]) {
     const el = page.locator(part);
-    if ((await el.count()) && !wholeOrOut(await rectOf(el.first()), view))
-      throw new Error(`replay: the timeline's shot cuts ${part} at the frame's edge`);
+    if (!(await el.count())) continue;
+    const rect = await rectOf(el.first());
+    if (!wholeOrOut(rect, view))
+      throw new Error(
+        `replay: the timeline's shot cuts ${part} at the frame's edge (${JSON.stringify(rect)} in ${JSON.stringify(view)})`,
+      );
   }
   clock.shot(timeline, TIMELINE_ZOOM, doneAt);
   if (!(await page.getByRole("button", { name: t.workspace.replay }).count()))
@@ -625,7 +645,7 @@ const edit: BeatScript = async (page, clock, plan, lang) => {
   const words = labels(lang);
   const [s0, s1] = sentences(plan, "edit", 2);
   const summary = page.locator(".edit-line > summary");
-  // The whole workspace, Line 7 picked, as its editor is opened. A close-up on the line's head and
+  // The whole workspace, its line picked, as its editor is opened. A close-up on the line's head and
   // the editor's summary, or on the whole editor, is as tall as the player's caption strip and
   // controls beside it, and would cut their labels at the frame's left edge (2026-09-23); the
   // line's own box sits beside the film's picture, where no words are.

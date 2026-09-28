@@ -33,7 +33,7 @@ import {
 import { CONTENT_HEIGHT, DEVICE_SCALE, FPS, HEIGHT, runFile, SAMPLE_RUN, WIDTH } from "./config";
 import { encodeArgs, subtitlesFilter } from "./encode";
 import { film } from "./facts";
-import { labels } from "./labels";
+import { labels, lineGloss } from "./labels";
 import { masterCut } from "./master";
 import { renderMotion } from "./motion";
 import { PAGES } from "./pages/index";
@@ -183,15 +183,15 @@ export function revealEvents(
       h.freaky.text,
       ko?.freaky,
     ),
-    // The English film glosses Gapline's Korean line; the Korean film shows the line alone. Each is
-    // up from its first spoken sound, not from its voice file's lead-in.
+    // Gapline's line, with its translation under it where the film's language differs. Each is up
+    // from its first spoken sound, not from its voice file's lead-in.
     ...h.lines.map((l) =>
       centred(
         subEvent(
           at(l.start + l.onset),
           at(l.start + l.voiced + LINE_HOLD_S),
           l.text,
-          lang === "en" ? l.gloss : "",
+          lineGloss(l.text, lang),
           REVEAL_SUB_CENTRE_Y,
         ),
       ),

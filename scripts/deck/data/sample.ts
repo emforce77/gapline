@@ -25,11 +25,12 @@ import {
   runDir,
   span,
   stagesOf,
+  SAMPLE_LANGUAGE,
   TOLERANCE_S,
   unionOf,
 } from "./runs";
 
-export const runId = pin.runs.ko;
+export const runId = pin.runs[SAMPLE_LANGUAGE];
 export const run = readRun(runId);
 if (run.parentRunId || run.humanEdits?.length)
   throw new Error(`${runId} is not an automatic run: it has a parent or records edits`);
@@ -200,12 +201,16 @@ if (!mixDone) throw new Error("the sample was never mixed");
 agree("run time", mixDone.t, run.summary.wallSeconds);
 
 // ------------------------------------------------------------------ one line sent back and rewritten
-/** A rejection's first cited rule, with the reviewer's reason and fix and our English glosses. */
+/**
+ * A rejection: the words it quotes, every rule it cites for them (the first with the reviewer's reason),
+ * the reviewer's fix, and our English glosses.
+ */
 function rejectionOf(v: RunCue["versions"][number]) {
   const hit = v.review?.violations[0];
   if (!v.review || v.review.pass || !hit) throw new Error(`"${v.text}" was not rejected`);
   return {
     rule: hit.rule,
+    rules: v.review.violations.map((x) => x.rule),
     quote: hit.quote,
     reason: hit.reason,
     reasonGloss: gloss(hit.reason),
@@ -222,10 +227,10 @@ const rejectedThenPassed = (c: RunCue) =>
 const rewritten = shipped.filter(rejectedThenPassed).sort((a, b) => a.start - b.start)[0];
 if (!rewritten) throw new Error(`no line of ${runId} was rejected once and passed on its rewrite`);
 const [draft, rewrite] = rewritten.versions;
-if (draft.review?.violations.length !== 1)
-  throw new Error(`${rewritten.id}'s rejection cites more than one rule; the deck shows one`);
-if (!draft.voice || !rewrite.voice)
-  throw new Error(`${rewritten.id}'s draft or rewrite was not voiced`);
+// The slide strikes one quote: every rule the rejection cites must point at the same words.
+if (new Set(draft.review?.violations.map((x) => x.quote)).size !== 1)
+  throw new Error(`${rewritten.id}'s rejection quotes more than one passage; the deck strikes one`);
+if (!rewrite.voice) throw new Error(`${rewritten.id}'s rewrite was not voiced`);
 
 // Who sent it back: the per-line reviewer (rounds 1–3) or the final check (round 0, recorded by the
 // fix stage after the verify stage read the whole voiced track).
@@ -255,8 +260,8 @@ export const line = {
     text: draft.text,
     gloss: gloss(draft.text),
     ...rejectionOf(draft),
-    /** The draft was voiced before the final check sent it back. */
-    voiced: round2(draft.voice.seconds),
+    /** Voiced only when the final check sent it back (a reviewer's rejection comes before the voice). */
+    voiced: draft.voice ? round2(draft.voice.seconds) : null,
   },
   rewrite: { text: rewrite.text, gloss: gloss(rewrite.text) },
   /** The rewrite's measured voice. */

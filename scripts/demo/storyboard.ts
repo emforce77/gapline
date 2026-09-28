@@ -38,8 +38,11 @@ const cap = (en: string, ko: string, groups?: Partial<Record<Language, string[][
   groups ? { caption: { en, ko }, groups } : { caption: { en, ko } };
 const pause = (seconds: number): Part => ({ pause: seconds });
 
-/** The film cuts to the next shot 0.33 s before this line's window ends (measured on described.mp4). */
-const WINDOW_END_CLEARANCE_S = 0.45;
+/**
+ * The next line starts at this line's window end (the sample's L3 at 19.0 s, on the same shot): the
+ * listen stops this long before it, so none of the next line is heard.
+ */
+const WINDOW_END_CLEARANCE_S = 0.2;
 /** The listen starts at least this long after the voice of the line before it has ended. */
 const PREVIOUS_VOICE_CLEARANCE_S = 0.15;
 /** The line heard before the listened one, whose voice must not reach into the listen. */
@@ -70,21 +73,6 @@ const EDIT_TYPING_S = 1.4;
 /** The review opens on the line being picked, before its first sentence. */
 const REVIEW_PICK_S = 1.6;
 
-/** Hangul syllables with a final consonant other than ㄹ take 으로; the rest take 로. */
-const HANGUL_FIRST = 0xac00;
-const HANGUL_LAST = 0xd7a3;
-const FINALS = 28;
-const RIEUL_FINAL = 8;
-function euro(word: string): string {
-  const last = [...word].reverse().find((c) => {
-    const code = c.codePointAt(0)!;
-    return code >= HANGUL_FIRST && code <= HANGUL_LAST;
-  });
-  if (!last) throw new Error(`no Hangul to attach a particle to: ${word}`);
-  const final = (last.codePointAt(0)! - HANGUL_FIRST) % FINALS;
-  return final === 0 || final === RIEUL_FINAL ? "로" : "으로";
-}
-
 export function buildStoryboard(): Scene[] {
   const court = film.court.date;
   const courtEn = court.toLocaleDateString("en-GB", {
@@ -101,9 +89,11 @@ export function buildStoryboard(): Scene[] {
   const clip = film.original.clipSeconds;
   const voiced = film.line.voiced.toFixed(1);
   const room = film.line.room.toFixed(1);
-  const rewrite = film.line.rewrite.text;
-  /** The rewrite quoted inside a sentence: its closing full stop would come before the particle. */
-  const rewriteWords = rewrite.replace(/\.$/, "");
+  // The review scene says the draft named a city before the picture shows one.
+  if (film.line.rejectedBy !== "review" || !/\bcity\b/i.test(film.line.draft.quote))
+    throw new Error(
+      "the review scene's line is not a reviewer's rejection of a city named too early",
+    );
   return [
     {
       id: "dark",
@@ -286,26 +276,26 @@ export function buildStoryboard(): Scene[] {
       parts: [
         pause(REVIEW_PICK_S),
         cap(
-          "Here the final check sent a line back, citing the rule and the guideline page.",
-          "여기서는 최종 점검이 문장 하나를 돌려보냈습니다. 어긴 규칙과 가이드라인의 해당 쪽이 함께 적힙니다.",
+          "Here the reviewer sent a line back, citing the rules and the guideline pages.",
+          "여기서는 검수가 문장 하나를 돌려보냈습니다. 어긴 규칙과 가이드라인의 해당 쪽이 함께 적힙니다.",
           {
+            en: [
+              ["Here the reviewer sent a line back,", "citing the rules and the guideline pages."],
+            ],
             ko: [
-              ["여기서는 최종 점검이", "문장 하나를 돌려보냈습니다."],
+              ["여기서는 검수가", "문장 하나를 돌려보냈습니다."],
               ["어긴 규칙과", "가이드라인의 해당 쪽이 함께 적힙니다."],
             ],
           },
         ),
         cap(
-          "Gapline rewrote it as the check suggested: it now reads the title on screen.",
-          `갭라인은 점검 의견대로 화면 속 영어 문구를 우리말로 옮겨 ‘${rewriteWords}’${euro(rewrite)} 다시 썼습니다.`,
+          "The draft named a city not yet on screen. Gapline rewrote it as suggested.",
+          "초안은 아직 화면에 없는 도시를 먼저 말했습니다. 갭라인은 검수 의견대로 다시 썼습니다.",
           {
-            en: [
-              ["Gapline rewrote it as the check suggested:", "it now reads the title on screen."],
-            ],
-            // The first caption ends on a verb (옮겨), not on a modifier waiting for its noun.
+            en: [["The draft named a city not yet on screen.", "Gapline rewrote it as suggested."]],
             ko: [
-              ["갭라인은 점검 의견대로", "화면 속 영어 문구를 우리말로 옮겨"],
-              [`‘${rewriteWords}’${euro(rewrite)} 다시 썼습니다.`],
+              ["초안은 아직 화면에 없는", "도시를 먼저 말했습니다."],
+              ["갭라인은 검수 의견대로 다시 썼습니다."],
             ],
           },
         ),

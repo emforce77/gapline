@@ -10,7 +10,7 @@ const Span = z.object({ start: z.number(), end: z.number() });
 /** runtime/showcase.json: the one sample run the app, the film and the deck show. */
 export const ShowcasePinSchema = z.object({
   projectId: z.string(),
-  runs: z.object({ ko: z.string() }),
+  runs: z.object({ ko: z.string(), en: z.string() }),
 });
 
 const Violation = z.object({ rule: z.string(), quote: z.string(), reason: z.string() });

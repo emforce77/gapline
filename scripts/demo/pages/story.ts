@@ -145,7 +145,6 @@ const C = {
   lines: 500,
   linesH: 48,
   axis: 578,
-  result: 660,
 };
 
 export async function constraintPage(timing: PageTiming): Promise<string> {
@@ -220,8 +219,7 @@ export async function constraintPage(timing: PageTiming): Promise<string> {
 .ct-axis { left:${C.x0}px; top:${C.axis}px; width:${C.x1 - C.x0}px; height:2px; background:var(--rule); }
 .ct-tick { top:${C.axis}px; width:1px; height:12px; background:var(--tick); }
 .ct-t { top:${C.axis + 16}px; transform:translateX(-50%); font-family:var(--mono); font-size:24px; color:var(--ink-400); }
-#ct-result { left:${M}px; top:${C.result}px; font-size:32px; color:var(--ink-300); opacity:0; }
-#ct-result b { font-family:var(--serif); font-weight:400; font-size:56px; color:var(--ink-100); vertical-align:-6px; }`;
+`;
   const row = (top: number, label: string, small?: string) =>
     `<div class="a ct-row" style="top:${top}px"><p class="label">${label}</p>${small ? `<small>${small}</small>` : ""}</div>`;
   const body = `
@@ -236,24 +234,13 @@ ${row(
   `${pick(lang, { en: "Dialogue", ko: "대사" })} <span class="muted">${esc(secs(o.speechTotal, lang))}</span>`,
   pick(lang, { en: `silences ${secs(o.gapTotal, lang)}`, ko: `침묵 ${secs(o.gapTotal, lang)}` }),
 )}
-${row(
-  C.lines - 6,
-  pick(lang, { en: "Gapline’s lines", ko: "갭라인의 문장" }),
-  pick(lang, {
-    en: `${secs(o.narrationTotal, lang)} of voice`,
-    ko: `낭독 ${secs(o.narrationTotal, lang)}`,
-  }),
-)}
+${row(C.lines - 6, pick(lang, { en: "Gapline’s lines", ko: "갭라인의 문장" }))}
 <div class="lane a ct-lane" style="top:${C.dlg}px;height:${C.dlgH}px"></div>
 <div class="a ct-lane" id="ct-speech">${speech}</div>
 ${gaps}
 <div class="lane a ct-lane" style="top:${C.lines}px;height:${C.linesH}px">${lines}</div>
 <div class="a ct-axis"></div>${ticks}<p class="a ct-t" style="left:${x(o.clip)}px">${pick(lang, { en: `${o.clip} s`, ko: `${o.clip}초` })}</p>
 <div class="a" id="ct-play"></div><p class="a" id="ct-chip">Speech-to-Text · Chirp 3</p>
-<p class="a" id="ct-result">${pick(lang, {
-    en: `<b>${o.lines.length}</b> lines, <b>${o.narrationTotal.toFixed(1)}</b> s of voice, none over recognized speech`,
-    ko: `<b>${o.lines.length}</b>문장, 낭독 <b>${o.narrationTotal.toFixed(1)}</b>초, 인식된 대사와 겹침 없음`,
-  })}</p>
 ${note(
   pick(lang, {
     en: `A usable silence lasts at least ${MIN_GAP_SECONDS} s and keeps ${SPEECH_GUARD_SECONDS} s clear of speech.`,
@@ -283,7 +270,6 @@ $('.ct-gl.short span').style.opacity = mark;
 $('.ct-gap.short').style.boxShadow = 'inset 0 0 0 ' + (2 + 2 * mark) + 'px rgba(236,233,227,' + (0.55 + 0.45 * mark) + ')';
 $$('.ct-room').forEach((el, i) => { el.style.opacity = prog(t, S[2] + i * 0.12, 0.4); });
 $$('.ct-bar').forEach((el, i) => { el.style.width = Number(el.dataset.w) * prog(t, S[2] + 0.3 + i * 0.18, 0.7) + 'px'; });
-reveal($('#ct-result'), prog(t, S[2] + 1.4, 0.6));
 $('.src').style.opacity = prog(t, S[2] + ${FOOTNOTE_DELAY_S}, 0.6);`;
   return pageHtml({ lang, css, body, render, data: timing });
 }

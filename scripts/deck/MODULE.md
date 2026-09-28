@@ -2,12 +2,12 @@
 
 ## Direction
 
-Product name: Gapline (renamed from Scene on 2026-09-28; entries before that date use the old name).
+Product name: Gapline (renamed from Gapline on 2026-09-28; entries before that date use the old name).
 
-Builds the AI Builder Cup deck (14 slides plus "Sources and notes" pages, 1920x1080) from Scene's
+Builds the AI Builder Cup deck (14 slides plus "Sources and notes" pages, 1920x1080) from Gapline's
 own run records, so every number, timeline and bar on a slide is computed, not typed. The order is
 `PAGES` in `slides/index.ts`: cover, seven seconds, why now, fit the silence, product, how it checks
-itself, reviewer, measured, Scene listens twice, Google Cloud, how Scene differs, business, what we
+itself, reviewer, measured, Gapline listens twice, Google Cloud, how Gapline differs, business, what we
 will test next, close. Page numbers and notes groups follow a slide's position there, not its file
 name (`08-editor.ts` is slide 5, the product).
 `npm run deck` writes `runtime/deck/`: `gapline-deck.pdf`, `slides/NN-name.png`, `contact-sheet.png`,
@@ -27,7 +27,7 @@ once it is set.
   lines in them, the newspaper line's room and voice). The check fails on "Sample:" and "API
   calls/cost/fees" on a slide face.
 
-- Look: direction A "Screening room" (dark room, film stills, one accent). Amber only marks Scene's
+- Look: direction A "Screening room" (dark room, film stills, one accent). Amber only marks Gapline's
   words; a rejection is an ink strike plus an x mark and a label, never a second hue. Compositions
   vary with the content: full-bleed still (cover), film strip (hook), timelines, flow and architecture
   diagrams, a title-card band with the review chain, still plus bar chart, four product crops with rings,
@@ -55,10 +55,10 @@ once it is set.
   on a missing file or field, and cross-check against each run's own summary and events.
   `data/runs.ts` holds the shared helpers and reads the one pin in `runtime/showcase.json`; the app,
   the film (`scripts/demo/config.ts` `SAMPLE_RUN`) and the deck all show that run.
-  `data/sample.ts` is the automatic sample (…350b05): the clip (speech counted once where the
-  re-listen overlaps the first pass), the seven seconds, the line the final check sent back and Scene
-  rewrote from its fix (L5) and the final check's list (3 moments, 2 during dialogue). It refuses a
-  run with a parent, an edit, a line written by a person, or an added line.
+  `data/sample.ts` is the automatic sample in `SAMPLE_LANGUAGE` (English, …221ceb): the clip (speech
+  counted once where the re-listen overlaps the first pass), the seven seconds, the line sent back and
+  rewritten (L2, by the reviewer) and the final check's list. It refuses a run with a parent, an edit,
+  a line written by a person, or an added line that shipped.
   `data/analysis.ts` is the earlier run of the clip whose hearing and watching the sample reused
   (…837b9f; speech, scene and gaps checked field for field) and its re-listen report; the
   listens-twice slide checks that its second listen is that run's. `data/live-check.ts` is the 22 Sep
@@ -72,8 +72,8 @@ once it is set.
   JSON carries the clip's SHA-256, checked). It gives the launch call's true timing, checks the
   re-listen test fixture still reproduces it, and fails the build if any finished line overlaps speech
   either recognizer hears, or if the seven seconds, recognized alone, hold a word. It is the build's
-  check, not Scene's: no slide names it (the listens-twice slide draws the call's band from it
-  unlabelled; Scene itself uses Chirp 3, twice). Launch call before
+  check, not Gapline's: no slide names it (the listens-twice slide draws the call's band from it
+  unlabelled; Gapline itself uses Chirp 3, twice). Launch call before
   and after: the evaluation's default run (d88b71, 22 Sep) had a silence over the call and a line at
   4.50 s spoken over it; in the sample the re-listen heard the call (3.71–6.47 s) and closed that
   2.38 s silence, so no line lies there. Runs are compared by time spans, never by gap ids.
@@ -87,12 +87,13 @@ once it is set.
   `src/lib/pipeline/guidelines.ts` (the reviewer slide renders both rejections' titles and pages from
   it, so a retitled or re-cited rule shows up on the next build). Service settings come from
   `deploy/cloud-run.sh` (the architecture and limits slides parse its flags).
-- Reviewer example: the sample's Line 5 (47.2 s, `line` in `data/sample.ts`). It passed its review
-  and was voiced (2.32 s); the final check sent it back for viewer or camera framing (뜬다), and Scene
-  rewrote it as the check suggested, reading the on-screen title (전체 기억 재생., 1.74 s in
-  2.63 s). The still is "playback" at 48.5 s, on the shot whose on-screen text reads MEMORY
-  PLAYBACK - GLOBAL (`stills.ts` checks the shot and that the frame lies inside Line 5). The slide
-  ends on the rewrite that passed.
+- Reviewer example: the sample's Line 2 (15.0 s, `line` in `data/sample.ts`). Its draft, "The rocket
+  launches above a futuristic city skyline.", was sent back by the reviewer for Reveals too early and
+  Not on screen, both quoting "a futuristic city skyline"; Gapline rewrote it from the reviewer's fix
+  ("Exhaust pours from the thrusters as the rocket ascends.", 3.65 s in 4.0 s). The still
+  "line-start" is at 15.5 s, on the shot the line starts on (13–17.5 s, only the thrusters);
+  `stills.ts` checks it lies inside that shot and the line. The slide refuses an example whose rules
+  are not about the picture.
 - Fit-loop facts are read from the pipeline, not typed: `data/city.ts` reads `MAX_SPEAKING_RATE`,
   `MAX_SHORTEN_ROUNDS`, `RATE_HEADROOM` and the speed-up rule from `src/lib/pipeline/fit-voice.ts`, and recovers the unstored
   1.0x take of a sped-up version from its rate (the newspaper's shortened line: 3.52–3.55 s at 1.0x,
@@ -101,7 +102,7 @@ once it is set.
 - Stills come from the Blender 1080p master, fetched once into `runtime/deck/cache/` and checked by
   SHA-256. Before cutting, `film.ts` proves the repo clips' offsets against the master
   (clip.mp4 = film 0–65 s, eval-tos-city.mp4 = film 65–110 s); a mismatch stops the build.
-- Product screenshots are taken with `--screens` from a running Scene (`SCENE_APP_URL`, default
+- Product screenshots are taken with `--screens` from a running Gapline (`SCENE_APP_URL`, default
   the local dev server): `screens.ts` opens the pinned run (`/p/<project>?run=<pin>`, English) at
   device scale 2 in a 1440x900 window and saves four crops shown 1:1 on the product slide: the
   player's switches (Eyes closed), the timeline from the switches' left edge to 65 s, Line 5's panel
@@ -129,6 +130,22 @@ zero remote requests; `pdffonts` shows no Type 3 and every face embedded; `pdfto
 every `[lang=ko]` text on the deck (compared without whitespace).
 
 ## Debug log
+
+- [2026-09-28] Examples moved to an English automatic run of the opening (owner: judges read
+  English; Korean on the faces read as mixed languages). `runtime/showcase.json` now pins
+  `runs.en` = 20260928t064307205-en-standard-221ceb beside `runs.ko`; `SAMPLE_LANGUAGE` in
+  `data/runs.ts` picks the one the deck and the film follow. Two earlier English runs failed before
+  mixing: gcloud's token had expired (…866c03, $0.26), then OpenRouter closed the fix stage's review
+  after 170.6 s without a first token ("Upstream idle timeout", …f839cf, $0.20); the run that
+  shipped cost $0.27. The two failures were settled at the full $2.50 reservation each
+  (`settleRun(…, null)`), which filled the local $5 daily cap; the third run was started once with
+  `DAILY_BUDGET_USD=10`. The English run has no line the final check sent back: its example is L2,
+  which the reviewer sent back for "Reveals too early, Not on screen" (the draft named "a futuristic
+  city skyline" at 15.0 s, where the shot shows only the thrusters) and which passed on its rewrite.
+  `data/sample.ts` now takes a reviewer's rejection (draft not voiced) and several rules on one
+  quote; the reviewer slide shows the frame at 15.5 s. `gloss()` returns English text as is, and
+  slides print a gloss only where it differs. The timeline crop slides left to hold a line early in
+  the clip (it used to end at 65 s). The cover's name block moved right for the longer name.
 
 - [2026-09-28] The owner found the numbers cheap: they came from one sample run ("Sample: 7 lines in
   8 min 6 s for $0.32", "1 of 8 dropped", "7 of 7 fit", "$0.33 a minute" on the competitors' price
@@ -248,14 +265,13 @@ every `[lang=ko]` text on the deck (compared without whitespace).
 
 ## Status
 
-Last built 2026-09-28 with `npm run deck` (no `--screens`): 15 pages (14 slides, 1 notes page, 16
-endnotes), 0 check problems, the Korean PDF text check passed, visible words 31–90 per slide (all
-within their caps). `pdftotext` of the PDF holds no sample figure, run id or revision; the only
-dollar figures are the competitors' prices and the price axis. The product crops are the earlier
-`--screens` capture of run 350b05 (unchanged). Presenter checked with Playwright over a local
-server: Home/End reach pages 1 and 15, a source marker opens its note on the notes page, Escape
-returns to the slide (`.playwright-mcp/2026-09-28_1440_deck-cut/`). 5 submission items open (see
-`runtime/deck/gapline-deck_check.md`): the development Gemini label, demo URL, repo URL, video URL and
-team. The service was taken down on 23 Sep; set `SUBMISSION.demoUrl` after the redeploy. The 1080p
-master stays in `runtime/deck/cache/` (584 MB) for `--stills`; delete it when the stills are final.
-Tests: `tests/deck-data.test.ts` (needs the gitignored `runtime/`).
+Last built 2026-09-28 with `npm run deck -- --screens --stills` against the local production server
+(`SCENE_APP_URL=http://127.0.0.1:21961`, data without `budget/`), then `npm run deck`: 15 pages
+(14 slides, 1 notes page, 16 endnotes), 0 check problems, the Korean PDF text check passed (on the
+notes' guideline quote, the only Korean left), visible words 31–90 per slide. The sample is the
+English run …221ceb; the product crops show it with "Line 2 · 0:15.0" chosen and the Generate crop
+reading "Generate". The pin lives in the gitignored `runtime/showcase.json` (`runs.en`, `runs.ko`):
+a clone needs it, as it needs the runs. 5 submission items open (see
+`runtime/deck/gapline-deck_check.md`): the development Gemini label, demo URL, repo URL, video URL
+and team. The 1080p master stays in `runtime/deck/cache/` (584 MB) for `--stills`; delete it when
+the stills are final. Tests: `tests/deck-data.test.ts` (needs the gitignored `runtime/`).

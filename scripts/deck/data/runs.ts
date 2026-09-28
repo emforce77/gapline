@@ -62,6 +62,11 @@ export function unionOf(spans: readonly { start: number; end: number }[]) {
 
 // ------------------------------------------------------------------ the pin and the run folders
 export const pin = readJsonFile(SHOWCASE_PIN, ShowcasePinSchema);
+/**
+ * The narration language of the sample the deck and the film describe (English since 2026-09-28: the
+ * judges read English). The app pins a result per language; this picks the one the story follows.
+ */
+export const SAMPLE_LANGUAGE = "en" as const;
 if (SHOWCASE_CLIP !== join(PROJECTS, pin.projectId, "clip.mp4"))
   throw new Error(`the pinned project ${pin.projectId} is not the clip paths.ts names`);
 

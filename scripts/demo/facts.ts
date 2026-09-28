@@ -17,11 +17,7 @@ if (PROJECT_ID !== pin.projectId || SAMPLE_RUN !== runId)
   throw new Error(
     `the film records ${PROJECT_ID}/${SAMPLE_RUN}, the pin is ${pin.projectId}/${runId}`,
   );
-// The review scene tells a line the final check sent back after it had passed its own review.
-if (line.rejectedBy !== "final check")
-  throw new Error(
-    `${line.cueId} was sent back by the ${line.rejectedBy}; the film says the final check`,
-  );
+// The review scene tells a line the reviewer sent back (its captions name who did).
 const rejectedBy = line.rejectedBy;
 
 /** Film seconds heard in the hook: from just before "…locked." to just after "This is pretty freaky." */

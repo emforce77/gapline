@@ -2,16 +2,16 @@
 
 ## Direction
 
-Product name: Gapline (renamed from Scene on 2026-09-28; entries before that date use the old name).
+Product name: Gapline (renamed from Gapline on 2026-09-28; entries before that date use the old name).
 The demo's film-scene type is still `Scene` in code; it names a scene of the film, not the product.
 
 Builds the under-3-minute English submission film and a Korean review copy (same picture, Korean
 captions) into `runtime/demo-v3/<lang>/`: `gapline-demo-<lang>.mp4`, `_check.md`, `_contact.jpg` and
 `.srt`. There is no presenter voice (the owner found the synthetic narration worse than none,
 2026-09-23): captions tell the story and the only sound is the film's own. The story follows the deck
-(`scripts/deck`, direction "Screening room"): hook with eyes closed, the same seconds with Scene, why
+(`scripts/deck`, direction "Screening room"): hook with eyes closed, the same seconds with Gapline, why
 now, the constraint, the product in the app (upload, and one press of Generate running every step;
-the saved automatic run replayed; a line the final check sent back and Scene rewrote from the
+the saved automatic run replayed; a line the final check sent back and Gapline rewrote from the
 check's fix; the measured fit and playback; the optional edit, offered once), Google Cloud,
 close. There is no evidence scene: one sample run's totals (lines, minutes, API fees) and the
 evaluation's small counts read as a benchmark they are not (owner, 2026-09-28).
@@ -37,7 +37,7 @@ evaluation's small counts read as a benchmark they are not (owner, 2026-09-28).
   Korean), else several; breaks keep names, counted numbers and Korean bound words together, never
   end a line on an article or preposition, and prefer a clause end or a conjunction at the start of
   the second line. `groups` on a caption sets them by hand where a list defeats the rules. The
-  reveal has no captions of its own: `segments.ts` sets its label, Scene's amber lines (with the
+  reveal has no captions of its own: `segments.ts` sets its label, Gapline's amber lines (with the
   English translation in the English film) and the film's dialogue (with a Korean line under it in
   the Korean film) inside the band.
 - Language: every word on screen follows the film's language, except product names (Cloud Run,
@@ -141,6 +141,18 @@ neither a caption nor film sound, a recording made where `/api/live-status` said
 OpenRouter) on the cloud page. It never ticks the human watch-through.
 
 ## Debug log
+
+- [2026-09-28] The film follows the English sample (`SAMPLE_LANGUAGE`, …221ceb) and the new name.
+  The upload scene now presses the sample's narration language; the review scene's captions name the
+  reviewer and say the draft named a city not yet on screen (guarded on the quote); the edit scene
+  types "pink" before "brain." in the second line of the seven seconds. The English film prints no
+  gloss under English lines; the Korean copy puts our Korean under them (`lineGloss`, `KO_LINES` in
+  `labels.ts`) and keeps its overlays Korean ("단어 하나 추가"). The listen stops 0.2 s before the
+  next line (L3 at 19.0 s, same shot); 0.45 s was the Korean line's cut. The constraint page no
+  longer prints the sample's "6 lines, 17.0 s of voice" or the lines lane's voice total. First English
+  record stopped in the replay: the line picker's top sat at 642 of the 660 CSS px frame (measured;
+  the English timeline has one narration row, 188 px against the Korean run's 210). The replay's page
+  now stops that much higher when the picker would be cut, with the picker just out of the picture.
 
 - [2026-09-28] The evidence scene is gone (owner: one sample's "7 lines, 8 min 6 s, $0.32" and the
   evaluation's "18 of 20 lines" read cheap). The storyboard runs cloud straight into close;

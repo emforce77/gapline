@@ -24,21 +24,15 @@ SEVEN_FRAMES.forEach((t, i) => {
 });
 
 /**
- * The reviewer slide's frame: inside the line the final check sent back (Line 5, 47.2 s), on the shot
- * whose on-screen words the rewrite reads ("MEMORY PLAYBACK - GLOBAL" in the sample's scene map).
+ * The reviewer slide's frame: inside the line the reviewer sent back, on the shot where the line
+ * starts, this far into it: what the picture shows while the draft named what comes later.
  */
-const PLAYBACK_FRAME = 48.5;
-const playbackShot = opening.shots.find((s) => PLAYBACK_FRAME >= s.start && PLAYBACK_FRAME < s.end);
-if (!playbackShot)
-  throw new Error(`no shot holds the reviewer slide's frame at ${PLAYBACK_FRAME}s`);
-if (
-  !/MEMORY PLAYBACK/.test(playbackShot.onScreenText) ||
-  PLAYBACK_FRAME < line.start ||
-  PLAYBACK_FRAME >= line.windowEnd
-)
-  throw new Error("the reviewer slide's frame is outside its line or its shot");
-/** The shot the reviewer slide's frame comes from. */
-const frameShot: NonNullable<typeof playbackShot> = playbackShot;
+const INTO_SHOT_S = 0.5;
+const lineShot = opening.shots.find((s) => line.start >= s.start && line.start < s.end);
+if (!lineShot) throw new Error(`no shot holds the start of ${line.cueId}`);
+const LINE_FRAME = line.start + INTO_SHOT_S;
+if (LINE_FRAME >= Math.min(lineShot.end, line.windowEnd))
+  throw new Error("the reviewer slide's frame is outside its shot or its line");
 
 export const thumbTimes = Array.from({ length: THUMB_COUNT }, (_, i) => {
   const slot = opening.clip / THUMB_COUNT;
@@ -52,7 +46,7 @@ export const STILL_SPECS: StillSpec[] = [
   ),
   ...thumbTimes.map((t, i) => ({ name: `thumb-${i}`, filmTime: t, width: THUMB })),
   { name: "news", filmTime: newspaper.filmTime, width: FULL },
-  { name: "playback", filmTime: PLAYBACK_FRAME, width: FULL },
+  { name: "line-start", filmTime: LINE_FRAME, width: FULL },
 ];
 
 export const stillUrl = (name: string): string => {
@@ -60,4 +54,4 @@ export const stillUrl = (name: string): string => {
   return `assets/stills/${name}.jpg`;
 };
 
-export { frameShot as playbackShot, sevenShots };
+export { sevenShots };

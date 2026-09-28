@@ -119,7 +119,7 @@ export function constraintSlide(): string {
     throw new Error("the second listen's segment is not inside the drawn dialogue");
 
   const quoteNote = note(
-    `Korea Media &amp; Communications Commission (KMCC), 『장애인방송 프로그램 제공 가이드라인』 (guideline for accessible broadcasting), p.10: “${esc(KMCC_P10)}”; our translation.`,
+    `Korea Media &amp; Communications Commission (KMCC), 『장애인방송 프로그램 제공 가이드라인』 (guideline for accessible broadcasting), p.10: “<span lang="ko">${esc(KMCC_P10)}</span>”; our translation.`,
   );
 
   return slide({

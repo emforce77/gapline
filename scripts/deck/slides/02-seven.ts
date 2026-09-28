@@ -4,6 +4,7 @@
  * sample's two lines as measured voice inside their slots (the outline is the slot).
  */
 import { opening, seven } from "../data/sample";
+import { textLang } from "../glosses";
 import { esc, px, secs, slide } from "../html";
 import { sevenShots, stillUrl } from "../stills";
 import { MARGIN, W } from "../theme";
@@ -61,7 +62,9 @@ export function sevenSlide(): string {
       const shot = shown.find((s) => l.start >= s.start && l.start < s.end);
       if (!shot) throw new Error(`line ${l.id} is outside the strip's shots`);
       const { a, b } = shotBox(shot);
-      return `<p class="sub sv-sub on-film" lang="ko" style="left:${px(a + SUB_INSET)};width:${px(b - a - 2 * SUB_INSET)};top:${Y.sub}px">${esc(l.text)}<span class="gloss" lang="en">${esc(l.gloss)}</span></p>`;
+      const english =
+        l.gloss === l.text ? "" : `<span class="gloss" lang="en">${esc(l.gloss)}</span>`;
+      return `<p class="sub sv-sub on-film" lang="${textLang(l.text)}" style="left:${px(a + SUB_INSET)};width:${px(b - a - 2 * SUB_INSET)};top:${Y.sub}px">${esc(l.text)}${english}</p>`;
     })
     .join("");
 

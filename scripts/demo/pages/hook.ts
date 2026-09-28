@@ -7,7 +7,8 @@
  */
 import { dictionary } from "../../../src/i18n";
 import { film } from "../facts";
-import { labels } from "../labels";
+import { textLang } from "../../deck/glosses";
+import { labels, lineGloss } from "../labels";
 import { masterCut } from "../master";
 import { esc, note, pageHtml, pick, secs, STAGE, still, type PageTiming } from "./shell";
 
@@ -136,15 +137,16 @@ export async function sevenPage(timing: PageTiming): Promise<string> {
     )
     .join("");
   const lines = h.lines;
-  // Gapline's Korean line on its shot; the English film adds the translation under it.
+  // Gapline's line on its shot, with its translation under it where the film's language differs.
   const subs = lines
     .map((l) => {
       const shot = shots.find((s) => l.start >= s.a && l.start < s.b);
       if (!shot) throw new Error(`line ${l.id} is outside the strip's shots`);
       const c = (x(shot.a) + x(shot.b)) / 2;
       const w = x(shot.b) - x(shot.a) - 48;
-      const gloss = lang === "en" ? `<span class="gloss" lang="en">${esc(l.gloss)}</span>` : "";
-      return `<p class="a sub sv-sub" style="left:${c - w / 2}px;width:${w}px"><span class="box" lang="ko">${esc(l.text)}${gloss}</span></p>`;
+      const under = lineGloss(l.text, lang);
+      const gloss = under ? `<span class="gloss" lang="${lang}">${esc(under)}</span>` : "";
+      return `<p class="a sub sv-sub" style="left:${c - w / 2}px;width:${w}px"><span class="box" lang="${textLang(l.text)}">${esc(l.text)}${gloss}</span></p>`;
     })
     .join("");
   const rooms = lines

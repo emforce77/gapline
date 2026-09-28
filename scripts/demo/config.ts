@@ -4,7 +4,7 @@
  */
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { pin } from "../deck/data/runs";
+import { pin, SAMPLE_LANGUAGE } from "../deck/data/runs";
 
 export const DEMO_SRC = dirname(fileURLToPath(import.meta.url));
 export const REPO = resolve(DEMO_SRC, "../..");
@@ -25,10 +25,10 @@ export const BASE_URL = (process.env.DEMO_BASE_URL || LOCAL_URL).replace(/\/$/, 
 export const PROJECT_ID = "tos-opening";
 const RUNS_DIR = join(REPO, "runtime/projects", PROJECT_ID, "runs");
 /**
- * The automatic Korean run the film shows from replay to playback: the one sample runtime/showcase.json
- * pins for the app, the film and the deck (read through the deck's data/runs.ts).
+ * The automatic run the film shows from replay to playback: the sample runtime/showcase.json pins in
+ * the deck's sample language, for the app, the film and the deck (read through data/runs.ts).
  */
-export const SAMPLE_RUN = pin.runs.ko;
+export const SAMPLE_RUN = pin.runs[SAMPLE_LANGUAGE];
 
 export const runFile = (runId: string, file: string): string => join(RUNS_DIR, runId, file);
 export const CLIP_FILE = join(REPO, "runtime/projects", PROJECT_ID, "clip.mp4");

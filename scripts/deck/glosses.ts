@@ -2,7 +2,7 @@
  * English glosses (our translation) for every Korean text the deck and the film show, keyed by the
  * exact Korean from the run records. Wording matches the sample workspace
  * (src/components/workspace/glosses.tsx). `gloss()` throws for a Korean text without an entry, so no
- * Korean line reaches a slide or a film page unglossed.
+ * Korean line reaches a slide or a film page unglossed; an English text is its own English.
  */
 const EN_GLOSS: Record<string, string> = {
   // The evaluation's default run of the opening (22 Sep 2026, 20260922t051536291-ko-standard-d88b71):
@@ -48,8 +48,18 @@ const EN_GLOSS: Record<string, string> = {
     "Dialogue and important sound effects should be zones that description does not enter.",
 };
 
-export function gloss(korean: string): string {
-  const found = EN_GLOSS[korean];
-  if (!found) throw new Error(`no English gloss for Korean text: ${korean}`);
+const HANGUL = /\p{Script=Hangul}/u;
+
+/** The language a text is written in, for its `lang` attribute: Korean if it has any Hangul. */
+export const textLang = (text: string): "ko" | "en" => (HANGUL.test(text) ? "ko" : "en");
+
+/**
+ * The English of a text: our gloss of a Korean text, or an English text itself (a slide or a film page
+ * prints a gloss only where it differs from the text).
+ */
+export function gloss(text: string): string {
+  if (textLang(text) === "en") return text;
+  const found = EN_GLOSS[text];
+  if (!found) throw new Error(`no English gloss for Korean text: ${text}`);
   return found;
 }

@@ -3,7 +3,7 @@
  * sample run (runtime/showcase.json), so the deck shows the current UI sharply. The product slide
  * shows four crops of the workspace at 1:1 of the capture, so the app's own text stays legible: the
  * Generate button, the player's switches (Eyes closed), the timeline around the chosen line, and
- * the panel of the line the final check sent back (Line 5, 47.2 s). The Generate button is taken
+ * the panel of the line sent back and rewritten (`line` in data/sample.ts). The Generate button is taken
  * last, on the Brief density, which has no track of the clip: there it reads "Generate", not
  * "Generate again" (the capture stops otherwise). The density button is only clicked; any request
  * that could start a paid run or an edit is aborted. Run with `npm run deck -- --screens` while the
@@ -13,22 +13,24 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Browser, Locator, Page } from "playwright-core";
 import { dictionary, UI_LANG_COOKIE } from "../../src/i18n";
-import { pin } from "./data/runs";
+import { pin, SAMPLE_LANGUAGE } from "./data/runs";
 import { line } from "./data/sample";
 import { SCREENS } from "./paths";
 
 export const APP_URL = process.env.SCENE_APP_URL ?? "http://127.0.0.1:21960";
-/** The pinned run, opened directly: without `?run=` the page may pick another Korean run. */
-const SAMPLE = `/p/${pin.projectId}?run=${pin.runs.ko}`;
+/** The pinned run, opened directly: without `?run=` the page may pick another run. */
+const SAMPLE = `/p/${pin.projectId}?run=${pin.runs[SAMPLE_LANGUAGE]}`;
 export const DEVICE_SCALE = 2;
 /** A laptop-sized window: the whole workspace (player, timeline, inspector) in one frame. */
 export const WORKSPACE_VIEWPORT = { width: 1440, height: 900 };
 const SETTLE_MS = 1500;
 const PAID = /\/(runs|edits)(\/|$|\?)/;
-/** The line's history: the draft the final check sent back, and Gapline's rewrite that passed. */
+/** The line's history: the draft sent back, and Gapline's rewrite that passed. */
 const HISTORY_VERSIONS = 2;
 /** Space kept around each crop, in CSS pixels, so no control touches the crop's edge. */
 const CROP_PAD = 8;
+/** CSS px of timeline kept before a chosen line when the timeline crop slides left to hold it. */
+const TIMELINE_LEAD_CSS = 120;
 /** The English interface's words the capture looks for (the page is opened in English). */
 const UI = dictionary("en");
 
@@ -85,8 +87,10 @@ export function workspaceCapture(): WorkspaceCapture {
   if (!existsSync(file))
     throw new Error(`${WORKSPACE_BOXES} missing: run npm run deck -- --screens`);
   const capture = JSON.parse(readFileSync(file, "utf8")) as WorkspaceCapture;
-  if (capture.runId !== pin.runs.ko)
-    throw new Error(`the screenshots show ${capture.runId}, not the pinned ${pin.runs.ko}`);
+  if (capture.runId !== pin.runs[SAMPLE_LANGUAGE])
+    throw new Error(
+      `the screenshots show ${capture.runId}, not the pinned ${pin.runs[SAMPLE_LANGUAGE]}`,
+    );
   return capture;
 }
 
@@ -111,7 +115,8 @@ async function openSample(browser: Browser): Promise<{ page: Page; blocked: stri
   await page.locator(".ws-inspector").waitFor({ timeout: 15_000 });
   await page.waitForTimeout(SETTLE_MS);
   const shown = await page.locator(".run-panel .result-picker select").inputValue();
-  if (shown !== pin.runs.ko) throw new Error(`the workspace shows ${shown}, not ${pin.runs.ko}`);
+  if (shown !== pin.runs[SAMPLE_LANGUAGE])
+    throw new Error(`the workspace shows ${shown}, not ${pin.runs[SAMPLE_LANGUAGE]}`);
   return { page, blocked };
 }
 
@@ -151,7 +156,7 @@ export async function captureScreens(browser: Browser): Promise<string[]> {
   const { page, blocked } = await openSample(browser);
   const panel = page.locator(".ws-inspector");
 
-  // 1. The line the final check sent back, chosen in the line picker under the timeline.
+  // 1. The line sent back and rewritten, chosen in the line picker under the timeline.
   await page.locator("main select").first().selectOption(line.cueId);
   await page.waitForTimeout(SETTLE_MS);
   const heading = (await page.locator(".line-heading").first().innerText())
@@ -194,12 +199,13 @@ export async function captureScreens(browser: Browser): Promise<string[]> {
   );
   const controlsSize = await shoot(page, "controls", controlsCrop);
   const whole = around(await boxOf(page.locator(".timeline")));
-  const timelineCrop = { ...whole, x: left, width: whole.x + whole.width - left };
-  inside(
-    await boxOf(page.locator(".tl-narration .cue.selected")),
-    timelineCrop,
-    "the chosen line on the timeline",
-  );
+  const chosen = await boxOf(page.locator(".tl-narration .cue.selected"));
+  // As wide as the switches above it. It ends at the timeline's end, or, for a line early in the
+  // clip, slides left to hold that line with some of the film before it.
+  const width = whole.x + whole.width - left;
+  const x = Math.min(left, Math.max(whole.x, chosen.x - TIMELINE_LEAD_CSS));
+  const timelineCrop = { ...whole, x, width };
+  inside(chosen, timelineCrop, "the chosen line on the timeline");
   const timelineSize = await shoot(page, "timeline", timelineCrop);
 
   // 3. Last, the Generate button as a first press meets it: back from the line to the run panel, then
@@ -228,7 +234,7 @@ export async function captureScreens(browser: Browser): Promise<string[]> {
 
   const capture: WorkspaceCapture = {
     capturedAt: new Date().toLocaleDateString("en-CA"),
-    runId: pin.runs.ko,
+    runId: pin.runs[SAMPLE_LANGUAGE],
     lineHeading: heading,
     crops: {
       generate: generateSize,

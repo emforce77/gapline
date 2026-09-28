@@ -36,8 +36,8 @@ export const COVER_CSS = `
 .cv-sub { left:310px; width:1300px; font-size:44px; line-height:1.3; }
 .cv-name { position:absolute; left:var(--margin); font-family:var(--serif); font-weight:300;
   font-size:176px; line-height:1; letter-spacing:-0.03em; color:var(--ink-100); }
-.cv-side { position:absolute; left:640px; width:1184px; }
+.cv-side { position:absolute; left:760px; width:1064px; }
 .cv-theme { font-size:var(--fs-label); color:var(--ink-400); }
 .cv-tag { margin-top:4px; font-family:var(--serif); font-style:italic; font-size:54px; line-height:1.1; color:var(--ink-100); }
-.cv-what { margin-top:14px; max-width:1100px; font-size:var(--fs-body); line-height:1.4; color:var(--ink-300); text-wrap:pretty; }
+.cv-what { margin-top:14px; max-width:1064px; font-size:var(--fs-body); line-height:1.4; color:var(--ink-300); text-wrap:pretty; }
 `;
