@@ -1,12 +1,10 @@
 /**
  * 02. The hook, drawn to scale: the picture strip is exactly the silence between "…locked." and
  * "This is pretty freaky.", cut at its real shot boundary, with the dialogue at both ends and the
- * sample's two lines as measured voice inside their slots.
+ * sample's two lines as measured voice inside their slots (the outline is the slot).
  */
-import { opening, seven, summary } from "../data/sample";
-import { sevenHeard } from "../data/recognizers";
-import { dayMonthYear, esc, px, secs, slide } from "../html";
-import { notesFor } from "../notes";
+import { opening, seven } from "../data/sample";
+import { esc, px, secs, slide } from "../html";
 import { sevenShots, stillUrl } from "../stills";
 import { MARGIN, W } from "../theme";
 
@@ -21,7 +19,6 @@ const Y = {
   dlgH: 64,
   ad: 884,
   adH: 50,
-  slot: 942,
 };
 const SHOT_GAP = 3;
 /** Lower share of each frame darkened under the subtitles, as film subtitles are, so they stay legible. */
@@ -39,7 +36,6 @@ const pps = (W - 2 * MARGIN) / (domain[1] - domain[0]);
 const x = (t: number) => MARGIN + (t - domain[0]) * pps;
 
 export function sevenSlide(): string {
-  const note = notesFor("Seven seconds");
   const from = seven.locked.end;
   const to = seven.freaky.start;
   const shown = sevenShots.filter((s) => s.end > from && s.start < to);
@@ -72,31 +68,11 @@ export function sevenSlide(): string {
   // What a viewer hears instead of words: Scene's own sound label over the silence.
   const hum = opening.sounds.find((s) => s.start < to && s.end > from && HUM.test(s.label));
   if (!hum) throw new Error("no sound label over the seven seconds says hum; the body does");
-  const humNote = note(
-    `No words between ${secs(from)} and ${secs(to)}: neither Chirp 3 (Speech-to-Text v2) nor a second recognizer (faster-whisper small) hears any, on the whole clip or on that stretch alone (${dayMonthYear(sevenHeard.checkedAt)}). “A hum” is Scene’s own sound label for it (Gemini: “${esc(hum.label)}”, ${hum.start}–${secs(hum.end, 1)}).`,
-  );
-  const last = seven.lines[seven.lines.length - 1];
-  const linesNote = note(
-    `The sample track: one automatic Korean run of the ${opening.clip} s opening, ${dayMonthYear(summary.day.toISOString().slice(0, 10))}. Its lines here: ${seven.lines
-      .map(
-        (l) =>
-          `at ${secs(l.start)}, ${secs(l.voiced)} of voice in a ${secs(l.windowEnd - l.start)} slot`,
-      )
-      .join(
-        "; ",
-      )}. The second ends ${secs(to - (last.start + last.voiced))} before the next word. The English glosses under the Korean lines are ours.`,
-  );
   const clips = seven.lines
     .map(
       (l) =>
         `<div class="room" style="left:${px(x(l.start) - MARGIN)};width:${px(x(l.windowEnd) - x(l.start))}"></div>` +
         `<div class="clip ad" style="left:${px(x(l.start) - MARGIN)};width:${px(l.voiced * pps)}"><span class="sv-clip">${secs(l.voiced)}</span></div>`,
-    )
-    .join("");
-  const slots = seven.lines
-    .map(
-      (l) =>
-        `<p class="sv-slot" style="left:${px(x(l.start))};top:${Y.slot}px">in a ${secs(l.windowEnd - l.start)} slot</p>`,
     )
     .join("");
 
@@ -107,7 +83,7 @@ export function sevenSlide(): string {
     filmCredit: true,
     body: `
 <div class="intro"><h1 class="headline" style="max-width:1728px">For seven seconds, a blind viewer hears no words.</h1></div>
-<p class="body sv-body" style="left:${MARGIN}px;top:${Y.body}px">Only a hum${humNote}, then someone says <q>This is pretty freaky.</q> Scene fit two lines${linesNote} into that silence; each ends before the next word.</p>
+<p class="body sv-body" style="left:${MARGIN}px;top:${Y.body}px">Only a hum, then someone says <q>This is pretty freaky.</q> Scene fit two lines into that silence; each ends before the next word.</p>
 <p class="sv-edge" style="left:${px(x(from))};top:${Y.edge}px">${secs(from)}</p>
 <p class="sv-edge" style="right:${px(W - x(to))};top:${Y.edge}px;text-align:right">${secs(to)}</p>
 <div class="sv-inout" style="left:${px(x(from))};width:${px(x(to) - x(from))};top:${Y.edge + 38}px"></div>
@@ -120,8 +96,7 @@ ${subs}
   <div class="sv-span" style="left:${px(x(from) - MARGIN + 16)};width:${px(x(to) - x(from) - 32)}"><i></i><span><b class="num">${secs(seven.silence)}</b> with no dialogue</span><i></i></div>
   <div class="clip dialogue" style="left:${px(x(to) - MARGIN)};width:${px((seven.freaky.end - seven.freaky.start) * pps)}"></div>
 </div>
-<div class="lane" style="left:${MARGIN}px;width:${W - 2 * MARGIN}px;top:${Y.ad}px;height:${Y.adH}px">${clips}</div>
-${slots}`,
+<div class="lane" style="left:${MARGIN}px;width:${W - 2 * MARGIN}px;top:${Y.ad}px;height:${Y.adH}px">${clips}</div>`,
   });
 }
 
@@ -139,5 +114,4 @@ export const SEVEN_CSS = `
 .sv-span span { font-size:var(--fs-body); color:var(--ink-300); white-space:nowrap; }
 .sv-span b { font-weight:400; font-size:60px; color:var(--ink-100); margin-right:10px; vertical-align:-4px; }
 .sv-clip { display:block; padding:0 12px; font-size:var(--fs-label); font-weight:600; line-height:${Y.adH}px; font-variant-numeric:tabular-nums; }
-.sv-slot { position:absolute; font-size:var(--fs-label); color:var(--ink-300); white-space:nowrap; font-variant-numeric:tabular-nums; }
 `;

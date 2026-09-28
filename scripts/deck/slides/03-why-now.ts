@@ -1,9 +1,9 @@
 /**
  * 03. Why now: the Supreme Court ruling in plain words, on the dated track of the ten-year cinema
- * lawsuit and the streaming duty; then what one accessible film costs by hand and the subsidy cut,
- * drawn to scale. Case numbers and sources are endnotes.
+ * lawsuit and the streaming duty; then what one accessible film costs by hand. Case numbers and
+ * sources are endnotes.
  */
-import { HAND_MADE, LAWSUIT, STREAMING_DUTY, SUBSIDY } from "../facts";
+import { HAND_MADE, LAWSUIT, STREAMING_DUTY } from "../facts";
 import { dayMonthYear, intro, monthYear, px, slide } from "../html";
 import { notesFor } from "../notes";
 import { MARGIN, W } from "../theme";
@@ -12,13 +12,10 @@ const YEAR0 = 2016;
 const YEAR1 = 2027;
 const Y = { labels: 296, lane: 478, laneH: 64, duty: 578, axis: 670, bottom: 768 };
 const EVENT_LABEL_W = [470, 330, 470];
-const SUBSIDY_BAR_MAX = 560;
 /** The 2017 ruling that ties the duty to films arriving with a file: the business case rests on it. */
 const FILE_EVENT = 0;
 /** The appeals court's cap: its label (with the cap) comes from facts.ts as it stands. */
 const CAP_EVENT = 1;
-/** The subsidy line says "more than half": the build stops if the cut no longer is. */
-const HALF = 50;
 
 function yearFraction(iso: string): number {
   const d = new Date(`${iso}T00:00:00Z`);
@@ -73,15 +70,8 @@ export function whyNowSlide(): string {
   const duty = note(
     `Korea Media &amp; Communications Commission (KMCC) notice amended ${dayMonthYear(STREAMING_DUTY.date)}: streaming services get a duty to make efforts, with no quota or penalty reported (ZDNet Korea; Digital Daily).`,
   );
-  const cut = Math.round((1 - SUBSIDY.after.won / SUBSIDY.before.won) * 100);
-  if (cut <= HALF) throw new Error("the slide calls the subsidy cut more than half");
-  const bar = (year: number, won: number) =>
-    `<div class="wn-bar"><span class="wn-by">${year}</span><i style="width:${px((won / SUBSIDY.before.won) * SUBSIDY_BAR_MAX)}"></i><span class="wn-bv">₩${won.toFixed(2)}B</span></div>`;
   const hand = note(
     `Barrier-Free Film Committee FAQ (undated): about ₩${HAND_MADE.wonMillions}M per Korean film, description and captions together. ${HAND_MADE.months} months, about ${HAND_MADE.specialists} people: committee interview, The Better Future (Futurechosun), 2019. ₩1,358 per US$ (22 Sep 2026).`,
-  );
-  const subsidy = note(
-    `Public subsidy for described, captioned and signed TV: Korea Blind Union statement and KMCC’s reply to Beminor, 13 Mar 2026.`,
   );
 
   return slide({
@@ -99,15 +89,9 @@ ${events}
 <div class="wn-axis" style="top:${Y.axis}px"></div>
 <div style="position:absolute;left:0;top:${Y.axis}px">${years}</div>
 
-<div class="wn-block" style="left:${MARGIN}px;top:${Y.bottom}px;width:820px">
+<div class="wn-block" style="left:${MARGIN}px;top:${Y.bottom}px;width:${W - 2 * MARGIN}px">
   <p class="label">One accessible film, made by hand</p>
   <p class="wn-hand">About ${HAND_MADE.months} months, ${HAND_MADE.specialists} specialists and ₩${HAND_MADE.wonMillions} million (≈US$${HAND_MADE.usdThousands}k)${hand}</p>
-</div>
-<div class="wn-block" style="left:1040px;top:${Y.bottom}px;width:784px">
-  <p class="label">Subsidy for accessible TV${subsidy}</p>
-  ${bar(SUBSIDY.before.year, SUBSIDY.before.won)}
-  ${bar(SUBSIDY.after.year, SUBSIDY.after.won)}
-  <p class="wn-cut">−${cut}% in one year</p>
 </div>`,
   });
 }
@@ -127,10 +111,5 @@ export const WHY_NOW_CSS = `
 .wn-yt { position:absolute; top:0; width:1px; height:12px; background:var(--tick); }
 .wn-year { position:absolute; top:14px; font-size:var(--fs-label); color:var(--ink-400); font-variant-numeric:tabular-nums; }
 .wn-block { position:absolute; }
-.wn-hand { margin-top:14px; font-family:var(--serif); font-size:48px; line-height:1.15; color:var(--ink-100); text-wrap:balance; }
-.wn-bar { display:flex; align-items:center; gap:16px; margin-top:16px; }
-.wn-bar i { display:block; height:34px; background:var(--dialogue); border-radius:2px; }
-.wn-by { width:64px; font-size:var(--fs-label); color:var(--ink-300); font-variant-numeric:tabular-nums; }
-.wn-bv { font-size:var(--fs-label); color:var(--ink-100); font-variant-numeric:tabular-nums; }
-.wn-cut { margin-top:16px; font-size:var(--fs-body); font-weight:600; color:var(--ink-100); font-variant-numeric:tabular-nums; }
+.wn-hand { margin-top:14px; font-family:var(--serif); font-size:60px; line-height:1.15; color:var(--ink-100); text-wrap:balance; }
 `;

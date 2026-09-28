@@ -2,14 +2,14 @@
  * 06. The reviewer, followed through one line of the sample (Line 5, 47.2 s): the draft passed its
  * review and was voiced, the final check read the whole voiced track and sent it back for viewer
  * framing, and Scene rewrote it from the check's own fix: it passed and was voiced again, in the same
- * run. The frame beside the headline shows the on-screen words the rewrite reads. What Scene does when
- * a fix keeps failing (the line at 63 s, dropped after two rewrites) is a note on the rewrite.
+ * run. The frame beside the headline shows the on-screen words the rewrite reads. The rule's source
+ * in the guideline is the one note.
  */
 import { GUIDELINE_RULES } from "../../../src/lib/pipeline/guidelines";
-import { dropped, line, runId, summary } from "../data/sample";
-import { dayMonthYear, esc, intro, PASS_MARK, px, REJECT_MARK, secs, slide } from "../html";
+import { line } from "../data/sample";
+import { esc, intro, PASS_MARK, px, REJECT_MARK, slide } from "../html";
 import { notesFor } from "../notes";
-import { playbackShot, stillUrl } from "../stills";
+import { stillUrl } from "../stills";
 import { MARGIN, W } from "../theme";
 
 /** The frame beside the headline, cropped to the playback panel so its on-screen words read. */
@@ -39,8 +39,6 @@ function struck(text: string, quote: string): string {
 }
 
 const colX = (i: number) => MARGIN + i * (COL_W + ARROW_W);
-const isoDay = (d: Date) => d.toISOString().slice(0, 10);
-const titles = (rules: { rule: string }[]) => rules.map((r) => ruleOf(r.rule).title.en).join(", ");
 
 export function reviewerSlide(): string {
   const note = notesFor("Final check");
@@ -52,36 +50,22 @@ export function reviewerSlide(): string {
   // The fix must point the writer at the words on screen, and the rewrite must be those words.
   if (!line.draft.fixGloss.includes(line.gloss) || !ON_SCREEN.test(line.gloss))
     throw new Error("the check's fix no longer reads the on-screen words the frame shows");
-  if (dropped.rewrites < 2 || dropped.lastFixRepeatsRound < 1 || dropped.listedByFinalCheck)
-    throw new Error("the line at 63 s no longer went as its note says");
 
-  const run = note(
-    `One automatic Korean run of the ${summary.clipSeconds} s opening, ${dayMonthYear(isoDay(summary.day))} (${esc(runId)}). ${esc(line.cueId)}, at ${line.start} s with ${secs(line.room)} of room, passed its review and was voiced at ${secs(line.draft.voiced)}; the final check reads the whole voiced track once, and the fix stage rewrote the line before mixing. The glosses are ours.`,
-  );
-  const cite = note(
-    `Korea’s audio-description guideline: ${esc(rule.source.en)}. The check quoted “${esc(line.draft.quote)}” and explained: ${esc(line.draft.reasonGloss)}`,
-  );
-  const fix = note(
-    `The check’s fix, in Korean: “${esc(line.draft.fix)}” The frame is from the shot whose on-screen text the scene map reads as “${esc(playbackShot.onScreenText)}” (${playbackShot.start}–${secs(playbackShot.end, 1)}).`,
-  );
-  const [first, ...rest] = dropped.rounds;
-  const own = note(
-    `Not every rewrite passes: the reviewer rejected all ${dropped.rounds.length} versions of ${esc(dropped.cueId)}, at ${dropped.start} s: “${esc(first.gloss)}” (${esc(titles(first.rules))}) → ${rest.map((r) => `“${esc(r.gloss)}” (${esc(titles(r.rules))})`).join(" → ")}. The last fix was “${esc(dropped.rounds[dropped.rounds.length - 1].fixGloss)}”, the wording of round ${dropped.lastFixRepeatsRound}. After ${dropped.rewrites} rewrites Scene drops a line that still fails.`,
-  );
+  const cite = note(`${esc(rule.source.en)}.`);
 
   const verdict = (mark: string, title: string, marker = "") =>
     `<p class="verdict">${mark}<span>${esc(title)}${marker}</span></p>`;
   const cols = [
-    `<p class="rv-step">Draft, sent back by the final check${run}</p>
+    `<p class="rv-step">Draft, sent back by the final check</p>
   <p class="rv-line" lang="ko">${struck(line.draft.text, line.draft.quote)}</p>
   <p class="rv-gloss">${esc(line.draft.gloss)}</p>
   ${verdict(REJECT_MARK, rule.title.en, cite)}`,
     `<p class="rv-step">The check’s fix</p>
-  <p class="rv-fix">${esc(line.draft.fixGloss)}${fix}</p>`,
-    `<p class="rv-step">Scene’s rewrite${own}</p>
+  <p class="rv-fix">${esc(line.draft.fixGloss)}</p>`,
+    `<p class="rv-step">Scene’s rewrite</p>
   <p class="rv-line amber" lang="ko">${esc(line.rewrite.text)}</p>
   <p class="rv-gloss">${esc(line.rewrite.gloss)}</p>
-  ${verdict(PASS_MARK, `Passed, voiced ${secs(line.voiced)} in ${secs(line.room)}`)}`,
+  ${verdict(PASS_MARK, "Passed and voiced")}`,
   ]
     .map(
       (c, i) =>

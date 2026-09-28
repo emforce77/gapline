@@ -231,11 +231,6 @@ if (sevenSlice.words.length > 0)
   throw new Error(
     "the seven seconds, recognized on their own, hold words; the hook slide says none",
   );
-export const sevenHeard = {
-  from: sevenSlice.from,
-  to: sevenSlice.to,
-  checkedAt: sliceAsr.producedAt,
-};
 
 // ------------------------------------------------------------------ no line of the sample over speech
 const heardByEither = unionOf([
@@ -248,13 +243,3 @@ for (const l of opening.lines) {
   if (heardByEither.some((s) => overlap(said, s) > 0))
     throw new Error(`line ${l.id} overlaps speech one of the recognizers hears`);
 }
-/** The nearest any line of the sample comes to speech either recognizer hears, in seconds. */
-export const nearestSpeech = round2(
-  Math.min(
-    ...opening.lines.flatMap((l) =>
-      heardByEither.map((s) =>
-        s.end <= l.start ? l.start - s.end : Math.max(0, s.start - (l.start + l.voiced)),
-      ),
-    ),
-  ),
-);

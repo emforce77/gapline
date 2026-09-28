@@ -2,15 +2,13 @@
  * 05. How Scene checks itself: the pipeline as run.ts runs it (hear and watch, then
  * write, review, voice, measure, the final check, fix, and mix last), with the three checks drawn
  * heavier and what each does with a line that fails: rewrite it from the reviewer's fix, read it
- * faster or shorten it, or hand it to the fix stage. Each carries what it did in the sample run.
+ * faster or shorten it, or hand it to the fix stage. Under each loop, what happens next.
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { GUIDELINE_RULES } from "../../../src/lib/pipeline/guidelines";
 import { fitRule } from "../data/city";
-import { dropped, finalFix, missing, run, runId, summary } from "../data/sample";
-import { lastVersion } from "../data/runs";
-import { dayMonthYear, esc, intro, slide } from "../html";
+import { intro, slide } from "../html";
 import { notesFor } from "../notes";
 import { REPO } from "../paths";
 import { MARGIN, W } from "../theme";
@@ -75,23 +73,14 @@ function loop(from: number, to: number, edge: number, y: number): string {
   return `<path d="M${x1} ${edge} V${y + dir * R} Q${x1} ${y} ${x1 + side * R} ${y} H${x2 - side * R} Q${x2} ${y} ${x2} ${y + dir * R} V${edge - dir * 8}" class="hw-loop" marker-end="url(#hw-head)"/>`;
 }
 
-const noun = (n: number) => (n === 1 ? "line" : "lines");
-const isoDay = (d: Date) => d.toISOString().slice(0, 10);
-
 export function howSlide(): string {
   const note = notesFor("How it checks itself");
   const rounds = maxReviewRounds();
   const rewrites = rounds - 1;
-  if (dropped.rounds.length !== rounds || dropped.rewrites !== rewrites)
-    throw new Error(`the dropped line did not go through all ${rounds} review rounds`);
-  const shipped = run.cues.filter((c) => c.status === "fits");
-  const atNormalSpeed = shipped.filter(
-    (c) => lastVersion(c).voice?.rate === 1 && !c.versions.some((v) => v.by === "shorten"),
-  );
-  const droppedCount = run.cues.filter((c) => c.status === "dropped").length;
-  if (droppedCount !== 1 || run.cues.length - shipped.length !== droppedCount)
-    throw new Error("the sample's lines no longer split into shipped and one dropped");
   const faster = Math.round((fitRule.maxRate - 1) * 100);
+  const rules = note(
+    `The ${GUIDELINE_RULES.length} rules come from Korea’s audio-description guideline (Korea Media &amp; Communications Commission) and Netflix’s Audio Description Style Guide v2.5.`,
+  );
 
   const mid = ROW.top + ROW.h / 2;
   const bottom = ROW.top + ROW.h;
@@ -99,7 +88,15 @@ export function howSlide(): string {
   const inputs = INPUTS.map((s, i) =>
     box(s, colX(0), inputsTop + i * (INPUT.h + INPUT.gap), INPUT.h),
   ).join("");
-  const stages = STAGES.map((s, i) => box(s, colX(i + 1), ROW.top, ROW.h)).join("");
+  // The review box carries the rules' source.
+  const stages = STAGES.map((s, i) =>
+    box(
+      s.title === "Review" ? { ...s, text: `${s.text}${rules}` } : s,
+      colX(i + 1),
+      ROW.top,
+      ROW.h,
+    ),
+  ).join("");
   const flows = STAGES.slice(1)
     .map(
       (_, i) =>
@@ -116,17 +113,6 @@ export function howSlide(): string {
     loop(COL.final, COL.fix, ROW.top, LOOP_TOP),
   ].join("");
 
-  // Called in reading order (top left, top right, bottom), so the markers number that way.
-  const sample = note(
-    `Counts from the sample, one automatic Korean run of the ${summary.clipSeconds} s opening, ${dayMonthYear(isoDay(summary.day))} (${esc(runId)}), line by line from its records; its hearing and watching came from an earlier run of the same clip. Writer, reviewer and final check are one Gemini model with separate instructions, the reviewer at temperature 0 with the most reasoning. The ${GUIDELINE_RULES.length} rules come from Korea’s audio-description guideline (KMCC) and Netflix’s AD style guide; a line is reviewed at most ${rounds} times.`,
-  );
-
-  const fix = note(
-    `The final check reads the whole voiced track once. Its fix stage rewrites a failing line from the check’s fix and may write a new line where a missed moment’s silence still has room; both are reviewed and voiced like any other line before the mix. In the sample it sent ${finalFix.failing} ${noun(finalFix.failing)} back and listed ${finalFix.missing} missed moments, ${missing.filter((m) => m.duringDialogue).length} of them during dialogue; the fix stage added ${finalFix.added === 0 ? "none" : finalFix.added}.`,
-  );
-  const speed = note(
-    `A take that overruns its room is voiced again at rate = take ÷ room × ${fitRule.headroom}, at most ${fitRule.maxRate}×; a line that needs more is shortened, reviewed and voiced again, at most ${fitRule.shortenings} times, then dropped.`,
-  );
   const label = (
     place: "above" | "below",
     left: number,
@@ -150,9 +136,9 @@ ${intro("Every line is reviewed, timed and checked again before the mix.", undef
   ${inputArrows}${flows}${loops}
 </svg>
 ${inputs}${stages}
-${label("above", centre(1) - R, centre(COL.final) - centre(1) - GAP, `Breaks a rule: rewritten as the reviewer suggests, up to ${rewrites === 2 ? "twice" : `${rewrites} times`}`, `Sample: ${droppedCount} of ${run.cues.length} dropped after ${rewrites} rewrites${sample}`)}
-${label("above", centre(COL.final) - R, W - MARGIN - centre(COL.final) + R, `Fails the whole-track check: rewritten${fix}`, `Sample: ${finalFix.rewritten} ${noun(finalFix.rewritten)} rewritten; ${finalFix.missing} missed moments listed, ${finalFix.added === 0 ? "none" : finalFix.added} added`)}
-${label("below", centre(COL.voice) - R, centre(COL.fix) - centre(COL.voice), `Too long: up to ${faster}% faster, else shortened${speed}`, `Sample: ${atNormalSpeed.length} of ${shipped.length} fit at normal speed`)}`,
+${label("above", centre(1) - R, centre(COL.final) - centre(1) - GAP, `Breaks a rule: rewritten as the reviewer suggests, up to ${rewrites === 2 ? "twice" : `${rewrites} times`}`, "Only lines that pass go on to the voice")}
+${label("above", centre(COL.final) - R, W - MARGIN - centre(COL.final) + R, "Fails the whole-track check: rewritten", "Reviewed and voiced again")}
+${label("below", centre(COL.voice) - R, centre(COL.fix) - centre(COL.voice), `Too long: up to ${faster}% faster, else shortened`, "Voiced and measured again")}`,
   });
 }
 

@@ -45,7 +45,7 @@ export function writeCheckNote(r: CheckNoteInput): void {
     "clipping, overlaps",
     `text budget (all visible text: ${WORD_BUDGET.prose} words, ${WORD_BUDGET.exhibit} on table/chart/diagram slides; headline ${MAX_HEADLINE_WORDS}; prose ${MAX_PROSE_WORDS})`,
     "no slide-number cross-references",
-    "wording (no defensive negatives; no run ids, rule ids, page citations or multipliers on a slide face)",
+    "wording (no defensive negatives; no run ids, rule ids, page citations, multipliers, sample-run figures or API costs on a slide face)",
     "endnote markers, remote requests",
   ];
   const lines = [

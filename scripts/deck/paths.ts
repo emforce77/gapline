@@ -35,7 +35,6 @@ export const CITY_RUN = join(
 export const FIT_SOURCE = join(REPO, "src/lib/pipeline/fit-voice.ts");
 /** Ten runs over six clips, two reviewer settings. */
 export const EVAL_SUMMARY = join(REPO, "runtime/evaluation/summary.json");
-export const EVAL_CASES = join(REPO, "runtime/evaluation/cases.json");
 /** A second recognizer (faster-whisper small) on the same opening clip. */
 export const OPENING_SECOND_ASR = join(
   REPO,

@@ -38,6 +38,9 @@ const FACE_JARGON: [RegExp, string][] = [
   [/\bpp?\.\s?\d+|§\s?\d+/, "a page or section citation"],
   [/\binferred\b/i, '"inferred"'],
   [/\d\.\d+\s?[×x](?!\w)/, "a speed multiplier"],
+  // One sample run's totals read as a benchmark; the owner took them off the slides (2026-09-28).
+  [/\bSample:/, "a sample-run figure"],
+  [/\bAPI (?:calls|cost|fees)\b/i, "an API cost"],
 ];
 
 /**

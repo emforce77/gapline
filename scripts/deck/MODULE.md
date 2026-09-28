@@ -13,11 +13,17 @@ name (`08-editor.ts` is slide 5, the product).
 The HTML opens as an offline presentation fitted to the window: arrows or Space advance,
 Home/End jump to the first/last page, and Sources opens the notes. Escape or Back to slides returns
 from the notes; source markers jump to the matching note. The current page survives a reload.
-Printing includes all 18 pages at full resolution. The build uses `?export` to inspect every slide
+Printing includes every page at full resolution. The build uses `?export` to inspect every slide
 at its original 1920x1080 size; `presenter.ts` keeps this viewer separate from the slide designs.
-`npm run deck -- --final` also refuses to build while `SUBMISSION` in `facts.ts` lacks the repo,
-video or team, or `GEMINI_ACCESS_LABEL` still names OpenRouter; without `--final` those are listed
-as open items in the check note and on the console.
+`npm run deck -- --final` also refuses to build while `SUBMISSION` in `facts.ts` lacks the demo
+URL, repo, video or team, or `GEMINI_ACCESS_LABEL` still names OpenRouter; without `--final` those
+are listed as open items in the check note and on the console. The close slide prints each link only
+once it is set.
+- Numbers (owner, 2026-09-28): one sample run's totals (its cost, time, lines, "N of M" counts, cost
+  a minute) and the evaluation's small counts stay off the slides and the notes; a single run reads
+  as a benchmark it is not. Numbers that are part of an example stay (the seven seconds and the
+  lines in them, the newspaper line's room and voice). The check fails on "Sample:" and "API
+  calls/cost/fees" on a slide face.
 
 - Look: direction A "Screening room" (dark room, film stills, one accent). Amber only marks Scene's
   words; a rejection is an ink strike plus an x mark and a label, never a second hue. Compositions
@@ -33,29 +39,29 @@ as open items in the check note and on the console.
   told once, on the product slide. The check fails on defensive negatives anywhere ("no one
   edited", "with no one", "no edits", "without an editor", "unattended") and on audit jargon on a
   slide face (run ids, snake_case rule ids, "KMCC", page or § citations, "inferred", multipliers
-  such as 1.04×); those belong in the notes. The check note lists the slide faces that mention
+  such as 1.04×, "Sample:", API costs). The check note lists the slide faces that mention
   editing (listed, not failed).
 - Sources are endnotes: `notesFor("Short name")` gives a slide a `note(html)` function that prints a
   small linked superscript and files the text under the slide being built; `slides/16-notes.ts`
   prints every note at 20 px, grouped by slide position, split into pages by each note's estimated
   height (`LATIN_EM` 0.48, calibrated on 2026-09-23 against the rendered notes; `PAGE_FILL` 0.92); a
-  group that runs over repeats its heading on the next page. Film credits stay on every slide with a
-  frame.
+  group that runs over repeats its heading on the next page. Notes carry outside sources only
+  (rulings, prices, population, guideline, competitors); run ids, sample figures and how the deck's
+  build checked a claim stay in this file and in the build's guards. Film credits stay on every
+  slide with a frame.
 - Data: `data/*.ts` parse the run records (script.json, events.jsonl, ledger.jsonl) with zod, throw
   on a missing file or field, and cross-check against each run's own summary and events.
   `data/runs.ts` holds the shared helpers and reads the one pin in `runtime/showcase.json`; the app,
   the film (`scripts/demo/config.ts` `SAMPLE_RUN`) and the deck all show that run.
   `data/sample.ts` is the automatic sample (…350b05): the clip (speech counted once where the
   re-listen overlaps the first pass), the seven seconds, the line the final check sent back and Scene
-  rewrote from its fix (L5), the line the reviewer dropped after two rewrites because its last fix
-  repeated a rejected wording (L8), the final check's list (3 moments, 2 during dialogue) and
-  `finalFix`. It refuses a run with a parent, an edit, a line written by a person, or an added line.
+  rewrote from its fix (L5) and the final check's list (3 moments, 2 during dialogue). It refuses a
+  run with a parent, an edit, a line written by a person, or an added line.
   `data/analysis.ts` is the earlier run of the clip whose hearing and watching the sample reused
-  (…837b9f; speech, scene and gaps checked field for field): its cost and time, its re-listen report,
-  and the sample's cost ($0.3174 and 486 s for the run, $0.0392 and 24.7 s for the reused analysis,
-  $0.3566 for the API calls, $0.33 a minute). `data/live-check.ts` is the 22 Sep live-service check
-  around one line edit of an earlier track (cost and time checked against that edit's run); it gives
-  the optional edit's cost and time (in the product slide's note) and the service URL. Re-pinning the
+  (…837b9f; speech, scene and gaps checked field for field) and its re-listen report; the
+  listens-twice slide checks that its second listen is that run's. `data/live-check.ts` is the 22 Sep
+  live-service check around one line edit of an earlier track; the film reads the service URL from
+  it. Re-pinning the
   sample changes the deck and the film on the next build, or stops the build where a guard no longer
   holds.
 - Second recognizer: `data/recognizers.ts` reads faster-whisper on the whole clip and on short slices
@@ -63,7 +69,9 @@ as open items in the check note and on the console.
   `uv run --with faster-whisper==1.2.1 python scripts/deck/probe/slice_asr.py`, free and local; the
   JSON carries the clip's SHA-256, checked). It gives the launch call's true timing, checks the
   re-listen test fixture still reproduces it, and fails the build if any finished line overlaps speech
-  either recognizer hears, or if the seven seconds, recognized alone, hold a word. Launch call before
+  either recognizer hears, or if the seven seconds, recognized alone, hold a word. It is the build's
+  check, not Scene's: no slide names it (the listens-twice slide draws the call's band from it
+  unlabelled; Scene itself uses Chirp 3, twice). Launch call before
   and after: the evaluation's default run (d88b71, 22 Sep) had a silence over the call and a line at
   4.50 s spoken over it; in the sample the re-listen heard the call (3.71–6.47 s) and closed that
   2.38 s silence, so no line lies there. Runs are compared by time spans, never by gap ids.
@@ -82,17 +90,12 @@ as open items in the check note and on the console.
   rewrote it as the check suggested, reading the on-screen title (전체 기억 재생., 1.74 s in
   2.63 s). The still is "playback" at 48.5 s, on the shot whose on-screen text reads MEMORY
   PLAYBACK - GLOBAL (`stills.ts` checks the shot and that the frame lies inside Line 5). The slide
-  ends on the rewrite that passed; the line at 63 s that Scene dropped after two rewrites is the
-  rewrite's note.
+  ends on the rewrite that passed.
 - Fit-loop facts are read from the pipeline, not typed: `data/city.ts` reads `MAX_SPEAKING_RATE`,
   `MAX_SHORTEN_ROUNDS`, `RATE_HEADROOM` and the speed-up rule from `src/lib/pipeline/fit-voice.ts`, and recovers the unstored
   1.0x take of a sped-up version from its rate (the newspaper's shortened line: 3.52–3.55 s at 1.0x,
   3.91 s at 1.04x). The measured slide shows the estimate, the first voice and the closest shortened
-  take; its note lists every take, the unstored one as the speed-up rule puts it.
-- `data/loops.ts` counts what the review and fit loops did in the default reviewer's finished
-  evaluation runs; the film's evidence scene prints those counts, the limits slide's note gives them
-  beside the default-setting runs that stopped (`stoppedDefaultRuns`), and it fails if a dropped line
-  is left by neither loop.
+  take.
 - Stills come from the Blender 1080p master, fetched once into `runtime/deck/cache/` and checked by
   SHA-256. Before cutting, `film.ts` proves the repo clips' offsets against the master
   (clip.mp4 = film 0–65 s, eval-tos-city.mp4 = film 65–110 s); a mismatch stops the build.
@@ -124,6 +127,24 @@ zero remote requests; `pdffonts` shows no Type 3 and every face embedded; `pdfto
 every `[lang=ko]` text on the deck (compared without whitespace).
 
 ## Debug log
+
+- [2026-09-28] The owner found the numbers cheap: they came from one sample run ("Sample: 7 lines in
+  8 min 6 s for $0.32", "1 of 8 dropped", "7 of 7 fit", "$0.33 a minute" on the competitors' price
+  axis), and some exhibits read oddly once on the page. Taken off the faces: every sample total and
+  count, the TV subsidy cut (a TV fund on a film deck), the KOFIC bars ("Korean films mostly get a
+  description file already" argued against the market), the "Another recognizer" lane and "2.08 s
+  early" (the build's check, read as a feature; the headline is now "The first listen mistimed the
+  launch call"), "a second recognizer confirms it", "Recorded service check", "each paid step runs
+  once", the close's recorded demonstration date and font note, the comparison legend's "checked in
+  its code" and "model-written". Added: "Only lines that pass go on to the voice" and the other loop
+  outcomes as mechanism; "Others fit the voice or check by hand. Scene does both, automatically.";
+  Asia-Pacific's share of the world's blind people on the business face; `SUBMISSION.demoUrl`. Notes
+  went from 48 over 4 pages to 16 on one page (outside sources only). The first rebuild split the
+  notes 15 + 1: the height estimate ran about 88 px over one page though the rendered right column
+  had about 250 px free; trimming three notes' own asides fitted one page, `LATIN_EM` and `PAGE_FILL`
+  are unchanged. `data/loops.ts` and `data/evaluation.ts` were deleted (nothing reads them now), and
+  the exports `cost`, `dropped`, `finalFix`, `sevenHeard`, `nearestSpeech` went with their slides;
+  every guard on a claim still made stays. Before: `runtime/deck/backups/20260928-before-cut/`.
 
 - [2026-09-26] Kept the Screening room design and added fitted offline presentation controls.
   The cover now leads with the fit-between-dialogue benefit; optional editing is explained only
@@ -225,24 +246,14 @@ every `[lang=ko]` text on the deck (compared without whitespace).
 
 ## Status
 
-Last built 2026-09-26 with `npm run deck` (no `--screens`), after the polish round logged above:
-18 pages (14 slides, 4 notes pages, 48 endnotes), 0 check problems, the Korean PDF text check
-passed, visible words 39–99 per slide (all within their caps; how Scene differs 99, business 97,
-constraint 95, Google Cloud 96), the optional edit told on one slide. The product crops are the ones
-the 22:15 build captured with `--screens` from the rebuilt local production server
-(`SCENE_APP_URL=http://127.0.0.1:21961`, run 350b05, Line 5 chosen, the Generate crop reading
-"Generate"); that build also had 0 check problems and 39–99 words. The polish round changed wording
-only, no number: Google Cloud's storage box reads "each paid step runs once" (its note names the
-reused hearing and watching); business "A public program covers Korean films", with its own note;
-constraint "a second recognizer confirms it"; the dropped line's note opens "Not every rewrite
-passes"; the comparison legend names Microsoft's No; the product caption reads "Scene rewrote the
-line the final check sent back". The app's verdict chip is changing to "Sent back by the final
-check, then passed after a rewrite": capture the crops again with `--screens` against 21961 once the
-app is rebuilt (`screens.ts` finds the chip by its class, not its words). 4 submission items open
-(see `runtime/deck/scene-deck_check.md`): the development Gemini label, repo URL, video URL and
-team. The close slide shows the 22 Sep demonstration date; its source note retains the historical
-service URL without claiming current availability. The service was taken down on 23 Sep.
-Presenter smoke checks passed for arrow navigation, reload, endnote links and return, 390px window
-bounds, all 18 pages visible in print, and zero browser errors. The 1080p master stays in `runtime/deck/cache/`
-(584 MB) for `--stills`; delete it when the stills are final. Tests: `tests/deck-data.test.ts`
-(needs the gitignored `runtime/`).
+Last built 2026-09-28 with `npm run deck` (no `--screens`): 15 pages (14 slides, 1 notes page, 16
+endnotes), 0 check problems, the Korean PDF text check passed, visible words 31–90 per slide (all
+within their caps). `pdftotext` of the PDF holds no sample figure, run id or revision; the only
+dollar figures are the competitors' prices and the price axis. The product crops are the earlier
+`--screens` capture of run 350b05 (unchanged). Presenter checked with Playwright over a local
+server: Home/End reach pages 1 and 15, a source marker opens its note on the notes page, Escape
+returns to the slide (`.playwright-mcp/2026-09-28_1440_deck-cut/`). 5 submission items open (see
+`runtime/deck/scene-deck_check.md`): the development Gemini label, demo URL, repo URL, video URL and
+team. The service was taken down on 23 Sep; set `SUBMISSION.demoUrl` after the redeploy. The 1080p
+master stays in `runtime/deck/cache/` (584 MB) for `--stills`; delete it when the stills are final.
+Tests: `tests/deck-data.test.ts` (needs the gitignored `runtime/`).

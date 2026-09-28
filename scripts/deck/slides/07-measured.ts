@@ -2,11 +2,10 @@
  * 07. Measured, not estimated: the newspaper line of the English city run fits its room by word
  * count and overruns it when spoken; shortened and read faster, it still overruns, so Scene drops it.
  * Three bars on one seconds scale against the room: the estimate, the first voice, and the closest
- * of the shortened takes. Every take is listed in the notes.
+ * of the shortened takes. The word budget's source is the one note.
  */
-import { cityRun, fitRule, newspaper as n } from "../data/city";
-import { runDay } from "../data/runs";
-import { dayMonthYear, esc, intro, px, secs, slide } from "../html";
+import { fitRule, newspaper as n } from "../data/city";
+import { esc, intro, px, secs, slide } from "../html";
 import { notesFor } from "../notes";
 import { stillUrl } from "../stills";
 import { MARGIN } from "../theme";
@@ -18,11 +17,8 @@ const BAR_SPAN = 520;
 const VALUE_X = CHART.left + BAR_SPAN + 24;
 const pps = BAR_SPAN / AXIS_MAX_S;
 const BODY_W = 860;
-/** The city sequence's project folder (paths.ts CITY_RUN), where the run's call ledger lives. */
-const CITY_PROJECT = "eval-tos-city";
 /** Straight single quotes inside a quoted line become typographic ones. */
 const inner = (text: string) => text.replace(/'([^']*)'/g, "‘$1’");
-const percentFaster = (rate: number) => Math.round((rate - 1) * 100);
 
 type Kind = "estimate" | "voice";
 interface Row {
@@ -43,13 +39,7 @@ export function measuredSlide(): string {
   const roomX = CHART.left + n.room * pps;
 
   const budget = note(
-    `${n.wordsPerSecond} words a second is MediaScribe’s published budget and Scene’s own writing budget: ${draft.words} words, ${secs(n.estimate)}.`,
-  );
-  const takes = note(
-    `Every take: the draft ${secs(draft.voiced)}; shortened to “${esc(inner(shortened[0].text))}”, whose first take (not stored) the speed-up rule puts at ${n.firstTake.low.toFixed(2)}–${secs(n.firstTake.high)}, re-voiced ${percentFaster(shortened[0].rate)}% faster at ${secs(shortened[0].voiced)}; shortened again to the same words, ${secs(shortened[1].voiced)}. Scene reads a line at most ${percentFaster(fitRule.maxRate)}% faster and shortens it at most ${fitRule.shortenings} times.`,
-  );
-  const room = note(
-    `English run, city sequence, default reviewer, ${dayMonthYear(runDay(cityRun.runId, CITY_PROJECT).toISOString().slice(0, 10))}. The line starts on the headline’s shot (${n.shot.start}–${n.shot.end} s); Scene’s next line starts at ${n.windowEnd} s, on the next shot. The final check listed the headline among what the track misses.`,
+    `${n.wordsPerSecond} words a second is MediaScribe’s published budget and Scene’s own writing budget.`,
   );
   const rows: Row[] = [
     {
@@ -60,7 +50,7 @@ export function measuredSlide(): string {
     },
     { label: "The real voice", seconds: draft.voiced, kind: "voice", tag: "too long" },
     {
-      label: `Shortened, read ${percentFaster(closest.rate)}% faster${takes}`,
+      label: "Shortened and sped up",
       seconds: closest.voiced,
       kind: "voice",
       tag: "still too long",
@@ -92,7 +82,7 @@ export function measuredSlide(): string {
 ${intro(`The word count said it fit; the voice took ${secs(draft.voiced)}.`, undefined, 1728)}
 <img class="still ms-pic" src="${stillUrl("news")}" alt="" style="left:${MARGIN}px;top:${PIC.top}px;width:${PIC.w}px;height:${PIC.h}px;object-position:40% 50%">
 <p class="ms-draft" style="left:${MARGIN}px;top:${PIC.top + PIC.h + 28}px;width:${PIC.w}px">“${esc(inner(draft.text))}”</p>
-<p class="ms-roomlabel" style="left:${px(roomX - 1)};top:${CHART.top - 52}px">Room: ${secs(n.room)}${room}</p>
+<p class="ms-roomlabel" style="left:${px(roomX - 1)};top:${CHART.top - 52}px">Room: ${secs(n.room)}</p>
 ${bars}
 <p class="body ms-body" style="left:${CHART.left}px;top:${bottom + 20}px;width:${BODY_W}px">Scene times the real voice, not a word count. Shortened and sped up, the line still ran long, so Scene dropped it rather than run into the next line.</p>`,
   });

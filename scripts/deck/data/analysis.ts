@@ -1,5 +1,5 @@
 /**
- * Where the sample's hearing and watching came from, and what the sample cost with them. Scene keeps
+ * Where the sample's hearing and watching came from. Scene keeps
  * the last analysis of a clip and reuses it: the sample (data/sample.ts) took its speech, re-listen
  * and scene map from an earlier run of the same clip on the same day. That run's hear and watch calls
  * are the only record of what the analysis cost, so the build fails if its folder is gone.
@@ -7,7 +7,7 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
-import { run as sampleRun, runId as sampleRunId, summary as sampleSummary } from "./sample";
+import { runId as sampleRunId, summary as sampleSummary } from "./sample";
 import {
   readLedger,
   readRun,
@@ -24,7 +24,6 @@ const ANALYSIS_RUN = "20260923t064439178-ko-standard-837b9f";
 const ANALYSIS_STAGES = ["hear", "relisten", "watch"];
 /** Ledger label of the re-listen (RELISTEN_LEDGER_LABEL in src/lib/pipeline/relisten.ts). */
 const RELISTEN_LABEL = "hear:relisten";
-const SECONDS_PER_MINUTE = 60;
 
 const analysisRun = readRun(ANALYSIS_RUN);
 if (
@@ -100,28 +99,4 @@ export const analysis = {
     billedSeconds: relistenCall[0].billedSeconds,
     seconds: relistenStage.seconds,
   },
-};
-
-// ------------------------------------------------------------------ what the sample cost
-const sampleLedger = readLedger(sampleRunId);
-const sampleLedgerUsd = sampleLedger.reduce((sum, e) => sum + e.costUsd, 0);
-if (Math.abs(sampleLedgerUsd - sampleSummary.costUsd) > TOLERANCE_USD)
-  throw new Error(
-    `${sampleRunId}: its ledger sums to ${sampleLedgerUsd}, not ${sampleSummary.costUsd}`,
-  );
-const allInCostUsd = sampleSummary.costUsd + analysis.costUsd;
-
-/**
- * API cost and time. The run's own figures leave out hearing and watching, which it reused; the
- * all-in figures add them back (their seconds are not added: they ran in another run).
- */
-export const cost = {
-  runCostUsd: sampleSummary.costUsd,
-  runSeconds: sampleSummary.seconds,
-  /** The run's cost by stage (write, review, revise, voice), as it recorded it. */
-  runByStage: sampleRun.summary.costByStage,
-  analysisCostUsd: analysis.costUsd,
-  analysisSeconds: analysis.seconds,
-  allInCostUsd,
-  allInPerMinuteUsd: allInCostUsd / (sampleSummary.clipSeconds / SECONDS_PER_MINUTE),
 };

@@ -2,10 +2,9 @@
  * 04. The constraint, drawn from the sample track on a plain seconds axis: picture, dialogue (every
  * segment Scene heard, overlaps drawn once) with the usable silences outlined and labelled, and
  * Scene's lines as measured voice inside each line's slot. The launch call that only the second listen
- * heard is bracketed, so the silence it closed reads as dialogue.
+ * heard is drawn as dialogue, where it closed a silence; the listens-twice slide tells that story.
  */
-import { MIN_GAP_SECONDS, SPEECH_GUARD_SECONDS } from "../../../src/lib/pipeline/gaps";
-import { launchCall, nearestSpeech } from "../data/recognizers";
+import { launchCall } from "../data/recognizers";
 import { unionOf } from "../data/runs";
 import { opening, seven } from "../data/sample";
 import { gloss } from "../glosses";
@@ -20,7 +19,6 @@ const Y = {
   thumbs: 318,
   thumbsH: 96,
   notes: 432,
-  bracket: 482,
   dlg: 494,
   dlgH: 60,
   gapLabels: 562,
@@ -121,18 +119,8 @@ export function constraintSlide(): string {
     throw new Error("the second listen's segment is not inside the drawn dialogue");
 
   const quoteNote = note(
-    `Korea Media &amp; Communications Commission (KMCC), 『장애인방송 프로그램 제공 가이드라인』 (guideline for accessible broadcasting), p.10: “${esc(KMCC_P10)}”; our translation. Its clauses are mostly recommendations.`,
+    `Korea Media &amp; Communications Commission (KMCC), 『장애인방송 프로그램 제공 가이드라인』 (guideline for accessible broadcasting), p.10: “${esc(KMCC_P10)}”; our translation.`,
   );
-  const lanesNote = note(
-    `The sample track, one automatic run: ${opening.clip} s = ${opening.speechTotal.toFixed(2)} s dialogue + ${opening.gapTotal.toFixed(2)} s usable silence + ${opening.remainder.toFixed(2)} s margins and short pauses, as Scene’s gap finder made them: a ${SPEECH_GUARD_SECONDS} s margin around speech, no pauses under ${MIN_GAP_SECONDS} s. Dialogue counts each second once where the second listen overlaps the first.`,
-  );
-  const callNote = note(
-    `Chirp 3’s first pass put the launch call, “${esc(launchCall.text)}”, at ${launchCall.chirp.start}–${secs(launchCall.chirp.end)}, ${secs(launchCall.early)} early, so ${launchCall.before.gap.start}–${secs(launchCall.before.gap.end)} looked silent. The second listen recognizes each silence again on its own; it heard the call at ${second.start}–${secs(second.end)} and closed that silence (in an earlier run of the same clip, whose hearing the sample reused). A second recognizer (faster-whisper small) hears it at ${launchCall.heard.start.toFixed(2)}–${secs(launchCall.heard.end)}.`,
-  );
-  const resultNote = note(
-    `Checked by the deck’s build: none of the ${opening.lines.length} lines overlaps speech that Chirp 3 or the second recognizer hears, on the whole clip or slice by slice. The closest starts ${secs(nearestSpeech)} after speech.`,
-  );
-  const midSecond = (second.start + second.end) / 2;
 
   return slide({
     id: "s-constraint",
@@ -149,11 +137,8 @@ export function constraintSlide(): string {
 </div>
 ${thumbs}
 <div class="ct-head" style="top:${Y.thumbs}px;height:${Y.thumbsH}px"><p class="label">Picture</p></div>
-<div class="ct-head" style="top:${Y.dlg}px;height:${Y.dlgH}px"><p class="label">Dialogue${lanesNote}</p></div>
+<div class="ct-head" style="top:${Y.dlg}px;height:${Y.dlgH}px"><p class="label">Dialogue</p></div>
 <div class="ct-head" style="top:${Y.lines}px;height:${Y.linesH}px"><p class="label">Scene’s lines</p></div>
-<p class="ct-note" style="left:${px(x(second.start))};top:${Y.notes}px">heard on the second listen${callNote}</p>
-<div class="ct-leader" style="left:${px(x(midSecond) - 1)};top:${Y.notes + LEADER_TOP}px;height:${Y.bracket - Y.notes - LEADER_TOP}px"></div>
-<div class="ct-bracket" style="left:${px(x(second.start))};width:${px((second.end - second.start) * pps)};top:${Y.bracket}px"></div>
 <p class="ct-note right" style="right:${px(W - x(hook.end))};top:${Y.notes}px">the seven seconds</p>
 <div class="ct-leader" style="left:${px(x((hook.start + hook.end) / 2) - 1)};top:${Y.notes + LEADER_TOP}px;height:${Y.dlg - Y.notes - LEADER_TOP}px"></div>
 <div class="lane" style="left:${X0}px;width:${px(X1 - X0)};top:${Y.dlg}px;height:${Y.dlgH}px">${gaps}${speech}</div>
@@ -162,7 +147,7 @@ ${inLane}
 ${gapLabels}
 <div class="ct-axis" style="top:${Y.axis}px"></div>
 <div style="position:absolute;left:0;width:${W}px;top:${Y.axis}px">${ticks}</div>
-<p class="body ct-result" style="left:${MARGIN}px;top:${Y.result}px"><span>Scene fit ${opening.lines.length} lines, ${secs(opening.narrationTotal, 1)} of voice, into ${opening.gaps.length} usable silences in ${opening.clip}${" "}s.</span><span>None talks over speech; a second recognizer confirms it.${resultNote}</span></p>`,
+<p class="body ct-result" style="left:${MARGIN}px;top:${Y.result}px">Scene maps the silences first, then writes each line to fit one of them.</p>`,
   });
 }
 
@@ -178,12 +163,10 @@ export const CONSTRAINT_CSS = `
 .ct-note { position:absolute; font-size:var(--fs-label); color:var(--ink-300); white-space:nowrap; }
 .ct-note.right { text-align:right; }
 .ct-leader { position:absolute; width:2px; background:var(--ink-300); }
-.ct-bracket { position:absolute; height:8px; border:2px solid var(--ink-300); border-bottom:0; }
 .ct-axis { position:absolute; left:${X0}px; width:${X1 - X0}px; height:2px; background:var(--rule); }
 .ct-tick { position:absolute; top:0; width:1px; height:12px; background:var(--tick); }
 .ct-t { position:absolute; top:16px; font-size:var(--fs-label); color:var(--ink-400); font-variant-numeric:tabular-nums; white-space:nowrap; }
 .ct-in { position:absolute; font-size:var(--fs-label); font-weight:500; color:var(--ink-100); white-space:nowrap; }
 .ct-in.dark { color:#f4f4f5; }
 .ct-result { position:absolute; width:${W - 2 * MARGIN}px; color:var(--ink-100); }
-.ct-result span { display:block; }
 `;

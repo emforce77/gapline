@@ -1,11 +1,9 @@
 /**
  * 12. Where Scene is different: a fair table with named alternatives, terse cells, a dash wherever a
  * vendor does not document something, and the column Scene loses (pausing the film) kept in. The
- * headline names what Scene adds: every line is checked against Korea's guideline, and the final
- * check's list of what it could not fix stays in the result (the "Reports what it missed" column).
+ * headline names what Scene adds: the others either fit the voice or check it by hand; Scene fits
+ * every line and checks it against a guideline on its own.
  */
-import { MAX_UPLOAD_SECONDS } from "../../../src/lib/api-contract";
-import { RULE_IDS } from "../../../src/lib/pipeline/guidelines";
 import {
   COMPARE_COLUMNS,
   COMPETITORS,
@@ -46,18 +44,8 @@ export function differentSlide(): string {
     SCENE_ROW.length !== COMPARE_COLUMNS.length
   )
     throw new Error("comparison rows and columns disagree");
-  // The legend names the one competitor whose "No" we read in its own code: the open-source row.
-  const withNo = COMPETITORS.filter((c) => c.cells.some((x) => x.support === "no"));
-  if (withNo.length !== 1 || !withNo[0].name.includes("open source"))
-    throw new Error(
-      "a competitor's 'No' outside the open-source row; the legend says we read it in its code",
-    );
-  const readInCode = withNo[0].name.split(",")[0];
-  const scene = note(
-    `Every line, and every rewrite, shortening and fix, is reviewed against the same ${RULE_IDS.length} rules and must fit its measured room; so is a line a person changes. Guidelines: KMCC (Korea Media &amp; Communications Commission) accessible-broadcasting guideline, audio description section; Netflix Audio Description Style Guide v2.5. The final check’s list of what a track misses is written by a model. Standard (inline) description only; clips up to ${MAX_UPLOAD_SECONDS} s.`,
-  );
   const vendors = note(
-    "Read 23 Sep 2026. MediaScribe (mediascribe.ai): silences of 3 s or more, 2.5 words a second, overruns summarized and re-voiced. ViddyScribe (docs.viddyscribe.com): Gemini API Developer Competition winner, 2024; 53 languages including Korean; auto-fit; extended description; videos up to 8 h. Microsoft (github.com/microsoft/ai-audio-descriptions): measures every line at render, edited ones included, and speeds a line up to at most 1.15× in tempo, else the render fails; no review stage; English defaults. 3Play Media, Verbit: human QA; extended description.",
+    "Read 23 Sep 2026. MediaScribe (mediascribe.ai): silences of 3 s or more, 2.5 words a second, overruns summarized and re-voiced. ViddyScribe (docs.viddyscribe.com): 53 languages including Korean; auto-fit; extended description. Microsoft (github.com/microsoft/ai-audio-descriptions): measures every line at render and speeds it up to at most 1.15× in tempo, else the render fails; no review stage; English defaults. 3Play Media, Verbit: human QA; extended description.",
   );
   const rows = COMPETITORS.map(
     (c) =>
@@ -72,14 +60,14 @@ export function differentSlide(): string {
     name: "different",
     kind: "exhibit",
     body: `
-<div class="intro"><h1 class="headline" style="max-width:1600px">Scene checks every line against Korea’s guideline and reports what it could not fix.</h1></div>
+<div class="intro"><h1 class="headline" style="max-width:1600px">Others fit the voice or check by hand. Scene does both, automatically.</h1></div>
 <div class="df-wrap" style="left:${MARGIN}px;top:${TABLE_TOP}px;width:${W - 2 * MARGIN}px">
 <table class="df-table">
   <colgroup><col style="width:${NAME_COL}px">${COMPARE_COLUMNS.map((_, i) => (i === CLAIM_COLUMN ? `<col style="width:${CLAIM_COL}px">` : "<col>")).join("")}</colgroup>
   <thead><tr><th></th>${head}</tr></thead>
-  <tbody>${rows}<tr class="scene"><th>Scene${scene}</th>${SCENE_ROW.map(cell).join("")}</tr></tbody>
+  <tbody>${rows}<tr class="scene"><th>Scene</th>${SCENE_ROW.map(cell).join("")}</tr></tbody>
 </table>
-<p class="df-legend">— = not published · ${esc(readInCode)}’s No = checked in its code${vendors}</p>
+<p class="df-legend">— = not published${vendors}</p>
 </div>`,
   });
 }

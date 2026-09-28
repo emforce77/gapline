@@ -47,6 +47,8 @@ function openItems(): string[] {
   const items: string[] = [];
   if (/openrouter/i.test(GEMINI_ACCESS_LABEL))
     items.push(`GEMINI_ACCESS_LABEL (src/lib/models.ts) still reads "${GEMINI_ACCESS_LABEL}"`);
+  if (!SUBMISSION.demoUrl)
+    items.push("no deployed demo URL: set SUBMISSION.demoUrl in scripts/deck/facts.ts");
   if (!SUBMISSION.repoUrl)
     items.push("no public GitHub URL: set SUBMISSION.repoUrl in scripts/deck/facts.ts");
   if (!SUBMISSION.videoUrl)

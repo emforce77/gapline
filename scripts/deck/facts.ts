@@ -53,13 +53,6 @@ export const HAND_MADE = {
     "Barrier-Free Film Committee FAQ (undated; covers description and captions); The Better Future (Futurechosun) 2019 interview",
 };
 
-/** Public subsidy for described, captioned and signed TV, in billions of won. */
-export const SUBSIDY = {
-  before: { year: 2025, won: 7.76 },
-  after: { year: 2026, won: 3.58 },
-  source: "Korea Blind Union statement and KMCC reply, Beminor, 13 Mar 2026",
-};
-
 export const AUDIENCE = {
   koreansRegistered: "about 244,000",
   koreaSource: "Ministry of Health and Welfare, end of 2025 (9.3% of 2,627,761 registered)",
@@ -161,17 +154,13 @@ export const SCENE_ROW: CompetitorCell[] = [
   { support: "yes", note: "speed, shorten, drop" },
   { support: "yes", note: "rewrites, shortenings, fixes" },
   { support: "yes", note: "Korea, Netflix" },
-  { support: "yes", note: "model-written" },
+  { support: "yes", note: "" },
   { support: "yes", note: "" },
   { support: "no", note: "" },
 ];
 
 /** KOFIC's barrier-free film program in 2025, via Newspim (24 Mar 2026); single secondary source. */
 export const KOFIC_2025 = {
-  accessible: 147,
-  releases: 213,
-  /** Of the accessible versions, how many reached audiences in barrier-free screenings. */
-  screened: 17,
   source: "KOFIC via Newspim, 24 Mar 2026",
 };
 
@@ -179,12 +168,18 @@ export const KOFIC_2025 = {
  * Links and names the close slide prints once the owner has them. `npm run deck -- --final` refuses
  * to build while any is missing or the Gemini access label still names the development route.
  */
-export const SUBMISSION: { repoUrl: string | null; videoUrl: string | null; team: string | null } =
-  {
-    repoUrl: null,
-    videoUrl: null,
-    team: null,
-  };
+export const SUBMISSION: {
+  /** The deployed Cloud Run URL, once the service is up again for judging. */
+  demoUrl: string | null;
+  repoUrl: string | null;
+  videoUrl: string | null;
+  team: string | null;
+} = {
+  demoUrl: null,
+  repoUrl: null,
+  videoUrl: null,
+  team: null,
+};
 
 export const FILM_CREDIT = "Tears of Steel © Blender Foundation, CC BY 3.0, mango.blender.org";
 export const THEME = "Media, Content & Digital Experiences";

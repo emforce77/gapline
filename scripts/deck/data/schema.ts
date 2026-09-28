@@ -148,16 +148,6 @@ const EvalRun = z.object({
   error: z.string().optional(),
 });
 export const EvalSummarySchema = z.object({ runs: z.array(EvalRun) });
-export type EvalRunRecord = z.infer<typeof EvalRun>;
-
-export const EvalCasesSchema = z.array(
-  z.object({
-    id: z.string(),
-    language: z.enum(["ko", "en"]),
-    seconds: z.number(),
-    facts: z.array(z.string()),
-  }),
-);
 
 export const SecondAsrSchema = z.object({
   source: z.string(),

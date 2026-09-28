@@ -11,7 +11,7 @@ import { readJsonFile, ScriptSchema, type RunCue } from "./schema";
 /** eval-tos-city.mp4 is film 65–110 s (runtime/evaluation/cases.json "from", frame-checked by film.ts). */
 export const CITY_FILM_OFFSET_S = 65;
 
-export const cityRun = readJsonFile(CITY_RUN, ScriptSchema);
+const cityRun = readJsonFile(CITY_RUN, ScriptSchema);
 
 function cueOf(id: string): RunCue {
   const found = cityRun.cues.find((c) => c.id === id);

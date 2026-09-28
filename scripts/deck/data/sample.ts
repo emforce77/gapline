@@ -9,7 +9,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { parseWav } from "../../../src/lib/media/wav";
-import { freeRoom, sameWords } from "../../../src/lib/pipeline/cues";
+import { freeRoom } from "../../../src/lib/pipeline/cues";
 import { findGaps } from "../../../src/lib/pipeline/gaps";
 import { gloss } from "../glosses";
 import { type RunCue } from "./schema";
@@ -267,51 +267,8 @@ export const line = {
   rejectedBy,
 };
 
-// ------------------------------------------------------------------ the line the reviewer dropped
+// ------------------------------------------------------------------ lines the pipeline dropped
 const droppedCues = run.cues.filter((c) => c.status === "dropped");
-if (droppedCues.length !== 1 || droppedCues[0].droppedReason !== "review")
-  throw new Error(`expected one line dropped after review in ${runId}`);
-const lost = droppedCues[0];
-if (events.reviews.filter((r) => r.cueId === lost.id).length !== lost.versions.length)
-  throw new Error(`${lost.id}: one review per version expected in the events`);
-const rounds = lost.versions.map((v) => {
-  const r = v.review;
-  if (!r || r.pass) throw new Error(`${lost.id}: a version of the dropped line passed`);
-  return {
-    text: v.text,
-    gloss: gloss(v.text),
-    by: v.by,
-    rules: r.violations.map((x) => ({
-      rule: x.rule,
-      quote: x.quote,
-      reason: x.reason,
-      reasonGloss: gloss(x.reason),
-    })),
-    fix: r.fix,
-    fixGloss: gloss(r.fix),
-  };
-});
-// The reviewer slide says the last fix brought back wording that had already been rejected.
-const lastFix = rounds[rounds.length - 1].fix;
-const repeatedIdx = rounds.slice(0, -1).findIndex((r) => sameWords(r.text, lastFix));
-if (repeatedIdx < 0)
-  throw new Error(`${lost.id}'s last fix no longer repeats a wording the reviewer rejected`);
-
-export const dropped = {
-  cueId: lost.id,
-  start: lost.start,
-  windowEnd: lost.windowEnd,
-  room: round2(lost.windowEnd - lost.start),
-  /** Every version, each rejected: its rules (with reasons) and the reviewer's fix. */
-  rounds,
-  rewrites: rounds.length - 1,
-  /** Which round's wording the last fix repeats (1 = the draft). */
-  lastFixRepeatsRound: repeatedIdx + 1,
-  /** Whether the final check listed this moment as missing. */
-  listedByFinalCheck: run.summary.finalReview.missing.some(
-    (m) => m.at >= lost.start && m.at < lost.windowEnd,
-  ),
-};
 
 // ------------------------------------------------------------------ what the final check fixed and listed
 const inDialogue = (t: number) => speechUnion.some((s) => t >= s.start && t < s.end);
@@ -347,17 +304,12 @@ if (
   recordedFix.rewritten !== fixedByRewrite.length
 )
   throw new Error(`the events disagree with the run's finalFix ${JSON.stringify(recordedFix)}`);
-if (recordedFix.added !== 0)
-  throw new Error("the fix stage added a line; the deck and the film say it added none");
 if (recordedFix.missing !== missing.length)
   throw new Error(
     `finalFix counts ${recordedFix.missing} missing moments, the list has ${missing.length}`,
   );
 if (rejectedBy === "final check" && !finalRejections.some((r) => r.cueId === line.cueId))
   throw new Error(`the final check's rejection is not ${line.cueId}'s`);
-
-/** What the final check found, as the run recorded it: failing lines, missing moments, fixes. */
-export const finalFix = recordedFix;
 
 /** What the final check still lists: moments, how many have no silence left, and dropped lines. */
 export const notes = {
