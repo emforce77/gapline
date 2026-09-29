@@ -49,8 +49,15 @@ the film by `npm run demo` ([scripts/demo](../scripts/demo/MODULE.md)).
   exponential backoff up to four times, and a rejected request no longer holds part of the daily
   allowance (the API does not bill it). Two runs that failed earlier on 29 September still hold
   theirs; the allowance renews at 00:00 UTC.
-- The Google Drive video is the earlier 2 min 40 s cut until the 3 min 30 s film is uploaded as a
-  new version of the same Drive file, which keeps the link in the deck and above.
+- The owner replaced the Google Drive video at the same link. An anonymous download on 29 September
+  confirms the new English film (210.53 seconds, 1920 × 1080), matching the current local MP4 by SHA-256.
+- The final 16-page deck at `runtime/pitch/gapline-pitch.pdf` matches the publicly downloadable
+  `v0.2.0-preview` PDF by SHA-256. The deck includes the public repository, Drive and prototype links.
+- The film follows the owner's supplied 3–4-minute submission instructions, recorded in
+  [the demo module](../scripts/demo/MODULE.md). The public FAQ separately says under 3 minutes;
+  check the authenticated submission form's current wording before final submission.
+- Further Gemini generation checks are deferred at the owner's request because the daily quota
+  is exhausted. No additional generation or quota changes were made for this material update.
 - The Hack2skill dashboard requires the team's authenticated session. The competition entry has
   not been submitted.
 
