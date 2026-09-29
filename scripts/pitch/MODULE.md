@@ -78,5 +78,5 @@ demo video, the submission form's brief description.
 
 ## Status
 
-Built 2026-09-29: 16 pages in the template's order, all checks passing. Open: the team leader name
-on the cover. The README and docs/SUBMISSION.md still link the HTML deck's PDF from the release.
+Built 2026-09-29: 16 pages in the template's order, all checks passing. The cover names the team
+leader, Jeyoon Yeom (owner, 2026-09-29), and `npm run pitch -- --final` passes.

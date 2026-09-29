@@ -41,7 +41,7 @@ import {
 import { REPO } from "../deck/paths";
 
 /** The template's cover asks for it; set it here before the final build (`npm run pitch -- --final`). */
-const TEAM_LEADER: string | null = null;
+const TEAM_LEADER: string | null = "Jeyoon Yeom";
 
 const OUT_DIR = join(REPO, "runtime/pitch");
 const OUT_FILE = join(OUT_DIR, "pitch-data.json");
