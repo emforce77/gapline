@@ -9,15 +9,15 @@ rewrites any line a final check sends back, and mixes the track. It works in Kor
 
 [Live demo](https://scene-ad-958994530029.asia-northeast3.run.app) |
 [Submission video (Google Drive)](https://drive.google.com/file/d/1yuhGGyPOm_IhLdVcERYa43bwXbHBhTub/view) |
-[Demo video (English, MP4)](https://github.com/emforce77/gapline/releases/download/v0.1.0-preview/gapline-demo-en.mp4) |
-[Pitch deck (PDF)](https://github.com/emforce77/gapline/releases/download/v0.1.0-preview/gapline-deck-submission.pdf) |
+[Demo video (English, MP4)](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-demo-en.mp4) |
+[Pitch deck (PDF)](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-pitch.pdf) |
 [Architecture](docs/ARCHITECTURE.md) | [Evaluation](docs/EVALUATION.md) | [Deploy your own](docs/DEPLOY.md)
 
-**Deployment status (29 September 2026):** the Cloud Run candidate uses the Gemini API directly
-with a Google AI Studio key. Sample playback and downloads pass. Fresh video generation is blocked
-by Gemini HTTP 503 responses; the migration has not passed end-to-end deployment verification.
-The submission video and updated deck describe the candidate's direct Gemini API architecture;
-the migration's source changes remain unpublished pending live verification.
+**Deployment status (29 September 2026):** the live prototype on Cloud Run calls the Gemini API
+directly. Sample playback and downloads work. New generation waits on paid-tier quota for the
+Gemini API key: on the free tier, Gemini 3.8 Flash often answers HTTP 503 ("high demand") and allows
+5 requests a minute. Gapline retries rejected requests with backoff and does not count them against
+the daily allowance. Details in [submission details](docs/SUBMISSION.md#delivery-status--29-september-2026).
 
 Built by **Grab Your Dream** for AI Builder Cup 2026, theme _Media, Content & Digital Experiences_.
 See [submission details](docs/SUBMISSION.md) for the prepared materials and remaining delivery steps.

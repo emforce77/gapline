@@ -26,25 +26,31 @@ low-vision listeners or professional describers. Results and limitations are doc
 | --- | --- |
 | Source repository | https://github.com/emforce77/gapline |
 | Live prototype | https://scene-ad-958994530029.asia-northeast3.run.app |
-| Submission video, English, 160 seconds | [Watch on Google Drive](https://drive.google.com/file/d/1yuhGGyPOm_IhLdVcERYa43bwXbHBhTub/view) |
-| Previously published English demo, 160 seconds | [Download MP4](https://github.com/emforce77/gapline/releases/download/v0.1.0-preview/gapline-demo-en.mp4) |
-| Previously published Korean review copy | [Download MP4](https://github.com/emforce77/gapline/releases/download/v0.1.0-preview/gapline-demo-ko.mp4) |
-| Updated English pitch deck | [Download PDF](https://github.com/emforce77/gapline/releases/download/v0.1.0-preview/gapline-deck-submission.pdf) |
+| Submission video, English (Google Drive) | [Watch on Google Drive](https://drive.google.com/file/d/1yuhGGyPOm_IhLdVcERYa43bwXbHBhTub/view) |
+| Pitch deck in the Hack2skill template | [Download PDF](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-pitch.pdf) |
+| English demo, 3 min 30 s | [Download MP4](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-demo-en.mp4) |
+| Korean review copy | [Download MP4](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-demo-ko.mp4) |
+
+The deck is built by `npm run pitch` from the organisers' template ([scripts/pitch](../scripts/pitch/MODULE.md));
+the film by `npm run demo` ([scripts/demo](../scripts/demo/MODULE.md)).
 
 ## Delivery status — 29 September 2026
 
-- Cloud Run revision `scene-ad-00002-kmf` serves the live prototype above, using the direct Gemini API
+- Cloud Run revision `scene-ad-00003-nmh` serves the live prototype, calling the Gemini API directly
   with `GOOGLE_API_KEY` from Secret Manager. Its daily API allowance remains $5.
-- Sample playback, private-upload access checks, and the sample's four downloads pass. A minimal
-  structured Gemini call also passes. Fresh video generation still fails at the watch stage with
-  HTTP 503 (high demand), so end-to-end validation and publication of the migration remain pending.
-  Two failed runs retain their conservative reservations; new live runs reopen at 00:00 UTC on
-  30 September unless those unknown costs can be reconciled.
-- The owner uploaded the original English MP4 to Google Drive; its public link above is the selected
-  competition video. The updated PDF includes the live prototype, repository, and video links.
-- The updated video and deck describe the direct Gemini API candidate. Its source migration remains
-  unpublished pending live validation. Recorded sample runs and historical evaluation costs remain
-  unchanged; new Gemini costs are estimates from reported usage and published token rates.
+- The Gemini API key in use is on the free tier. Measured on 29 September: a 429 answer names the
+  quota `GenerateRequestsPerMinutePerProjectPerModel-FreeTier` (5 requests a minute), Gemini 3.8
+  Flash answered 4 of 8 small requests with HTTP 503 ("high demand"), and the model's free daily
+  requests then ran out. Fresh generation needs paid-tier quota: set up billing for the key's
+  project in Google AI Studio, or add prepaid credits to project `majestic-voice-486204-q6` (a key
+  there answered 402, "prepayment credits are depleted") and store a key from it in
+  `scene-ad-gemini-key`.
+- Since revision `scene-ad-00003-nmh`, a request the API rejects with 429 or 503 is retried with
+  exponential backoff up to four times, and a rejected request no longer holds part of the daily
+  allowance (the API does not bill it). Two runs that failed earlier on 29 September still hold
+  theirs; the allowance renews at 00:00 UTC.
+- The Google Drive video is the earlier 2 min 40 s cut until the 3 min 30 s film is uploaded as a
+  new version of the same Drive file, which keeps the link in the deck and above.
 - The Hack2skill dashboard requires the team's authenticated session. The competition entry has
   not been submitted.
 
