@@ -7,10 +7,22 @@ import { readFileSync } from "node:fs";
 import { MAX_UPLOAD_SECONDS } from "../../src/lib/api-contract";
 import { GUIDELINE_RULES } from "../../src/lib/pipeline/guidelines";
 import { GEMINI_ACCESS_LABEL, MODELS } from "../../src/lib/models";
+import { newspaper } from "../deck/data/city";
 import { liveCheck } from "../deck/data/live-check";
+import { launchCall } from "../deck/data/recognizers";
 import { pin } from "../deck/data/runs";
 import { line, notes, opening, runId, seven, summary } from "../deck/data/sample";
-import { CATEGORY, FILM_CREDIT, HAND_MADE, LAWSUIT, THEME } from "../deck/facts";
+import {
+  CATEGORY,
+  COMPARE_COLUMNS,
+  COMPETITORS,
+  FILM_CREDIT,
+  HAND_MADE,
+  LAWSUIT,
+  PRICE_POINTS,
+  SCENE_ROW,
+  THEME,
+} from "../deck/facts";
 import { PROJECT_ID, REPO, SAMPLE_RUN } from "./config";
 
 if (PROJECT_ID !== pin.projectId || SAMPLE_RUN !== runId)
@@ -69,6 +81,28 @@ export const film = {
   credit: FILM_CREDIT,
   theme: THEME,
   category: CATEGORY,
+  /**
+   * The deck's performance report, told in the checks scene: a line from another scene of the film
+   * that fit on paper, ran long when voiced and was dropped (scripts/deck/data/city.ts), and the
+   * launch call a first listen missed and the second heard (scripts/deck/data/recognizers.ts).
+   */
+  newspaper: {
+    room: newspaper.room,
+    estimate: newspaper.estimate,
+    voiced: newspaper.tries[0].voiced,
+    shortened: newspaper.tries[1].voiced,
+    /** Where the deck cut the headline's still (film seconds). */
+    filmTime: newspaper.filmTime,
+  },
+  launchCall: {
+    firstListen: launchCall.chirp,
+    silence: launchCall.before.gap,
+    lineOverCall: { start: launchCall.before.line.start, voiced: launchCall.before.line.voiced },
+    relisten: launchCall.after.relisten,
+  },
+  /** The deck's benchmarking table (vendor pages and code read 23 Sep 2026) and published prices. */
+  compare: { columns: COMPARE_COLUMNS, competitors: COMPETITORS, gapline: SCENE_ROW },
+  prices: PRICE_POINTS,
 };
 
 /** "5 min 49 s" / "5분 49초" */

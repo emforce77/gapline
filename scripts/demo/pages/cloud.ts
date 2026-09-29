@@ -2,7 +2,8 @@
  * "cloud": the one Cloud Run service a clip passes through, drawn in hairlines. The service's outline
  * draws first; then one line runs through the run's stages in order, each stage lighting as the line
  * reaches it, with the Google model it calls under its name and the two loops that send a line back;
- * last, Cloud Storage under the service and the progress stream back to the browser. No looping
+ * then Cloud Storage under the service and the progress stream back to the browser; last, how it
+ * ships (Cloud Build into Artifact Registry) and where the Gemini API key lives. No looping
  * pulses: every mark is drawn once and stays fixed while it is read.
  * Settings come from deploy/cloud-run.sh (via the deck's data/deploy.ts); the Gemini access wording is
  * GEMINI_ACCESS_LABEL (src/lib/models.ts), the one place it may change.
@@ -10,7 +11,7 @@
 import type { Language } from "../../../src/lib/pipeline/schemas";
 import { SPEC } from "../../deck/data/deploy";
 import { film, GEMINI_NAME } from "../facts";
-import { esc, note, pageHtml, pick, STAGE, type PageTiming } from "./shell";
+import { esc, pageHtml, pick, STAGE, type PageTiming } from "./shell";
 
 const M = STAGE.margin;
 /**
@@ -28,6 +29,17 @@ const LOOP_DEPTH = 50;
 const NODE_X0 = BOX.x + 96;
 const NODE_X1 = BOX.x + BOX.w - 96;
 const SHELF = { x: BOX.x, y: BOX.y + BOX.h + 36, w: BOX.w, h: 80 };
+/** The release row under the shelf: Cloud Build → Artifact Registry → the service; the key's home. */
+const SHIP = {
+  y: SHELF.y + SHELF.h + 22,
+  h: 46,
+  build: 200,
+  registry: 270,
+  arrow: 64,
+  secret: 430,
+};
+/** How far a part of the diagram steps back while another part is named. */
+const DIM = 0.6;
 /** Share of the services sentence the line takes to cross every stage. */
 const CROSS_SHARE = 0.8;
 
@@ -157,8 +169,16 @@ svg { position:absolute; left:0; top:0; overflow:visible; }
 .cz-arrowl { font-size:24px; color:var(--ink-300); white-space:nowrap; opacity:0; }
 .cz-shelf { left:${SHELF.x}px; top:${SHELF.y}px; height:${SHELF.h}px; width:0; background:var(--lane); border-radius:10px; overflow:hidden; }
 .cz-shelf p { position:absolute; left:32px; top:22px; font-size:24px; color:var(--ink-300); white-space:nowrap; opacity:0; }
-.cz-shelf b { font-size:28px; font-weight:600; color:var(--ink-100); margin-right:22px; }`;
+.cz-shelf b { font-size:28px; font-weight:600; color:var(--ink-100); margin-right:22px; }
+.cz-chip { top:${SHIP.y}px; height:${SHIP.h}px; line-height:${SHIP.h - 3}px; border:1.5px solid var(--ink-400); border-radius:8px; text-align:center; font-size:24px; font-weight:600; color:var(--ink-100); white-space:nowrap; opacity:0; }
+.cz-chip span { font-weight:400; color:var(--ink-300); margin-left:10px; }
+.cz-dim { background:var(--screen); opacity:0; pointer-events:none; }
+.cz-shipl { top:${SHIP.y}px; line-height:${SHIP.h}px; font-size:24px; color:var(--ink-300); white-space:nowrap; opacity:0; }`;
   const arrowY = { up: LINE_Y - 22, down: LINE_Y + 18 };
+  const shipMid = SHIP.y + SHIP.h / 2;
+  const b1 = BOX.x + SHIP.build;
+  const r0 = b1 + SHIP.arrow + 16;
+  const r1 = r0 + SHIP.registry;
   const body = `
 <h2 class="a h2" id="cz-head">${pick(lang, {
     en: "One Cloud Run service, from clip to finished track.",
@@ -173,6 +193,8 @@ svg { position:absolute; left:0; top:0; overflow:visible; }
   <path class="cz-link" id="cz-up" d="M${BROWSER.x + BROWSER.w + 8} ${arrowY.up} H${BOX.x - 10}"/><path class="cz-tip" data-for="cz-up" d="${TIP}"/>
   <path class="cz-link" id="cz-down" d="M${BOX.x - 10} ${arrowY.down} H${BROWSER.x + BROWSER.w + 12}"/><path class="cz-tip" data-for="cz-down" d="${TIP}"/>
   ${drops}
+  <path class="cz-link" id="cz-b1" d="M${b1 + 8} ${shipMid} H${r0 - 10}"/><path class="cz-tip" data-for="cz-b1" d="${TIP}"/>
+  <path class="cz-link" id="cz-b2" d="M${r1 + 8} ${shipMid} H${r1 + SHIP.arrow + 6}"/><path class="cz-tip" data-for="cz-b2" d="${TIP}"/>
 </svg>
 <p class="a cz-spec"><b>Cloud Run</b>${esc(SPEC.region ?? "")} · ${esc(SPEC.env)} · ${esc(SPEC.cpu)} vCPU · ${esc(SPEC.memory)} · ${pick(
     lang,
@@ -201,12 +223,15 @@ ${names}
     en: "every clip, run and version · voice clips · finished tracks · mounted as a volume",
     ko: "클립·실행·버전 전부 · 음성 파일 · 완성 트랙 · 볼륨으로 연결",
   })}</p></div>
-${note(
-  pick(lang, {
-    en: "Settings from deploy/cloud-run.sh · model key in Secret Manager · built by Cloud Build",
-    ko: "설정: deploy/cloud-run.sh · 모델 키는 Secret Manager · 빌드는 Cloud Build",
-  }),
-)}`;
+<p class="a cz-chip" id="cz-build" style="left:${BOX.x}px;width:${SHIP.build}px">Cloud Build</p>
+<p class="a cz-chip" id="cz-reg" style="left:${r0}px;width:${SHIP.registry}px">Artifact Registry</p>
+<p class="a cz-shipl" id="cz-deploy" style="left:${r1 + SHIP.arrow + 22}px">${pick(lang, {
+    en: "deploys the service",
+    ko: "서비스 배포",
+  })}</p>
+<div class="a cz-dim" id="cz-dim-box" style="left:${BOX.x - 4}px;top:${BOX.y - 4}px;width:${BOX.w + 8}px;height:${BOX.h + 8}px"></div>
+<div class="a cz-dim" id="cz-dim-shelf" style="left:${SHELF.x - 4}px;top:${SHELF.y - 4}px;width:${SHELF.w + 8}px;height:${SHELF.h + 8}px"></div>
+<p class="a cz-chip" id="cz-secret" style="left:${BOX.x + BOX.w - SHIP.secret}px;width:${SHIP.secret}px">Secret Manager <span>${pick(lang, { en: "Gemini API key", ko: "Gemini API 키" })}</span></p>`;
   const render = `
 const S = D.S, L = D.L;
 // Draws a path up to share p, with its arrowhead riding the drawn end.
@@ -252,6 +277,18 @@ $('.cz-shelf').style.width = (${SHELF.w} * prog(t, S[2] + 0.1, 1.1)) + 'px';
 $('.cz-shelf p').style.opacity = prog(t, S[2] + 0.8, 0.6);
 $$('.cz-drop').forEach((el, i) => { el.style.opacity = prog(t, S[2] + 0.9 + i * 0.2, 0.5); });
 draw($('#cz-down'), prog(t, S[2] + L[2] * 0.55, 0.8));
-$('#cz-downl').style.opacity = prog(t, S[2] + L[2] * 0.55 + 0.4, 0.5);`;
+$('#cz-downl').style.opacity = prog(t, S[2] + L[2] * 0.55 + 0.4, 0.5);
+// 4. How it ships, and where the key is kept.
+reveal($('#cz-build'), prog(t, S[3] + 0.1, 0.5), 8);
+draw($('#cz-b1'), prog(t, S[3] + 0.6, 0.6));
+reveal($('#cz-reg'), prog(t, S[3] + 1.0, 0.5), 8);
+draw($('#cz-b2'), prog(t, S[3] + 1.5, 0.6));
+$('#cz-deploy').style.opacity = prog(t, S[3] + 1.9, 0.5);
+reveal($('#cz-secret'), prog(t, S[3] + L[3] * 0.6, 0.6), 8);
+// Focus: the service steps back while storage and the stream to the browser are named, storage while
+// the release path is named; the whole diagram returns for the end of the scene.
+const back = prog(t, S[3] + L[3] * 0.8, 0.8);
+$('#cz-dim-box').style.opacity = ${DIM} * prog(t, S[2] + L[2] * 0.5, 0.6) * (1 - back);
+$('#cz-dim-shelf').style.opacity = ${DIM} * prog(t, S[3] + L[3] * 0.45, 0.6) * (1 - back);`;
   return pageHtml({ lang, css, body, render, data });
 }

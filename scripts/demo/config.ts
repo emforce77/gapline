@@ -41,7 +41,12 @@ export const HEIGHT = 1080;
  * 60 px pitch, the lower one's descenders at least 54 px (5 %, title-safe) above the frame's foot.
  */
 export const CONTENT_HEIGHT = 880;
-export const MAX_SECONDS = 180;
+/**
+ * The film's length: 3 to 4 minutes, as the mandatory submission rules the owner pasted on
+ * 2026-09-29 ask (the template and the FAQ said "3 minutes" and "under 3 minutes" before them).
+ */
+export const MIN_SECONDS = 180;
+export const MAX_SECONDS = 240;
 
 /**
  * Browser recording: a 1440×660 CSS viewport at device scale 2 gives 2880×1320 frames, the picture
