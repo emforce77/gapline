@@ -28,7 +28,7 @@ low-vision listeners or professional describers. Results and limitations are doc
 | Live prototype | https://scene-ad-958994530029.asia-northeast3.run.app |
 | Submission video, English (Google Drive) | [Watch on Google Drive](https://drive.google.com/file/d/1yuhGGyPOm_IhLdVcERYa43bwXbHBhTub/view) |
 | Pitch deck in the Hack2skill template | [Download PDF](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-pitch.pdf) |
-| English demo, 3 min 30 s | [Download MP4](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-demo-en.mp4) |
+| English demo, 2 min 56 s | [Download MP4](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-demo-en.mp4) |
 | Korean review copy | [Download MP4](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-demo-ko.mp4) |
 
 The deck is built by `npm run pitch` from the organisers' template ([scripts/pitch](../scripts/pitch/MODULE.md));
@@ -49,13 +49,15 @@ the film by `npm run demo` ([scripts/demo](../scripts/demo/MODULE.md)).
   exponential backoff up to four times, and a rejected request no longer holds part of the daily
   allowance (the API does not bill it). Two runs that failed earlier on 29 September still hold
   theirs; the allowance renews at 00:00 UTC.
-- The owner replaced the Google Drive video at the same link. An anonymous download on 29 September
-  confirms the new English film (210.53 seconds, 1920 × 1080), matching the current local MP4 by SHA-256.
+- The film now runs under 3 minutes: English 176.57 seconds (2:56), Korean 176.83 seconds. The
+  `v0.2.0-preview` release MP4s were replaced on 29 September, and anonymous downloads match the local
+  films by SHA-256. The Google Drive link still plays the earlier 3:30 cut (210.53 seconds) until the
+  owner uploads the new English film as a new version of the same Drive file, which keeps the link.
 - The final 16-page deck at `runtime/pitch/gapline-pitch.pdf` matches the publicly downloadable
   `v0.2.0-preview` PDF by SHA-256. The deck includes the public repository, Drive and prototype links.
-- The film follows the owner's supplied 3–4-minute submission instructions, recorded in
-  [the demo module](../scripts/demo/MODULE.md). The public FAQ separately says under 3 minutes;
-  check the authenticated submission form's current wording before final submission.
+- The film runs under 3 minutes, as the owner confirmed on 29 September. The template says
+  "3 minutes" and the public FAQ says "under 3 minutes"; the build fails at 180 seconds or more
+  ([the demo module](../scripts/demo/MODULE.md)).
 - Further Gemini generation checks are deferred at the owner's request because the daily quota
   is exhausted. No additional generation or quota changes were made for this material update.
 - The Hack2skill dashboard requires the team's authenticated session. The competition entry has
