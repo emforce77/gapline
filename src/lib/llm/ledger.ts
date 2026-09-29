@@ -12,8 +12,11 @@ export interface CallRecord {
   costUsd: number;
   /** False when usage is incomplete; costUsd contributes only the known subtotal. */
   costKnown?: boolean;
-  /** Optional for compatibility with historical ledgers. Estimates are not provider invoices. */
-  costSource?: "token_estimate" | "provider_charge" | "list_price" | "unknown";
+  /**
+   * Optional for compatibility with historical ledgers. Estimates are not provider invoices.
+   * not_billed: the API rejected the request with an HTTP error before generating (no charge).
+   */
+  costSource?: "token_estimate" | "provider_charge" | "list_price" | "not_billed" | "unknown";
   thinkingTokens?: number;
   cachedTokens?: number;
   attempt?: number;

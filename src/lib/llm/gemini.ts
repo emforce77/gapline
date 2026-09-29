@@ -102,6 +102,10 @@ export class ProviderError extends Error {
     public status: number,
     public retryable: boolean,
     public retryAfterSeconds = 2,
+    /** The API answered with an HTTP error before generating anything; Gemini bills none of these. */
+    public rejected = false,
+    /** The API named the wait (Retry-After or RetryInfo); otherwise the backoff sets it. */
+    public waitGiven = false,
   ) {
     super(message);
   }
@@ -114,16 +118,39 @@ export function retryAfterSeconds(value: string | null, now = Date.now()): numbe
   return Number.isFinite(seconds) ? Math.max(0, seconds) : 2;
 }
 
-/**
- * Longest Retry-After waited out inside a request. A longer one ends the run with a retryable
- * error (provider_busy) instead of holding the viewer's request open.
- */
-export const MAX_RETRY_WAIT_SECONDS = 30;
+/** The wait a Gemini error body asks for (google.rpc.RetryInfo, e.g. "10.4s"), if any. */
+export function retryInfoSeconds(body: unknown): number | null {
+  const details = (body as { error?: { details?: { "@type"?: string; retryDelay?: string }[] } })
+    ?.error?.details;
+  const delay = details?.find((d) => d["@type"]?.endsWith("google.rpc.RetryInfo"))?.retryDelay;
+  if (typeof delay !== "string" || !delay.endsWith("s")) return null;
+  const seconds = Number(delay.slice(0, -1));
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+}
 
 /**
- * One retry, with a separate ledger entry for every attempt, including streamed errors: after a
- * retryable provider error, or after output that is not valid JSON for the schema (a run should not
- * end on one malformed answer).
+ * Longest wait sat out inside a request. A longer one ends the run with a retryable error
+ * (provider_busy) instead of holding the viewer's request open.
+ */
+export const MAX_RETRY_WAIT_SECONDS = 30;
+/**
+ * Attempts for a request the API rejected with 429 or 503 before generating. Those are not billed
+ * ("If your request fails with a 400 or 500 error, you won't be charged", ai.google.dev billing,
+ * read 2026-09-29), so they can be retried with exponential backoff as the troubleshooting guide
+ * recommends. An error after the stream started may have been billed and is retried once.
+ */
+export const MAX_REJECTED_ATTEMPTS = 4;
+
+/** Exponential backoff with jitter: about 2, 4 and 8 s after the first, second and third try. */
+export function backoffSeconds(attempt: number, random = Math.random): number {
+  return 2 ** attempt * (0.75 + random() * 0.5);
+}
+
+/**
+ * Retries with a separate ledger entry for every attempt, including streamed errors: a rejected
+ * request (HTTP 429 or 503) up to MAX_REJECTED_ATTEMPTS, any other retryable provider error once,
+ * and output that is not valid JSON for the schema once (a run should not end on one malformed
+ * answer).
  */
 export async function callStructured<T>(
   call: StructuredCall<T>,
@@ -136,14 +163,15 @@ export async function callStructured<T>(
         console.warn(`LLM output invalid, retrying once: label=${call.label} model=${call.model}`);
         continue;
       }
-      if (
-        !(error instanceof ProviderError) ||
-        !error.retryable ||
-        attempt === 2 ||
-        error.retryAfterSeconds > MAX_RETRY_WAIT_SECONDS
-      )
-        throw error;
-      await delay(error.retryAfterSeconds * 1000, undefined, { signal: call.signal });
+      if (!(error instanceof ProviderError) || !error.retryable) throw error;
+      const attempts = error.rejected ? MAX_REJECTED_ATTEMPTS : 2;
+      const wait = error.waitGiven ? error.retryAfterSeconds : backoffSeconds(attempt);
+      if (attempt >= attempts || wait > MAX_RETRY_WAIT_SECONDS) throw error;
+      console.warn(
+        `LLM provider busy, retrying in ${wait.toFixed(1)} s: label=${call.label} ` +
+          `model=${call.model} attempt=${attempt} status=${error.status}`,
+      );
+      await delay(wait * 1000, undefined, { signal: call.signal });
     }
   }
 }
@@ -163,11 +191,15 @@ async function callOnce<T>(
   let usage: GeminiUsage | undefined;
   let finishReason = "";
   let streamComplete = false;
+  let rejected = false;
   let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
 
   const record = (ok: boolean, error?: string): CallRecord => {
-    const cost =
-      streamComplete && finishReason ? estimateGeminiCost(usage, call.model, started) : null;
+    const cost = rejected
+      ? 0
+      : streamComplete && finishReason
+        ? estimateGeminiCost(usage, call.model, started)
+        : null;
     return {
       at: new Date(started).toISOString(),
       label: call.label,
@@ -179,7 +211,7 @@ async function callOnce<T>(
       cachedTokens: usage?.cachedContentTokenCount ?? 0,
       costUsd: cost ?? 0,
       costKnown: cost !== null,
-      costSource: cost === null ? "unknown" : "token_estimate",
+      costSource: rejected ? "not_billed" : cost === null ? "unknown" : "token_estimate",
       attempt,
       latencyMs: Date.now() - started,
       firstTokenMs: firstTokenAt === null ? null : firstTokenAt - started,
@@ -216,16 +248,23 @@ async function callOnce<T>(
       },
     );
     if (!response.ok || !response.body) {
+      rejected = !response.ok;
       const body = await response.text();
       let message = body.slice(0, 600);
+      let hint: number | null = null;
       try {
-        message = JSON.parse(body).error?.message ?? message;
+        const parsed = JSON.parse(body);
+        message = parsed.error?.message ?? message;
+        hint = retryInfoSeconds(parsed);
       } catch {}
+      const header = response.headers.get("retry-after");
       throw new ProviderError(
         `Gemini API HTTP ${response.status}: ${message}`,
         response.status,
         response.status === 429 || response.status === 503,
-        retryAfterSeconds(response.headers.get("retry-after")),
+        header ? retryAfterSeconds(header) : (hint ?? 2),
+        rejected,
+        header !== null || hint !== null,
       );
     }
 
@@ -273,7 +312,14 @@ async function callOnce<T>(
     }
     streamComplete = true;
     if (!finishReason)
-      throw new ProviderError("Gemini API stream ended without a finish reason", 502, true, 0);
+      throw new ProviderError(
+        "Gemini API stream ended without a finish reason",
+        502,
+        true,
+        0,
+        false,
+        true,
+      );
     if (finishReason !== "STOP")
       throw new ProviderError(`Gemini API generation ended with ${finishReason}`, 502, false);
 

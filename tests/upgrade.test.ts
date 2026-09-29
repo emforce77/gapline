@@ -13,11 +13,14 @@ import {
   type Cue,
 } from "../src/lib/pipeline/schemas";
 import {
+  backoffSeconds,
   callStructured,
   estimateGeminiCost,
   MAX_OUTPUT_TOKENS,
+  MAX_REJECTED_ATTEMPTS,
   ProviderError,
   retryAfterSeconds,
+  retryInfoSeconds,
 } from "../src/lib/llm/gemini";
 import { readCallRecords, summarizeCosts } from "../src/lib/llm/ledger";
 import { analysisKey, readAnalysisParts, saveAnalysisPart } from "../src/lib/store/analysis";
@@ -238,7 +241,7 @@ it("keeps charges unknown when Gemini omits usage or the stream ends without a f
   }
 });
 
-it("honors Retry-After, retries at most once and retains unknown charges", async () => {
+it("honors Retry-After and retries a rejected request up to four times, billing it nothing", async () => {
   const original = globalThis.fetch;
   const oldKey = process.env.GEMINI_API_KEY;
   const oldGoogleKey = process.env.GOOGLE_API_KEY;
@@ -277,12 +280,19 @@ it("honors Retry-After, retries at most once and retains unknown charges", async
     failAlways = true;
     await assert.rejects(
       callStructured(input),
-      (e: unknown) => e instanceof ProviderError && e.retryable,
+      (e: unknown) => e instanceof ProviderError && e.retryable && e.rejected,
     );
-    assert.equal(calls, 4);
+    assert.equal(calls, 2 + MAX_REJECTED_ATTEMPTS);
     const records = await readCallRecords(input.ledgerFile);
-    assert.equal(records.length, 4);
-    assert.equal(summarizeCosts(records).costStatus, "unresolved");
+    assert.equal(records.length, 2 + MAX_REJECTED_ATTEMPTS);
+    const rejected = records.filter((record) => !record.ok);
+    assert.equal(rejected.length, 1 + MAX_REJECTED_ATTEMPTS);
+    assert.ok(
+      rejected.every(
+        (r) => r.costKnown === true && r.costUsd === 0 && r.costSource === "not_billed",
+      ),
+    );
+    assert.equal(summarizeCosts(records).costStatus, "known");
     assert.equal(
       retryAfterSeconds("Tue, 22 Sep 2026 00:00:05 GMT", Date.parse("2026-09-22T00:00:00Z")),
       5,
@@ -294,6 +304,92 @@ it("honors Retry-After, retries at most once and retains unknown charges", async
     if (oldGoogleKey === undefined) delete process.env.GOOGLE_API_KEY;
     else process.env.GOOGLE_API_KEY = oldGoogleKey;
   }
+});
+
+it("waits as RetryInfo asks, backs off without it, and keeps rejected calls off the run allowance", async () => {
+  const retryInfo = (delay: string) => ({
+    error: {
+      code: 503,
+      message: "This model is currently experiencing high demand.",
+      details: [{ "@type": "type.googleapis.com/google.rpc.RetryInfo", retryDelay: delay }],
+    },
+  });
+  assert.equal(retryInfoSeconds(retryInfo("10.4s")), 10.4);
+  assert.equal(retryInfoSeconds({ error: { details: [] } }), null);
+  assert.equal(retryInfoSeconds(retryInfo("soon")), null);
+  assert.equal(
+    backoffSeconds(1, () => 0),
+    1.5,
+  );
+  assert.equal(
+    backoffSeconds(1, () => 1),
+    2.5,
+  );
+  assert.equal(
+    backoffSeconds(3, () => 0.5),
+    8,
+  );
+
+  const dir = await mkdtemp(join(tmpdir(), "scene-rejected-"));
+  const input = {
+    label: "watch",
+    model: "gemini-3.8-flash",
+    system: "",
+    user: [],
+    schemaName: "fixture",
+    schema: z.object({ ok: z.boolean() }),
+    ledgerFile: join(dir, "ledger.jsonl"),
+  };
+  let calls = 0;
+  await withFetch(
+    async () => {
+      calls++;
+      if (calls < MAX_REJECTED_ATTEMPTS) return Response.json(retryInfo("0s"), { status: 503 });
+      return new Response(
+        `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 100, thoughtsTokenCount: 0, totalTokenCount: 200 } })}\n\n`,
+      );
+    },
+    // Each attempt reserves 1.1 USD of the run's 2.5: rejected attempts must give theirs back.
+    () =>
+      withRunBudget({ id: "fixture", date: "2026-09-29", scope: "demo", amount: 2.5 }, async () => {
+        const result = await callStructured(input);
+        assert.equal(result.data.ok, true);
+      }),
+  );
+  assert.equal(calls, MAX_REJECTED_ATTEMPTS);
+
+  calls = 0;
+  const started = Date.now();
+  await withFetch(
+    async () => {
+      calls++;
+      return Response.json(retryInfo("120s"), { status: 429 });
+    },
+    () =>
+      assert.rejects(
+        callStructured(input),
+        (e: unknown) => e instanceof ProviderError && e.retryAfterSeconds === 120 && e.waitGiven,
+      ),
+  );
+  assert.equal(calls, 1);
+  assert.ok(Date.now() - started < 5000);
+
+  calls = 0;
+  await withFetch(
+    async () => {
+      calls++;
+      return Response.json(
+        { error: { code: 503, message: "busy" } },
+        { status: calls === 1 ? 503 : 400 },
+      );
+    },
+    () =>
+      assert.rejects(
+        callStructured(input),
+        (e: unknown) => e instanceof ProviderError && !e.retryable,
+      ),
+  );
+  assert.equal(calls, 2);
 });
 
 it("persists partial analysis before downstream failure and invalidates changed source or language", async () => {

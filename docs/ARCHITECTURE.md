@@ -233,9 +233,13 @@ track ([evaluation](EVALUATION.md#edits-on-the-earlier-sample-track)).
   A call whose cost cannot be estimated keeps its full reservation. The allowance lives in the bucket
   and is updated with conditional writes, so two instances cannot spend the same money. Hosting,
   storage and network costs are outside this API total.
-- **Provider hiccups and bad answers.** A rate-limited or unavailable model call is retried once when
-  the provider asks for a short wait. A longer wait ends the run with an error that says to try
-  again, instead of holding the request open. Model output that is not valid JSON for its schema is
+- **Provider hiccups and bad answers.** A model call the Gemini API turns away with HTTP 429 or 503
+  ("high demand") is tried up to four times, waiting as long as the API asks or, when it names no
+  wait, about 2, 4 and 8 seconds with jitter (Google's troubleshooting guide). A rejected call is
+  logged at no cost, because the API does not bill a request that fails with an HTTP error, so it
+  does not use up the day's allowance. An error after the answer started streaming is retried once.
+  A wait longer than 30 seconds ends the run with an error that says to try again, instead of
+  holding the request open. Model output that is not valid JSON for its schema is
   retried once, and a review that names unknown lines or skips one is asked for once more. A
   retryable Text-to-Speech failure is retried once. A rewrite or shortening the writer leaves out
   drops that line (reason `unchanged`) instead of failing the run; in the fix stage it keeps the line
