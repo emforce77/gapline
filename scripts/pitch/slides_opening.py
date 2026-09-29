@@ -25,11 +25,10 @@ from pitch_theme import (
 )
 
 COVER_VALUE_PT = 18
-# Wide enough for "Problem Statement: Media, Content & Digital Experiences" on one line at the
-# template's 18 pt (6.71 in measured, with the template's 1 in list indent and 0.1 in insets).
-COVER_TEXT_W = Emu(int(7.95 * 914400))
-# The product's name sits right of the longest detail line.
-PRODUCT_BOX = (8.15, 3.28, 1.55, 1.72)
+COVER_TEXT_W = Emu(int(5.9 * 914400))
+# Labels whose value starts on its own line, under the label's text: the theme's name is too long
+# to follow "Problem Statement:" on one line at the template's 18 pt (owner, 2026-09-29).
+VALUE_BELOW = {"Problem Statement:"}
 MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
 
 
@@ -51,6 +50,8 @@ def fill_cover(slide: object, data: dict, canvas: Canvas) -> None:
         label = paragraph.text.strip()
         if label not in values:
             continue
+        if label in VALUE_BELOW:
+            paragraph.add_line_break()
         run = paragraph.add_run()
         run.text = values[label]
         run.font.name = FAMILY_MEDIUM
@@ -61,11 +62,11 @@ def fill_cover(slide: object, data: dict, canvas: Canvas) -> None:
         raise RuntimeError(f"the cover's team details had {filled} of {len(values)} labels")
     text(
         canvas,
-        box(*PRODUCT_BOX),
+        box(6.35, 3.28, 3.3, 1.72),
         [
-            p(r("Gapline", (FAMILY_SEMIBOLD, 28, INK))),
-            p(r("Descriptions that fit", (LEAD[0], 12, LEAD[2]))),
-            p(r("between the lines.", (LEAD[0], 12, LEAD[2])), space_after=8),
+            p(r("Gapline", (FAMILY_SEMIBOLD, 34, INK))),
+            p(r("Descriptions that fit", LEAD)),
+            p(r("between the lines.", LEAD), space_after=8),
             # The themes page also asks for a category (Healthcare, Education, ... Accessibility).
             p(r(f"Category: {team['category']}", LABEL)),
         ],
