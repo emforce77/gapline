@@ -14,6 +14,8 @@
     "demo": "node --env-file=.env.local --import tsx scripts/demo/make-demo.ts",
     "test:media": "node --env-file-if-exists=.env.local --import tsx --test tests/*.media.ts",
     "deck": "node --import tsx scripts/deck/build-deck.ts",
+    "pitch": "node --import tsx scripts/pitch/export-data.ts && uv run --with python-pptx==1.0.2 --with fonttools==4.66.0 --with pypdf==6.19.0 python scripts/pitch/build_pitch.py",
+    "pitch:snapshots": "node --import tsx scripts/pitch/snapshots.ts",
     "relisten": "node --env-file=.env.local --import tsx scripts/check-relisten.ts"
   },
   "engines": {
