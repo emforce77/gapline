@@ -5,19 +5,19 @@
 Product name: Gapline (renamed from Gapline on 2026-09-28; entries before that date use the old name).
 The demo's film-scene type is still `Scene` in code; it names a scene of the film, not the product.
 
-Builds the 3-to-4-minute English submission film (the mandatory submission rules, 2026-09-29) and a Korean review copy (same picture, Korean
+Builds the English submission film, under 3 minutes (owner, 2026-09-29), and a Korean review copy (same picture, Korean
 captions) into `runtime/demo-v3/<lang>/`: `gapline-demo-<lang>.mp4`, `_check.md`, `_contact.jpg` and
 `.srt`. There is no presenter voice (the owner found the synthetic narration worse than none,
 2026-09-23): captions tell the story and the only sound is the film's own. The story follows the deck
 (`scripts/deck`, direction "Screening room"): hook with eyes closed, the same seconds with Gapline, why
 now, the constraint, the product in the app (upload, and one press of Generate running every step;
 the saved automatic run replayed; a line the final check sent back and Gapline rewrote from the
-check's fix; the measured fit and playback; the optional edit, offered once), the checks
-(the deck's performance report: a line dropped because its real voice ran long, and a launch call
-the first listen missed), Google Cloud (with how it ships: Cloud Build, Artifact Registry, Secret
-Manager), the comparison with other tools (the deck's benchmarking table), who would pay and what
-we test next, close. Since 2026-09-29 the story follows the submission deck in the Hack2skill
-template (`scripts/pitch`); the pages keep the film's own dark look. There is no evidence scene: one sample run's totals (lines, minutes, API fees) and the
+check's fix; the measured fit and playback; the optional edit, offered once), Google Cloud (with
+how it ships: Cloud Build, Artifact Registry, Secret Manager), the comparison with other tools (the
+deck's benchmarking table), close. Since 2026-09-29 the story follows the submission deck in the
+Hack2skill template (`scripts/pitch`); the pages keep the film's own dark look. The deck's
+performance report and its business and next-steps slides stay in the deck: the film has no room
+for them under 3 minutes. There is no evidence scene: one sample run's totals (lines, minutes, API fees) and the
 evaluation's small counts read as a benchmark they are not (owner, 2026-09-28).
 
 - The app scenes show the one automatic run `runtime/showcase.json` pins for the app, the film and
@@ -136,7 +136,7 @@ Before it records, `record.ts` asks the server's `/api/live-status` and stops wh
 start there (the notice would be in the picture). Repeat both steps for `ko`. The record step must
 follow any caption change, because each app scene is timed by its captions.
 
-The check note fails (unchecked box) on: length outside 180–240 s, a film excerpt heard more than
+The check note fails (unchecked box) on: a length of 180 s or more, a film excerpt heard more than
 40 ms from its place or a sound track shorter than the picture (the build then exits 1), loudness
 more than 1.5 LU from -16 LUFS, a frozen stretch over 4 s in the picture area, a caption faster
 than the reading pace or shorter than 1.8 s, a line over the caption limit, more than 6 s with
@@ -145,6 +145,15 @@ neither a caption nor film sound, a recording made where `/api/live-status` said
 OpenRouter) on the cloud page. It never ticks the human watch-through.
 
 ## Debug log
+
+- [2026-09-29] The owner settled the length: under 3 minutes, not 3 to 4 (the pasted rule was the
+  odd one out; the template says "3 minutes", the FAQ "under 3 minutes"). The checks and next
+  scenes left the film (`pages/checks.ts`, `pages/next.ts`, and the newspaper, launch-call and price
+  facts only they read); compare stays for how Gapline differs, and the review and result scenes
+  already show a line sent back and the measured fit. No app scene or caption changed, so the
+  2026-09-28 recordings were reused. The rule is back to strictly under 180 s (`MAX_SECONDS`).
+  Built EN 176.6 s, KO 176.8 s (210.5 and 208.9 before). Before:
+  `runtime/demo-v3/backups/20260929-before-under3/`.
 
 - [2026-09-29] The owner asked for a longer film that follows the new template deck. Three motion
   pages were added from the deck's checked data (`pages/checks.ts`, `compare.ts`, `next.ts`) and a
@@ -302,7 +311,17 @@ OpenRouter) on the cloud page. It never ticks the human watch-through.
 
 ## Status
 
-2026-09-29: rebuilt at 3:30 from the 2026-09-28 recordings: EN 210.5 s, KO 208.9 s, published
+2026-09-29, under 3 minutes: rebuilt without the checks and next scenes from the 2026-09-28
+recordings: EN 176.6 s (2:56.57), KO 176.8 s (2:56.83). Every kept scene has its old length, and its
+captions and sync are unchanged. The length, sync, loudness and caption boxes pass. The still-picture
+box stays open only for the replay stretches it flagged before (EN 6.2 s at 85.2 s, KO 5.1 s), and
+the human watch-through box is still open. Release v0.2.0-preview now serves these files: anonymous
+downloads match by SHA-256 (EN `538c78217f1835212b0e36448e0e6be162a6c7ea35a38349271c31347874ffa3`,
+25,908,696 bytes; KO `550d2072…`). The Google Drive submission link still plays the 3:30 cut until
+the owner uploads this film as a new version of the same file.
+
+2026-09-29, 3:30 (superseded the same evening):
+rebuilt at 3:30 from the 2026-09-28 recordings: EN 210.5 s, KO 208.9 s, published
 as release v0.2.0-preview (`gapline-demo-en.mp4`, `gapline-demo-ko.mp4`). Sync, loudness, caption
 and length boxes pass; the still-picture box stays open only for the app scenes it flagged before
 (EN replay 6.2 s; KO replay 5.1 s, dark 4.6 s, review 4.5 s). The owner replaced the Google Drive

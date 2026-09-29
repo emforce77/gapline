@@ -42,11 +42,10 @@ export const HEIGHT = 1080;
  */
 export const CONTENT_HEIGHT = 880;
 /**
- * The film's length: 3 to 4 minutes, as the mandatory submission rules the owner pasted on
- * 2026-09-29 ask (the template and the FAQ said "3 minutes" and "under 3 minutes" before them).
+ * The film runs under 3 minutes (owner, 2026-09-29, after a pasted rule said 3 to 4; the template
+ * says "3 minutes" and the FAQ "under 3 minutes"). The build fails at or above this length.
  */
-export const MIN_SECONDS = 180;
-export const MAX_SECONDS = 240;
+export const MAX_SECONDS = 180;
 
 /**
  * Browser recording: a 1440×660 CSS viewport at device scale 2 gives 2880×1320 frames, the picture

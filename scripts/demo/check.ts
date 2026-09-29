@@ -24,15 +24,7 @@ import {
 import type { Language } from "../../src/lib/pipeline/schemas";
 import { CAPTION_CHARS } from "./ass";
 import type { SrtCue } from "./build";
-import {
-  CONTENT_HEIGHT,
-  DEVICE_SCALE,
-  FPS,
-  MAX_SECONDS,
-  MIN_SECONDS,
-  VIEWPORT,
-  WIDTH,
-} from "./config";
+import { CONTENT_HEIGHT, DEVICE_SCALE, FPS, MAX_SECONDS, VIEWPORT, WIDTH } from "./config";
 import type { FilmSound, Placed } from "./mix";
 import type { LiveAllowance } from "./record";
 import type { BeatRecord, Frame } from "./recorder-kit";
@@ -334,7 +326,7 @@ export async function writeCheck(input: {
     "",
     `Built by \`npm run demo -- ${lang} build\` (scripts/demo/build.ts). App scenes recorded from ${source.baseUrl} at ${source.recordedAt}.`,
     "",
-    `- ${box(duration >= MIN_SECONDS && duration <= MAX_SECONDS)} length: ${r1(duration)} s (${MIN_SECONDS}–${MAX_SECONDS} s, 3 to 4 minutes; planned ${r1(input.total)} s)`,
+    `- ${box(duration < MAX_SECONDS)} length: ${r1(duration)} s (strictly below ${MAX_SECONDS} s; planned ${r1(input.total)} s)`,
     `- ${box(media.width === 1920 && media.height === 1080)} picture: ${media.width}×${media.height} H.264, ${r1(size / 1e6)} MB`,
     `- ${box(Math.abs(lufs - -16) <= 1.5)} loudness: ${lufs} LUFS integrated (target -16)`,
     `- ${box(inSync)} sound in sync: every film excerpt found in the film's sound within ${MAX_SYNC_ERROR_S * 1000} ms of its place (measured by cross-correlation)`,

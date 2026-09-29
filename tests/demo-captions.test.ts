@@ -3,7 +3,7 @@ import { describe, it } from "node:test";
 import { SPEC } from "../scripts/deck/data/deploy";
 import { SUBMISSION } from "../scripts/deck/facts";
 import { assDocument, CAPTION_CHARS, captionGroups, sayEvent } from "../scripts/demo/ass";
-import { HEIGHT, MAX_SECONDS, MIN_SECONDS } from "../scripts/demo/config";
+import { HEIGHT, MAX_SECONDS } from "../scripts/demo/config";
 import { film, GEMINI_NAME } from "../scripts/demo/facts";
 import { labels } from "../scripts/demo/labels";
 import { PAGES } from "../scripts/demo/pages/index";
@@ -124,7 +124,7 @@ describe("the film's storyboard", () => {
     scenes.flatMap((s) => s.parts.flatMap((p) => ("caption" in p ? [p.caption[lang]] : [])));
 
   for (const lang of LANGS)
-    it(`fits every ${lang} caption to its lines and pace, and the film to ${MIN_SECONDS}–${MAX_SECONDS} s`, () => {
+    it(`fits every ${lang} caption to its lines and pace, and the film under ${MAX_SECONDS} s`, () => {
       let total = 0;
       for (const scene of scenes) {
         const plan = planScene(scene, lang);
@@ -138,7 +138,7 @@ describe("the film's storyboard", () => {
           assert.ok(c.lines.join(" ").length / (c.end - c.start) <= READING_CPS[lang] + 1e-9);
         }
       }
-      assert.ok(total >= MIN_SECONDS && total <= MAX_SECONDS, `planned ${total.toFixed(1)} s`);
+      assert.ok(total < MAX_SECONDS, `planned ${total.toFixed(1)} s`);
     });
 
   it("gives each app scene the sentences its recording keys to", () => {
@@ -199,7 +199,7 @@ describe("the film's storyboard", () => {
 
 describe("motion pages in the Korean film", () => {
   // Pages that cut no stills (the seven and constraint pages call FFmpeg for theirs).
-  const PAGE_IDS: PageId[] = ["dark", "stakes", "checks", "cloud", "compare", "next", "close"];
+  const PAGE_IDS: PageId[] = ["dark", "stakes", "cloud", "compare", "close"];
   const words = (s: string) => s.match(/[A-Za-z][\w.\-/()&']*/g) ?? [];
   const hook = film.hook;
   const allowed = new Set(
@@ -207,9 +207,7 @@ describe("motion pages in the Korean film", () => {
       [
         "Tears of Steel Gapline Cloud Run Storage Gemini Speech-to-Text v2 Text-to-Speech Chirp HD",
         "FFmpeg Next.js Secret Manager Build deploy/cloud-run.sh vCPU API AI Builder Cup",
-        "Artifact Registry MediaScribe ViddyScribe Microsoft 3Play Media Verbit UW–Madison",
-        "mediascribe.ai",
-        film.launchCall.relisten.text,
+        "Artifact Registry MediaScribe ViddyScribe Microsoft 3Play Media Verbit",
         GEMINI_NAME,
         film.geminiAccess,
         film.credit,

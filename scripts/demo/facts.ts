@@ -1,15 +1,13 @@
 /**
  * Every number the film prints or says. The sample's numbers come from the one automatic run that
  * runtime/showcase.json pins for the app, the film and the deck (scripts/deck/data/sample.ts); outside
- * facts (court, prices) from scripts/deck/facts.ts with their source lines.
+ * facts (court, hand-made cost, the tools compared) from scripts/deck/facts.ts with their sources.
  */
 import { readFileSync } from "node:fs";
 import { MAX_UPLOAD_SECONDS } from "../../src/lib/api-contract";
 import { GUIDELINE_RULES } from "../../src/lib/pipeline/guidelines";
 import { GEMINI_ACCESS_LABEL, MODELS } from "../../src/lib/models";
-import { newspaper } from "../deck/data/city";
 import { liveCheck } from "../deck/data/live-check";
-import { launchCall } from "../deck/data/recognizers";
 import { pin } from "../deck/data/runs";
 import { line, notes, opening, runId, seven, summary } from "../deck/data/sample";
 import {
@@ -19,7 +17,6 @@ import {
   FILM_CREDIT,
   HAND_MADE,
   LAWSUIT,
-  PRICE_POINTS,
   SCENE_ROW,
   THEME,
 } from "../deck/facts";
@@ -81,28 +78,8 @@ export const film = {
   credit: FILM_CREDIT,
   theme: THEME,
   category: CATEGORY,
-  /**
-   * The deck's performance report, told in the checks scene: a line from another scene of the film
-   * that fit on paper, ran long when voiced and was dropped (scripts/deck/data/city.ts), and the
-   * launch call a first listen missed and the second heard (scripts/deck/data/recognizers.ts).
-   */
-  newspaper: {
-    room: newspaper.room,
-    estimate: newspaper.estimate,
-    voiced: newspaper.tries[0].voiced,
-    shortened: newspaper.tries[1].voiced,
-    /** Where the deck cut the headline's still (film seconds). */
-    filmTime: newspaper.filmTime,
-  },
-  launchCall: {
-    firstListen: launchCall.chirp,
-    silence: launchCall.before.gap,
-    lineOverCall: { start: launchCall.before.line.start, voiced: launchCall.before.line.voiced },
-    relisten: launchCall.after.relisten,
-  },
-  /** The deck's benchmarking table (vendor pages and code read 23 Sep 2026) and published prices. */
+  /** The deck's benchmarking table (vendor pages and code read 23 Sep 2026). */
   compare: { columns: COMPARE_COLUMNS, competitors: COMPETITORS, gapline: SCENE_ROW },
-  prices: PRICE_POINTS,
 };
 
 /** "5 min 49 s" / "5분 49초" */

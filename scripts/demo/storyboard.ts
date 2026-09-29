@@ -12,8 +12,7 @@ import type { Language } from "../../src/lib/pipeline/schemas";
 import { film } from "./facts";
 
 export type Beat = "upload" | "replay" | "review" | "edit" | "result";
-export type PageId =
-  "dark" | "seven" | "stakes" | "constraint" | "checks" | "cloud" | "compare" | "next" | "close";
+export type PageId = "dark" | "seven" | "stakes" | "constraint" | "cloud" | "compare" | "close";
 
 export type Part =
   /**
@@ -90,11 +89,6 @@ export function buildStoryboard(): Scene[] {
   const clip = film.original.clipSeconds;
   const voiced = film.line.voiced.toFixed(1);
   const room = film.line.room.toFixed(1);
-  const news = film.newspaper;
-  const newsRoom = news.room.toFixed(1);
-  const newsVoiced = news.voiced.toFixed(1);
-  if (!(news.estimate < news.room && news.voiced > news.room && news.shortened > news.room))
-    throw new Error("the newspaper line no longer fits on paper and runs long when voiced");
   // The review scene says the draft named a city before the picture shows one.
   if (film.line.rejectedBy !== "review" || !/\bcity\b/i.test(film.line.draft.quote))
     throw new Error(
@@ -346,71 +340,6 @@ export function buildStoryboard(): Scene[] {
       hold: 0.3,
     },
     {
-      id: "checks",
-      show: { page: "checks" },
-      chapter: true,
-      parts: [
-        cap(
-          `In another scene, a line about a newspaper fit its ${newsRoom}-second silence on paper.`,
-          `다른 장면에서, 신문을 묘사한 문장은 단어 수로는 ${newsRoom}초 침묵에 들어갔습니다.`,
-          {
-            en: [
-              [
-                "In another scene, a line about a newspaper",
-                `fit its ${newsRoom}-second silence on paper.`,
-              ],
-            ],
-            ko: [
-              [
-                "다른 장면에서, 신문을 묘사한 문장은",
-                `단어 수로는 ${newsRoom}초 침묵에 들어갔습니다.`,
-              ],
-            ],
-          },
-        ),
-        cap(
-          `Voiced, it ran ${newsVoiced} seconds. Shortened and sped up, it still ran long.`,
-          `실제로 낭독하니 ${newsVoiced}초였고, 줄여서 빠르게 읽어도 길었습니다.`,
-          {
-            en: [
-              [
-                `Voiced, it ran ${newsVoiced} seconds.`,
-                "Shortened and sped up, it still ran long.",
-              ],
-            ],
-            ko: [[`실제로 낭독하니 ${newsVoiced}초였고,`, "줄여서 빠르게 읽어도 길었습니다."]],
-          },
-        ),
-        cap(
-          "So Gapline dropped it rather than run it into the next line.",
-          "그래서 갭라인은 다음 문장을 침범하는 대신 이 문장을 뺐습니다.",
-          {
-            en: [["So Gapline dropped it", "rather than run it into the next line."]],
-            ko: [["그래서 갭라인은 다음 문장을", "침범하는 대신 이 문장을 뺐습니다."]],
-          },
-        ),
-        cap(
-          "A first listen missed a launch call under the music; a line was laid over it.",
-          "처음 들을 때는 음악에 묻힌 발사 교신을 놓쳐 그 위에 문장이 들어갔습니다.",
-          {
-            en: [
-              ["A first listen missed a launch call", "under the music; a line was laid over it."],
-            ],
-            ko: [["처음 들을 때는 음악에 묻힌 발사 교신을 놓쳐", "그 위에 문장이 들어갔습니다."]],
-          },
-        ),
-        cap(
-          "Now every silence is heard twice, and that call is kept clear.",
-          "이제는 모든 침묵을 두 번 들어, 그 교신 위에는 문장을 넣지 않습니다.",
-          {
-            en: [["Now every silence is heard twice,", "and that call is kept clear."]],
-            ko: [["이제는 모든 침묵을 두 번 들어,", "그 교신 위에는 문장을 넣지 않습니다."]],
-          },
-        ),
-      ],
-      hold: 0.4,
-    },
-    {
       id: "cloud",
       show: { page: "cloud" },
       chapter: true,
@@ -474,32 +403,6 @@ export function buildStoryboard(): Scene[] {
           {
             en: [["Gapline does both, and names", "the guideline behind every rejection."]],
             ko: [["갭라인은 둘 다 하고,", "반려할 때마다 근거 가이드라인을 밝힙니다."]],
-          },
-        ),
-      ],
-      hold: 0.6,
-    },
-    {
-      id: "next",
-      show: { page: "next" },
-      chapter: true,
-      parts: [
-        cap(
-          "Our bet: film distributors and streaming services would pay for the tracks.",
-          "영화 배급사와 스트리밍 서비스가 이 트랙에 비용을 낼 것이라 봅니다.",
-          {
-            en: [
-              ["Our bet: film distributors and streaming", "services would pay for the tracks."],
-            ],
-            ko: [["영화 배급사와 스트리밍 서비스가", "이 트랙에 비용을 낼 것이라 봅니다."]],
-          },
-        ),
-        cap(
-          "Next, we test it with blind viewers and professional describers.",
-          "다음은 시각장애인 관객과 전문 해설 작가와 함께 검증합니다.",
-          {
-            en: [["Next, we test it with blind viewers", "and professional describers."]],
-            ko: [["다음은 시각장애인 관객과", "전문 해설 작가와 함께 검증합니다."]],
           },
         ),
       ],

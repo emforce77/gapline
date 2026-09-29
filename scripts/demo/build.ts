@@ -12,7 +12,7 @@ import { runFfmpeg } from "../../src/lib/media/ffmpeg";
 import type { Language } from "../../src/lib/pipeline/schemas";
 import { sayEvent, type AssEvent } from "./ass";
 import { writeCheck } from "./check";
-import { CHROME_PATH, FPS, MAX_SECONDS, MIN_SECONDS } from "./config";
+import { CHROME_PATH, FPS, MAX_SECONDS } from "./config";
 import { mixSound, type Placed } from "./mix";
 import { preparePageAssets } from "./pages/shell";
 import type { BeatRecord, Frame } from "./recorder-kit";
@@ -97,10 +97,8 @@ export async function buildFilm(input: {
     return p;
   });
   const total = toFrames(cursor);
-  if (total < MIN_SECONDS || total > MAX_SECONDS)
-    throw new Error(
-      `film would run ${total.toFixed(2)} s; it must run ${MIN_SECONDS}–${MAX_SECONDS} s`,
-    );
+  if (total >= MAX_SECONDS)
+    throw new Error(`film would run ${total.toFixed(2)} s; the limit is under ${MAX_SECONDS} s`);
 
   const captions = filmCaptions(placed);
 
