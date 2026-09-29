@@ -302,6 +302,12 @@ OpenRouter) on the cloud page. It never ticks the human watch-through.
 
 ## Status
 
+2026-09-29: rebuilt at 3:30 from the 2026-09-28 recordings: EN 210.5 s, KO 208.9 s, published
+as release v0.2.0-preview (`gapline-demo-en.mp4`, `gapline-demo-ko.mp4`). Sync, loudness, caption
+and length boxes pass; the still-picture box stays open only for the app scenes it flagged before
+(EN replay 6.2 s; KO replay 5.1 s, dark 4.6 s, review 4.5 s). The Google Drive copy linked from the
+deck is still the 2:40 cut until the owner uploads this one as a new version of that file.
+
 2026-09-28: rebuilt without the evidence scene (debug log): EN 157.4 s, KO 156.5 s; every check box
 as before (frozen stretch and the development Gemini label open, the watch-through not yet done).
 The upload scene shows the app's landing, which still carries its "−54%" TV-subsidy figure
