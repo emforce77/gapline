@@ -12,13 +12,20 @@ import {
   RevisionSchema,
   type Cue,
 } from "../src/lib/pipeline/schemas";
-import { callStructured, ProviderError, retryAfterSeconds } from "../src/lib/llm/openrouter";
+import {
+  callStructured,
+  estimateGeminiCost,
+  MAX_OUTPUT_TOKENS,
+  ProviderError,
+  retryAfterSeconds,
+} from "../src/lib/llm/gemini";
 import { readCallRecords, summarizeCosts } from "../src/lib/llm/ledger";
 import { analysisKey, readAnalysisParts, saveAnalysisPart } from "../src/lib/store/analysis";
 import { projectDir, writeProject, type Project } from "../src/lib/store/projects";
 import { canAccess, ownerHash, sameOrigin } from "../src/lib/store/access";
 import { reserveRun, settleRun, withRunBudget, reserveCall } from "../src/lib/runs/budget";
 import { editBounds } from "../src/lib/runs/edit-run";
+import { withFetch } from "./with-fetch";
 
 it("rejects invalid timestamps, contradictory verdicts and duplicate ids", () => {
   assert.equal(
@@ -58,10 +65,185 @@ it("rejects invalid timestamps, contradictory verdicts and duplicate ids", () =>
   );
 });
 
+it("sends native Gemini media/schema options and streams only answer parts through EOF", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "scene-gemini-request-"));
+  const deltas: string[] = [];
+  const usage = {
+    promptTokenCount: 100,
+    candidatesTokenCount: 25,
+    thoughtsTokenCount: 75,
+    totalTokenCount: 200,
+  };
+  const schema = z.object({ ok: z.boolean() });
+  await withFetch(
+    async (url, init) => {
+      assert.equal(
+        url,
+        "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse",
+      );
+      assert.equal(init?.method, "POST");
+      const headers = new Headers(init?.headers);
+      assert.equal(headers.get("x-goog-api-key"), "preferred-fixture");
+      assert.equal(headers.get("content-type"), "application/json");
+      const body = JSON.parse(String(init?.body));
+      assert.deepEqual(body.systemInstruction.parts, [{ text: "Return an object." }]);
+      assert.deepEqual(body.contents, [
+        {
+          role: "user",
+          parts: [
+            { text: "Describe these." },
+            { inlineData: { mimeType: "video/mp4", data: "dmlkZW8=" } },
+            { inlineData: { mimeType: "audio/wav", data: "YXVkaW8=" } },
+          ],
+        },
+      ]);
+      assert.equal(body.generationConfig.responseFormat.text.mimeType, "APPLICATION_JSON");
+      assert.equal(body.generationConfig.responseFormat.text.schema.properties.ok.type, "boolean");
+      assert.equal(body.generationConfig.responseFormat.text.schema.$schema, undefined);
+      assert.equal(body.generationConfig.responseMimeType, undefined);
+      assert.equal(body.generationConfig.responseJsonSchema, undefined);
+      assert.equal(body.generationConfig.maxOutputTokens, MAX_OUTPUT_TOKENS);
+      assert.equal(body.generationConfig.temperature, 0.2);
+      assert.equal(body.generationConfig.thinkingConfig.thinkingLevel, "low");
+      assert.equal(body.messages, undefined);
+      assert.equal(body.response_format, undefined);
+      const chunks = [
+        { candidates: [{ content: { parts: [{ text: "private reasoning", thought: true }] } }] },
+        { candidates: [{ content: { parts: [{ text: '{"ok":' }] } }] },
+        {
+          candidates: [{ content: { parts: [{ text: "true}" }] }, finishReason: "STOP" }],
+          usageMetadata: usage,
+        },
+      ];
+      // Fragment the actual bytes, and omit a final newline or [DONE] marker.
+      const bytes = new TextEncoder().encode(
+        chunks.map((chunk) => `data: ${JSON.stringify(chunk)}`).join("\n\n"),
+      );
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(bytes.slice(0, 19));
+            controller.enqueue(bytes.slice(19));
+            controller.close();
+          },
+        }),
+      );
+    },
+    async () => {
+      process.env.GOOGLE_API_KEY = "preferred-fixture";
+      const result = await callStructured({
+        label: "watch",
+        model: "gemini-3.8-flash",
+        system: "Return an object.",
+        user: [
+          { type: "text", text: "Describe these." },
+          { type: "video_url", video_url: { url: "data:video/mp4;base64,dmlkZW8=" } },
+          { type: "input_audio", input_audio: { format: "wav", data: "YXVkaW8=" } },
+        ],
+        schemaName: "fixture",
+        schema,
+        temperature: 0.2,
+        reasoningEffort: "low",
+        ledgerFile: join(dir, "ledger.jsonl"),
+        onDelta: (text) => deltas.push(text),
+      });
+      assert.deepEqual(result.data, { ok: true });
+      assert.deepEqual(deltas, ['{"ok":', "true}"]);
+      assert.equal(result.record.promptTokens, 100);
+      assert.equal(result.record.completionTokens, 100);
+      assert.equal(result.record.costKnown, true);
+      assert.equal(result.record.costSource, "token_estimate");
+      assert.equal(result.record.finishReason, "STOP");
+    },
+  );
+});
+
+it("estimates Gemini cached inputs and thought tokens at the price in force when the call began", () => {
+  const usage = {
+    promptTokenCount: 1_000_000,
+    cachedContentTokenCount: 400_000,
+    candidatesTokenCount: 100_000,
+    thoughtsTokenCount: 200_000,
+    totalTokenCount: 1_300_000,
+  };
+  const discounted = estimateGeminiCost(
+    usage,
+    "gemini-3.8-flash",
+    Date.UTC(2026, 11, 31, 23, 59, 59),
+  );
+  assert.ok(discounted !== null && Math.abs(discounted - 1.605) < 1e-12);
+  assert.equal(estimateGeminiCost(usage, "gemini-3.8-flash", Date.UTC(2027, 0, 1)), discounted * 2);
+  const ordinary = { promptTokenCount: 100, candidatesTokenCount: 50, totalTokenCount: 150 };
+  assert.equal(estimateGeminiCost(ordinary, "gemini-3.8-flash", Date.UTC(2026, 8, 29)), 0.0002625);
+  for (const incomplete of [
+    undefined,
+    { promptTokenCount: 100 },
+    { ...ordinary, totalTokenCount: 151 },
+    { ...ordinary, cachedContentTokenCount: 101 },
+    { ...ordinary, thoughtsTokenCount: -1 },
+    { promptTokenCount: 0.5, candidatesTokenCount: 1, totalTokenCount: 1.5 },
+  ]) {
+    assert.equal(estimateGeminiCost(incomplete, "gemini-3.8-flash", Date.UTC(2026, 8, 29)), null);
+  }
+  assert.equal(estimateGeminiCost(ordinary, "unknown-model", Date.UTC(2026, 8, 29)), null);
+});
+
+it("keeps charges unknown when Gemini omits usage or the stream ends without a finish reason", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "scene-gemini-usage-"));
+  for (const complete of [true, false]) {
+    const ledgerFile = join(dir, `${complete ? "missing-usage" : "truncated"}.jsonl`);
+    let requests = 0;
+    await withFetch(
+      async () => {
+        requests++;
+        return new Response(
+          `data: ${JSON.stringify({
+            candidates: [
+              {
+                content: { parts: [{ text: '{"ok":true}' }] },
+                ...(complete ? { finishReason: "STOP" } : {}),
+              },
+            ],
+            ...(!complete
+              ? {
+                  usageMetadata: {
+                    promptTokenCount: 100,
+                    candidatesTokenCount: 100,
+                    totalTokenCount: 200,
+                  },
+                }
+              : {}),
+          })}\n\n`,
+        );
+      },
+      async () => {
+        const result = callStructured({
+          label: "review",
+          model: "gemini-3.8-flash",
+          system: "",
+          user: [{ type: "text", text: "Return an object." }],
+          schemaName: "fixture",
+          schema: z.object({ ok: z.boolean() }),
+          ledgerFile,
+        });
+        if (complete) assert.deepEqual((await result).data, { ok: true });
+        else await assert.rejects(result, ProviderError);
+      },
+    );
+    assert.equal(requests, complete ? 1 : 2);
+    const records = await readCallRecords(ledgerFile);
+    assert.equal(records.length, requests);
+    assert.ok(records.every((record) => record.costKnown === false && record.costUsd === 0));
+    assert.equal(summarizeCosts(records).costStatus, "unresolved");
+  }
+});
+
 it("honors Retry-After, retries at most once and retains unknown charges", async () => {
   const original = globalThis.fetch;
-  const oldKey = process.env.OPENROUTER_API_KEY;
-  process.env.OPENROUTER_API_KEY = "fixture";
+  const oldKey = process.env.GEMINI_API_KEY;
+  const oldGoogleKey = process.env.GOOGLE_API_KEY;
+  delete process.env.GOOGLE_API_KEY;
+  process.env.GEMINI_API_KEY = "fixture";
   const dir = await mkdtemp(join(tmpdir(), "scene-retry-"));
   let calls = 0;
   let failAlways = false;
@@ -73,20 +255,24 @@ it("honors Retry-After, retries at most once and retains unknown charges", async
         { status: 503, headers: { "Retry-After": "0" } },
       );
     return new Response(
-      `data: ${JSON.stringify({ choices: [{ delta: { content: '{"ok":true}' }, finish_reason: "stop" }], usage: { cost: 0.01 } })}\n\ndata: [DONE]`,
+      `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: '{"ok":true}' }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 100, thoughtsTokenCount: 0, totalTokenCount: 200 } })}\n\n`,
     );
   };
   try {
     const input = {
       label: "review",
-      model: "fixture",
+      model: "gemini-3.8-flash",
       system: "",
       user: [],
       schemaName: "fixture",
       schema: z.object({ ok: z.boolean() }),
       ledgerFile: join(dir, "ledger.jsonl"),
     };
-    assert.equal((await callStructured(input)).data.ok, true);
+    const result = await callStructured(input);
+    assert.equal(result.data.ok, true);
+    assert.equal(result.record.costKnown, true);
+    assert.equal(result.record.costSource, "token_estimate");
+    assert.ok(result.record.costUsd > 0);
     assert.equal(calls, 2);
     failAlways = true;
     await assert.rejects(
@@ -103,8 +289,10 @@ it("honors Retry-After, retries at most once and retains unknown charges", async
     );
   } finally {
     globalThis.fetch = original;
-    if (oldKey === undefined) delete process.env.OPENROUTER_API_KEY;
-    else process.env.OPENROUTER_API_KEY = oldKey;
+    if (oldKey === undefined) delete process.env.GEMINI_API_KEY;
+    else process.env.GEMINI_API_KEY = oldKey;
+    if (oldGoogleKey === undefined) delete process.env.GOOGLE_API_KEY;
+    else process.env.GOOGLE_API_KEY = oldGoogleKey;
   }
 });
 

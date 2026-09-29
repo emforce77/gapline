@@ -32,7 +32,7 @@ flowchart LR
 
 <!-- GEMINI_ACCESS_LABEL: keep the line below in step with GEMINI_ACCESS_LABEL in src/lib/models.ts. -->
 
-**Gemini access:** Gemini 3.8 Flash — currently via OpenRouter during development; moving to the Gemini API (Google AI Studio).
+**Gemini access:** Gemini 3.8 Flash — via Gemini API (Google AI Studio), using `GOOGLE_API_KEY`.
 
 - **Cloud Run.** One service in `asia-northeast3`, second-generation execution environment, 2 vCPU,
   2 GiB, up to 10 requests per instance, a 15-minute request timeout, 0 to 2 instances, startup CPU
@@ -73,9 +73,10 @@ flowchart LR
   again on arrival; an answer that does not is asked for once more. Reasoning is set per stage:
   writing at medium, rewriting at low, reviewing at high, watching at the model default. Writer and
   reviewer watch the same 360p copy of the clip.
-- **Secret Manager.** Holds the model API key, exposed to the service as an environment variable.
-- **Identity.** On Cloud Run, Google API calls use the service account's token from the metadata
-  server. Locally they use the gcloud CLI configuration named in `GCLOUD_CONFIGURATION`.
+- **Secret Manager.** Holds `scene-ad-gemini-key`, exposed to the service as `GOOGLE_API_KEY`.
+- **Identity.** Gemini calls use the Google AI Studio API key. On Cloud Run, Speech-to-Text,
+  Text-to-Speech and Cloud Storage use the service account's token from the metadata server.
+  Locally the Cloud APIs use the gcloud CLI configuration named in `GCLOUD_CONFIGURATION`.
 
 ## The loop that makes each line
 
@@ -227,10 +228,11 @@ track ([evaluation](EVALUATION.md#edits-on-the-earlier-sample-track)).
   four outputs and its per-line WAVs.
 - **Every paid call is covered before it starts.** A run or an edit reserves an amount against the
   daily allowance (`DAILY_BUDGET_USD`), and each call inside it reserves its own maximum before it is
-  sent. When the run ends, the reservation settles to the charges the providers reported. A charge that
-  could not be read keeps its full reservation. The allowance lives in the bucket and is updated with
-  conditional writes, so two instances cannot spend the same money. Hosting, storage and network costs
-  are outside this API total.
+  sent. When the run ends, the reservation settles to the logged API cost. Direct Gemini costs are
+  estimates from reported token usage and configured token rates; they are not billing records.
+  A call whose cost cannot be estimated keeps its full reservation. The allowance lives in the bucket
+  and is updated with conditional writes, so two instances cannot spend the same money. Hosting,
+  storage and network costs are outside this API total.
 - **Provider hiccups and bad answers.** A rate-limited or unavailable model call is retried once when
   the provider asks for a short wait. A longer wait ends the run with an error that says to try
   again, instead of holding the request open. Model output that is not valid JSON for its schema is

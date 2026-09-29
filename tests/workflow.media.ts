@@ -16,7 +16,8 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
   const env = { ...process.env };
   const originalFetch = globalThis.fetch;
   process.env.DATA_DIR = await mkdtemp(join(tmpdir(), "scene-workflow-"));
-  process.env.OPENROUTER_API_KEY = "fixture";
+  process.env.GEMINI_API_KEY = "fixture";
+  delete process.env.GOOGLE_API_KEY;
   process.env.GCP_PROJECT_ID = "fixture";
   delete process.env.DATA_BUCKET;
   process.env.DAILY_BUDGET_USD = "5";
@@ -48,14 +49,17 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
         ).toString("base64"),
       });
     }
-    assert.equal(address, "https://openrouter.ai/api/v1/chat/completions");
+    assert.equal(
+      address,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse",
+    );
     const body = JSON.parse(options!.body as string);
-    const name = body.response_format.json_schema.name;
+    const properties = body.generationConfig.responseFormat.text.schema.properties;
     let data: unknown;
-    if (name === "scene_map") {
+    if (properties.shots) {
       counts.watch++;
       data = scene;
-    } else if (name === "audio_description_script") {
+    } else if (properties.cues) {
       if (writerFails) return new Response("fixture writer failure", { status: 400 });
       data = {
         cues: [
@@ -64,10 +68,10 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
           { gapId: "g1", at: 3.5, text: "The shape stops." },
         ],
       };
-    } else if (name === "revised_lines")
+    } else if (properties.revisions)
       data = { revisions: [{ cueId: "L1", text: "Invented person." }], additions: [] };
     else {
-      const prompt = body.messages[1].content.at(-1).text as string;
+      const prompt = body.contents[0].parts.at(-1).text as string;
       const lines = [...prompt.matchAll(/- (L\d+) \[[^\]]+\]: ([^\n]+)/g)];
       data = {
         verdicts: lines.map((m) => ({
@@ -85,7 +89,7 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
       };
     }
     return new Response(
-      `data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(data) }, finish_reason: "stop" }], usage: { cost: 0.001 } })}\n\ndata: [DONE]\n`,
+      `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(data) }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 100, thoughtsTokenCount: 0, totalTokenCount: 200 } })}\n\n`,
     );
   };
   try {
@@ -132,8 +136,8 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
       filmLanguageCode: "en-US",
       language: "en" as const,
       density: "standard" as const,
-      writerModel: "fixture",
-      reviewerModel: "fixture",
+      writerModel: "gemini-3.8-flash",
+      reviewerModel: "gemini-3.8-flash",
       onAnalysis: (part: Parameters<typeof saveAnalysisPart>[2]) =>
         saveAnalysisPart(project, key, part),
     };

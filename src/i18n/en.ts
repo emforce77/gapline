@@ -370,7 +370,7 @@ export const en = {
     fit: "fit their silence",
     overlap: "narration over recognized speech",
     caught: "sent back by a check",
-    cost: "API cost",
+    cost: "Estimated API cost",
     time: "processing time",
   },
   editor: enEditor,

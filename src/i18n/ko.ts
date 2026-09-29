@@ -363,7 +363,7 @@ export const ko: Dictionary = {
     fit: "침묵 안에 맞음",
     overlap: "인식된 대사와 겹친 해설",
     caught: "점검에서 반려",
-    cost: "API 비용",
+    cost: "예상 API 비용",
     time: "처리 시간",
   },
   editor: koEditor,

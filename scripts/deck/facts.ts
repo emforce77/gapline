@@ -175,9 +175,9 @@ export const SUBMISSION: {
   videoUrl: string | null;
   team: string | null;
 } = {
-  demoUrl: null,
+  demoUrl: "https://scene-ad-958994530029.asia-northeast3.run.app",
   repoUrl: "https://github.com/emforce77/gapline",
-  videoUrl: null,
+  videoUrl: "https://drive.google.com/file/d/1yuhGGyPOm_IhLdVcERYa43bwXbHBhTub/view",
   team: "Grab Your Dream",
 };
 

@@ -1,7 +1,7 @@
 import { appendFile, mkdir, readFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
-/** One paid call. costUsd is OpenRouter's own charge (usage.cost) or the TTS list price. */
+/** One paid call. New Gemini costs are token-based estimates; historical records retain their source. */
 export interface CallRecord {
   at: string;
   label: string;
@@ -10,8 +10,12 @@ export interface CallRecord {
   promptTokens: number;
   completionTokens: number;
   costUsd: number;
-  /** False when the provider did not return a charge; costUsd is only a known subtotal. */
+  /** False when usage is incomplete; costUsd contributes only the known subtotal. */
   costKnown?: boolean;
+  /** Optional for compatibility with historical ledgers. Estimates are not provider invoices. */
+  costSource?: "token_estimate" | "provider_charge" | "list_price" | "unknown";
+  thinkingTokens?: number;
+  cachedTokens?: number;
   attempt?: number;
   latencyMs: number;
   firstTokenMs: number | null;

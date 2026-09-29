@@ -23,7 +23,7 @@ gcloud run deploy "$service" \
   --add-volume "name=data,type=cloud-storage,bucket=$bucket" \
   --add-volume-mount "volume=data,mount-path=/data" \
   --set-env-vars "DATA_DIR=/data,DATA_BUCKET=$bucket,GCP_PROJECT_ID=$project,DAILY_BUDGET_USD=${DAILY_BUDGET_USD:-5}" \
-  --set-secrets "OPENROUTER_API_KEY=scene-ad-openrouter-key:latest" \
+  --set-secrets "GOOGLE_API_KEY=scene-ad-gemini-key:latest" \
   --cpu 2 --memory 2Gi --concurrency 10 --timeout 900 \
   --min-instances 0 --max-instances 2 \
   --no-invoker-iam-check \

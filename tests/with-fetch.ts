@@ -6,7 +6,7 @@ export async function withFetch<T>(
   work: () => Promise<T>,
 ): Promise<T> {
   const original = globalThis.fetch;
-  const keys = ["GCP_PROJECT_ID", "OPENROUTER_API_KEY", "K_SERVICE"] as const;
+  const keys = ["GCP_PROJECT_ID", "GOOGLE_API_KEY", "GEMINI_API_KEY", "K_SERVICE"] as const;
   const saved = keys.map((k) => process.env[k]);
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     const address = String(url);
@@ -14,7 +14,8 @@ export async function withFetch<T>(
     return handler(address, init);
   }) as typeof fetch;
   process.env.GCP_PROJECT_ID = "fixture";
-  process.env.OPENROUTER_API_KEY = "fixture";
+  process.env.GEMINI_API_KEY = "fixture";
+  delete process.env.GOOGLE_API_KEY;
   process.env.K_SERVICE = "fixture";
   await googleAccessToken();
   delete process.env.K_SERVICE;

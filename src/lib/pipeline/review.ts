@@ -1,5 +1,5 @@
 import { ModelOutputError } from "../errors";
-import { callStructured } from "../llm/openrouter";
+import { callStructured } from "../llm/gemini";
 import { reasoningEffort } from "../models";
 import {
   DENSITY_STYLE,

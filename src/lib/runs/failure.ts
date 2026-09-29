@@ -1,7 +1,7 @@
 import { ZodError } from "zod";
 import type { RunErrorCode } from "../api-contract";
 import { ModelOutputError, ServiceError } from "../errors";
-import { ProviderError } from "../llm/openrouter";
+import { ProviderError } from "../llm/gemini";
 import { FfmpegError } from "../media/ffmpeg";
 import { BudgetExhaustedError } from "./budget";
 

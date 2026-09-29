@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { noteFromScript } from "../src/components/workspace/labels";
 import { googleAccessToken } from "../src/lib/google/auth";
+import { readCallRecords } from "../src/lib/llm/ledger";
 import { runFfmpeg } from "../src/lib/media/ffmpeg";
 import { encodeWav } from "../src/lib/media/narration-track";
 import { parseWav } from "../src/lib/media/wav";
@@ -41,7 +42,7 @@ function cue(id: string, gapId: string, start: number, seconds: number, text: st
       {
         text,
         by: "write",
-        model: "fixture",
+        model: "gemini-3.8-flash",
         review: { cueId: id, pass: true, violations: [], fix: "" },
         voice: { seconds, rate: 1 },
       },
@@ -60,7 +61,8 @@ it("removes one line: other WAVs reused byte-for-byte, track and audit rebuilt, 
   const env = { ...process.env };
   const originalFetch = globalThis.fetch;
   process.env.DATA_DIR = await mkdtemp(join(tmpdir(), "scene-remove-"));
-  process.env.OPENROUTER_API_KEY = "fixture";
+  process.env.GEMINI_API_KEY = "fixture";
+  delete process.env.GOOGLE_API_KEY;
   process.env.GCP_PROJECT_ID = "fixture";
   delete process.env.DATA_BUCKET;
   process.env.DAILY_BUDGET_USD = "5";
@@ -73,10 +75,13 @@ it("removes one line: other WAVs reused byte-for-byte, track and audit rebuilt, 
       counts.tts++;
       return Response.json({ audioContent: tone(0.7, 7).toString("base64") });
     }
-    assert.equal(address, "https://openrouter.ai/api/v1/chat/completions");
+    assert.equal(
+      address,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse",
+    );
     counts.review++;
     const body = JSON.parse(options!.body as string);
-    const prompt = body.messages[1].content.at(-1).text as string;
+    const prompt = body.contents[0].parts.at(-1).text as string;
     audits.push(prompt);
     const lines = [...prompt.matchAll(/- (L\d+) \[[^\]]+\]: ([^\n]+)/g)];
     const data = {
@@ -85,7 +90,7 @@ it("removes one line: other WAVs reused byte-for-byte, track and audit rebuilt, 
       missing: prompt.includes(TITLE) ? [] : [{ gapId: "g1", at: 1.8, what: MISSING_TITLE }],
     };
     return new Response(
-      `data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(data) }, finish_reason: "stop" }], usage: { cost: 0.002 } })}\n\ndata: [DONE]\n`,
+      `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(data) }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 100, thoughtsTokenCount: 0, totalTokenCount: 200 } })}\n\n`,
     );
   };
   try {
@@ -173,8 +178,8 @@ it("removes one line: other WAVs reused byte-for-byte, track and audit rebuilt, 
       runId: "base-run",
       language: "en",
       density: "standard",
-      writerModel: "fixture",
-      reviewerModel: "fixture",
+      writerModel: "gemini-3.8-flash",
+      reviewerModel: "gemini-3.8-flash",
       clipSeconds: CLIP_SECONDS,
       t: 0,
     };
@@ -220,8 +225,13 @@ it("removes one line: other WAVs reused byte-for-byte, track and audit rebuilt, 
     assert.equal(s.cuesFitting, 2);
     assert.equal(s.cuesWritten, s.cuesShipped + s.cuesDropped + s.cuesRemoved!);
     assert.ok(Math.abs(s.narrationSeconds - 1.1) < 1e-9);
-    assert.equal(s.costUsd, 0.002);
-    assert.deepEqual(s.costByStage, { voice: 0, review: 0.002 });
+    const calls = await readCallRecords(join(dir, "ledger.jsonl"));
+    const review = calls.find((call) => call.label.startsWith("review"))!;
+    assert.equal(review.costKnown, true);
+    assert.equal(review.costSource, "token_estimate");
+    assert.ok(review.costUsd > 0);
+    assert.equal(s.costUsd, review.costUsd);
+    assert.deepEqual(s.costByStage, { voice: 0, review: review.costUsd });
     // The audit saw only the remaining track, and the removed information is now reported missing.
     assert.ok(audits[0].includes("FINAL OUTPUT AUDIT"));
     assert.ok(!audits[0].includes("- L2 ") && !audits[0].includes(TITLE));

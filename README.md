@@ -7,12 +7,17 @@ screen. One press of Generate runs every step: Gapline writes each line for one 
 dialogue, checks it against a published audio-description guideline, voices it and measures the voice,
 rewrites any line a final check sends back, and mixes the track. It works in Korean and English.
 
+[Live demo](https://scene-ad-958994530029.asia-northeast3.run.app) |
+[Submission video (Google Drive)](https://drive.google.com/file/d/1yuhGGyPOm_IhLdVcERYa43bwXbHBhTub/view) |
 [Demo video (English, MP4)](https://github.com/emforce77/gapline/releases/download/v0.1.0-preview/gapline-demo-en.mp4) |
-[Pitch deck (PDF)](https://github.com/emforce77/gapline/releases/download/v0.1.0-preview/gapline-deck.pdf) |
+[Pitch deck (PDF)](https://github.com/emforce77/gapline/releases/download/v0.1.0-preview/gapline-deck-submission.pdf) |
 [Architecture](docs/ARCHITECTURE.md) | [Evaluation](docs/EVALUATION.md) | [Deploy your own](docs/DEPLOY.md)
 
-**Deployment status (29 September 2026):** the previous Cloud Run demo is offline. Redeployment is
-pending Google Cloud sign-in; the downloadable video and deck show the current local prototype.
+**Deployment status (29 September 2026):** the Cloud Run candidate uses the Gemini API directly
+with a Google AI Studio key. Sample playback and downloads pass. Fresh video generation is blocked
+by Gemini HTTP 503 responses; the migration has not passed end-to-end deployment verification.
+The submission video and updated deck describe the candidate's direct Gemini API architecture;
+the migration's source changes remain unpublished pending live verification.
 
 Built by **Grab Your Dream** for AI Builder Cup 2026, theme _Media, Content & Digital Experiences_.
 See [submission details](docs/SUBMISSION.md) for the prepared materials and remaining delivery steps.
@@ -48,7 +53,7 @@ Making one Korean film accessible still takes about three months, about ten spec
 
 ![The Gapline landing page](docs/images/landing.png)
 
-1. Open the app after [starting it locally](#run-it-locally). It starts with seven
+1. Open the [live demo](https://scene-ad-958994530029.asia-northeast3.run.app). It starts with seven
    seconds of _Tears of Steel_ where nobody speaks. Play **Original sound**, then **With description**,
    and turn on **Hide the picture** to hear it the way a blind viewer would.
 2. Choose **Open the sample** for the full 65 seconds, with Korean and English tracks. Press play, turn
@@ -172,7 +177,10 @@ flowchart LR
 
 <!-- GEMINI_ACCESS_LABEL: keep the line below in step with GEMINI_ACCESS_LABEL in src/lib/models.ts. -->
 
-**Gemini access:** Gemini 3.8 Flash — currently via OpenRouter during development; moving to the Gemini API (Google AI Studio).
+**Gemini access:** Gemini 3.8 Flash — via Gemini API (Google AI Studio), using `GOOGLE_API_KEY`.
+
+Gemini costs logged by the direct client are estimates from reported token usage and configured
+token rates. Historical evaluation figures below retain the charges recorded for those runs.
 
 | Service                                   | What it does in Gapline                                                                                                                                                                                                 |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -281,7 +289,7 @@ You need:
 - The gcloud CLI with a named configuration whose account can use those APIs in that project (for
   example `roles/speech.client` and `roles/serviceusage.serviceUsageConsumer`):
   `gcloud config configurations create scene && gcloud auth login`.
-- A key for the Gemini calls, in the variable listed in `.env.example`. <!-- GEMINI_ACCESS_LABEL -->
+- A Gemini API key from Google AI Studio, set as `GOOGLE_API_KEY` in `.env.local`.
 
 ```sh
 npm ci
@@ -293,8 +301,9 @@ npm run test:media           # the FFmpeg workflow with mocked providers
 npm run typecheck
 ```
 
-In `.env.local`, set the model API key, `GCP_PROJECT_ID` (your project), and `GCLOUD_CONFIGURATION`
+In `.env.local`, set `GOOGLE_API_KEY`, `GCP_PROJECT_ID` (your project), and `GCLOUD_CONFIGURATION`
 (the gcloud configuration name). `FFMPEG_PATH` is optional and defaults to `ffmpeg` on your path.
+`GEMINI_API_KEY` is also accepted; `GOOGLE_API_KEY` takes precedence if both are set.
 `DATA_DIR` defaults to `./runtime`, and `DAILY_BUDGET_USD` caps API spending per UTC day (default 5).
 
 A fresh clone has no finished tracks. Generate one from the page, or from the command line with

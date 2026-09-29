@@ -1,5 +1,5 @@
 import { ModelOutputError } from "../errors";
-import { callStructured } from "../llm/openrouter";
+import { callStructured } from "../llm/gemini";
 import { clampToClip, CLIP_END_TOLERANCE_SECONDS } from "../store/analysis";
 import { reasoningEffort } from "../models";
 import { SceneMapSchema, type SceneMap } from "./schemas";

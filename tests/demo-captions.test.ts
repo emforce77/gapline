@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { SPEC } from "../scripts/deck/data/deploy";
+import { SUBMISSION } from "../scripts/deck/facts";
 import { assDocument, CAPTION_CHARS, captionGroups, sayEvent } from "../scripts/demo/ass";
 import { HEIGHT, MAX_SECONDS } from "../scripts/demo/config";
 import { film, GEMINI_NAME } from "../scripts/demo/facts";
@@ -212,6 +213,7 @@ describe("motion pages in the Korean film", () => {
         film.theme,
         film.category,
         new URL(film.service).host,
+        SUBMISSION.repoUrl?.replace(/^https:\/\//, "") ?? "",
         Object.values(SPEC).join(" "),
         hook.locked.text,
         hook.freaky.text,

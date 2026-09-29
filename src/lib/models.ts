@@ -1,14 +1,13 @@
 /**
- * Google models only (OpenRouter IDs). One place so the ledger, UI and docs agree.
- * Prices are OpenRouter list prices per 1M tokens, checked 2026-09-21 via /api/v1/models.
+ * Google models only (native Gemini API IDs). One place so the ledger, UI and docs agree.
  */
 export const MODELS = {
-  /** Watches, listens, writes and reviews. $0.75 in / $3.75 out. */
-  flash: "google/gemini-3.8-flash",
+  /** Watches, writes and reviews. */
+  flash: "gemini-3.8-flash",
 } as const;
 
 /** How Gemini is reached, as shown on the deck, video and README. Change it here and nowhere else. */
-export const GEMINI_ACCESS_LABEL = "via OpenRouter (development)";
+export const GEMINI_ACCESS_LABEL = "via Gemini API (Google AI Studio)";
 
 export type Effort = "low" | "medium" | "high";
 

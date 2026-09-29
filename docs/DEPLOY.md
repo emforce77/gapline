@@ -9,7 +9,7 @@ accounts and a secret, then one deploy command. Every step uses the gcloud CLI.
 - The gcloud CLI, signed in with an account that can enable APIs and create buckets, service accounts,
   secrets and IAM bindings in that project (Owner works). That account must also be allowed to act as
   the two service accounts below; Owner is, otherwise grant it `roles/iam.serviceAccountUser` on each.
-- An API key for the Gemini calls. <!-- GEMINI_ACCESS_LABEL: update with deploy/cloud-run.sh when the Gemini access changes. -->
+- A Gemini API key from Google AI Studio, with billing and quota available for the configured model.
 - For the sample: Node.js 20.9 or newer and FFmpeg, as in the README's "Run it locally".
 
 ## 1. Choose names
@@ -31,7 +31,7 @@ The deploy script expects these bucket and service-account names. `GCP_REGION`, 
 ```sh
 gcloud services enable --project "$PROJECT_ID" \
   run.googleapis.com cloudbuild.googleapis.com artifactregistry.googleapis.com \
-  speech.googleapis.com texttospeech.googleapis.com \
+  speech.googleapis.com texttospeech.googleapis.com generativelanguage.googleapis.com \
   secretmanager.googleapis.com storage.googleapis.com
 ```
 
@@ -71,14 +71,16 @@ gcloud projects add-iam-policy-binding "$PROJECT_ID" \
 
 ## 5. Store the model API key
 
-The deploy script mounts the secret `scene-ad-openrouter-key` as the service's model API key.
+The deploy script exposes the secret `scene-ad-gemini-key` as `GOOGLE_API_KEY` for direct calls to
+the Gemini API. Speech-to-Text and Text-to-Speech continue to use the service account.
 <!-- GEMINI_ACCESS_LABEL: the secret name and variable come from deploy/cloud-run.sh; change them together. -->
 
 ```sh
-read -rs MODEL_API_KEY   # paste the key; it is not shown
-printf '%s' "$MODEL_API_KEY" | gcloud secrets create scene-ad-openrouter-key \
+read -rs GOOGLE_API_KEY   # paste the Google AI Studio key; it is not shown
+printf '%s' "$GOOGLE_API_KEY" | gcloud secrets create scene-ad-gemini-key \
   --project "$PROJECT_ID" --data-file=-
-gcloud secrets add-iam-policy-binding scene-ad-openrouter-key --project "$PROJECT_ID" \
+unset GOOGLE_API_KEY
+gcloud secrets add-iam-policy-binding scene-ad-gemini-key --project "$PROJECT_ID" \
   --member "serviceAccount:$RUN_SA" --role roles/secretmanager.secretAccessor
 ```
 
@@ -96,7 +98,7 @@ to Artifact Registry, and Cloud Run starts the service with:
   900-second request timeout, and 0 to 2 instances;
 - the bucket mounted at `/data`, with `DATA_DIR`, `DATA_BUCKET`, `GCP_PROJECT_ID` and
   `DAILY_BUDGET_USD` set (the daily API allowance, 5 US dollars unless you set it);
-- the model API key from Secret Manager;
+- `GOOGLE_API_KEY` from Secret Manager;
 - public access, by turning off the invoker IAM check.
 
 ## 7. Add the sample

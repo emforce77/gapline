@@ -266,7 +266,7 @@ it("reports a clip with little room, and a failed run by code only", async () =>
   let writerStatus = 200;
   const llm = (data: unknown) =>
     new Response(
-      `data: ${JSON.stringify({ choices: [{ delta: { content: JSON.stringify(data) }, finish_reason: "stop" }], usage: { cost: 0.001 } })}\n\ndata: [DONE]\n`,
+      `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(data) }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 100, thoughtsTokenCount: 0, totalTokenCount: 200 } })}\n\n`,
     );
   const handler = async (url: string, init?: RequestInit) => {
     // Someone speaks from 0.1 s to 4.9 s: no silence long enough for a line.
@@ -281,15 +281,19 @@ it("reports a clip with little room, and a failed run by code only", async () =>
         ],
         metadata: { totalBilledDuration: "5s" },
       });
-    assert.equal(url, "https://openrouter.ai/api/v1/chat/completions");
-    const name = JSON.parse(String(init!.body)).response_format.json_schema.name;
-    if (name === "scene_map")
+    assert.equal(
+      url,
+      "https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:streamGenerateContent?alt=sse",
+    );
+    const properties = JSON.parse(String(init!.body)).generationConfig.responseFormat.text.schema
+      .properties;
+    if (properties.shots)
       return llm({
         shots: [{ start: 0, end: 5, setting: "studio", action: "a man talks", onScreenText: "" }],
         characters: [],
         sounds: [],
       });
-    if (name === "audio_description_script") {
+    if (properties.cues) {
       if (writerStatus !== 200)
         return new Response(
           JSON.stringify({ error: { message: "Insufficient credits (internal detail)" } }),
@@ -305,8 +309,8 @@ it("reports a clip with little room, and a failed run by code only", async () =>
     filmLanguageCode: "en-US",
     language: "en" as const,
     density: "standard" as const,
-    writerModel: "fixture",
-    reviewerModel: "fixture",
+    writerModel: "gemini-3.8-flash",
+    reviewerModel: "gemini-3.8-flash",
   };
   const events: TimedRunEvent[] = [];
   const { summary } = await withFetch(handler, () =>

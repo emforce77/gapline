@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { z, ZodError } from "zod";
 import { MAX_UPLOAD_BYTES, RUN_TIME_LIMIT_SECONDS } from "../src/lib/api-contract";
 import { ModelOutputError, ServiceError } from "../src/lib/errors";
-import { callStructured, MAX_RETRY_WAIT_SECONDS, ProviderError } from "../src/lib/llm/openrouter";
+import { callStructured, MAX_RETRY_WAIT_SECONDS, ProviderError } from "../src/lib/llm/gemini";
 import { FfmpegError } from "../src/lib/media/ffmpeg";
 import { renderGaps } from "../src/lib/pipeline/context";
 import { assessRoom, findGaps, SPEECH_GUARD_SECONDS } from "../src/lib/pipeline/gaps";
@@ -214,8 +214,10 @@ describe("request and failure contract", () => {
 
   it("returns a long Retry-After as a retryable error instead of waiting", async () => {
     const original = globalThis.fetch;
-    const oldKey = process.env.OPENROUTER_API_KEY;
-    process.env.OPENROUTER_API_KEY = "fixture";
+    const oldKey = process.env.GEMINI_API_KEY;
+    const oldGoogleKey = process.env.GOOGLE_API_KEY;
+    delete process.env.GOOGLE_API_KEY;
+    process.env.GEMINI_API_KEY = "fixture";
     let calls = 0;
     globalThis.fetch = async () => {
       calls++;
@@ -227,7 +229,7 @@ describe("request and failure contract", () => {
       await assert.rejects(
         callStructured({
           label: "watch",
-          model: "fixture",
+          model: "gemini-3.8-flash",
           system: "",
           user: [],
           schemaName: "fixture",
@@ -240,8 +242,10 @@ describe("request and failure contract", () => {
       assert.ok(Date.now() - started < MAX_RETRY_WAIT_SECONDS * 1000);
     } finally {
       globalThis.fetch = original;
-      if (oldKey === undefined) delete process.env.OPENROUTER_API_KEY;
-      else process.env.OPENROUTER_API_KEY = oldKey;
+      if (oldKey === undefined) delete process.env.GEMINI_API_KEY;
+      else process.env.GEMINI_API_KEY = oldKey;
+      if (oldGoogleKey === undefined) delete process.env.GOOGLE_API_KEY;
+      else process.env.GOOGLE_API_KEY = oldGoogleKey;
     }
   });
 });
