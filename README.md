@@ -7,13 +7,15 @@ screen. One press of Generate runs every step: Gapline writes each line for one 
 dialogue, checks it against a published audio-description guideline, voices it and measures the voice,
 rewrites any line a final check sends back, and mixes the track. It works in Korean and English.
 
-[Live demo](https://scene-ad-958994530029.asia-northeast3.run.app) |
+[Demo video (English, MP4)](https://github.com/emforce77/gapline/releases/download/v0.1.0-preview/gapline-demo-en.mp4) |
+[Pitch deck (PDF)](https://github.com/emforce77/gapline/releases/download/v0.1.0-preview/gapline-deck.pdf) |
 [Architecture](docs/ARCHITECTURE.md) | [Evaluation](docs/EVALUATION.md) | [Deploy your own](docs/DEPLOY.md)
 
-<!-- TODO(submission): add the demo video link (public YouTube, Vimeo or Google Drive, under 3 minutes). -->
-<!-- TODO(submission): add the link to the deck PDF. -->
+**Deployment status (29 September 2026):** the previous Cloud Run demo is offline. Redeployment is
+pending Google Cloud sign-in; the downloadable video and deck show the current local prototype.
 
-Built for AI Builder Cup 2026, theme _Media, Content & Digital Experiences_.
+Built by **Grab Your Dream** for AI Builder Cup 2026, theme _Media, Content & Digital Experiences_.
+See [submission details](docs/SUBMISSION.md) for the prepared materials and remaining delivery steps.
 
 ![The Gapline workspace on the sample film](docs/images/workspace.png)
 
@@ -46,7 +48,7 @@ Making one Korean film accessible still takes about three months, about ten spec
 
 ![The Gapline landing page](docs/images/landing.png)
 
-1. Open the [live demo](https://scene-ad-958994530029.asia-northeast3.run.app). It starts with seven
+1. Open the app after [starting it locally](#run-it-locally). It starts with seven
    seconds of _Tears of Steel_ where nobody speaks. Play **Original sound**, then **With description**,
    and turn on **Hide the picture** to hear it the way a blind viewer would.
 2. Choose **Open the sample** for the full 65 seconds, with Korean and English tracks. Press play, turn

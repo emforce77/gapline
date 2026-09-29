@@ -176,9 +176,9 @@ export const SUBMISSION: {
   team: string | null;
 } = {
   demoUrl: null,
-  repoUrl: null,
+  repoUrl: "https://github.com/emforce77/gapline",
   videoUrl: null,
-  team: null,
+  team: "Grab Your Dream",
 };
 
 export const FILM_CREDIT = "Tears of Steel © Blender Foundation, CC BY 3.0, mango.blender.org";

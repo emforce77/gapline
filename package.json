@@ -2,7 +2,7 @@
   "name": "scene-ad",
   "version": "0.1.0",
   "private": true,
-  "description": "Scene: automatic audio description that fits the silence between the lines.",
+  "description": "Gapline: automatic audio description that fits the silence between the lines.",
   "scripts": {
     "dev": "WATCHPACK_POLLING=true next dev --webpack -H 127.0.0.1 -p 21960",
     "build": "next build",

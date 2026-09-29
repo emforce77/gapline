@@ -7,7 +7,7 @@ import { CATEGORY, SUBMISSION, THEME } from "../facts";
 import { esc, slide } from "../html";
 import { stillUrl } from "../stills";
 
-const PICTURE_H = 760;
+const PICTURE_H = 728;
 /** How far above the picture's lower edge the subtitle sits, as a film sets its subtitles. */
 const SUB_ABOVE_EDGE = 56;
 /** The text block under the picture: name on the left, tagline and sentence on the right. */
