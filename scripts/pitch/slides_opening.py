@@ -25,7 +25,11 @@ from pitch_theme import (
 )
 
 COVER_VALUE_PT = 18
-COVER_TEXT_W = Emu(int(5.9 * 914400))
+# Wide enough for "Problem Statement: Media, Content & Digital Experiences" on one line at the
+# template's 18 pt (6.71 in measured, with the template's 1 in list indent and 0.1 in insets).
+COVER_TEXT_W = Emu(int(7.95 * 914400))
+# The product's name sits right of the longest detail line.
+PRODUCT_BOX = (8.15, 3.28, 1.55, 1.72)
 MONTHS = "Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec".split()
 
 
@@ -57,11 +61,11 @@ def fill_cover(slide: object, data: dict, canvas: Canvas) -> None:
         raise RuntimeError(f"the cover's team details had {filled} of {len(values)} labels")
     text(
         canvas,
-        box(6.35, 3.28, 3.3, 1.72),
+        box(*PRODUCT_BOX),
         [
-            p(r("Gapline", (FAMILY_SEMIBOLD, 34, INK))),
-            p(r("Descriptions that fit", LEAD)),
-            p(r("between the lines.", LEAD), space_after=8),
+            p(r("Gapline", (FAMILY_SEMIBOLD, 28, INK))),
+            p(r("Descriptions that fit", (LEAD[0], 12, LEAD[2]))),
+            p(r("between the lines.", (LEAD[0], 12, LEAD[2])), space_after=8),
             # The themes page also asks for a category (Healthcare, Education, ... Accessibility).
             p(r(f"Category: {team['category']}", LABEL)),
         ],
