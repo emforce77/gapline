@@ -39,7 +39,8 @@ def fill_cover(slide: object, data: dict, canvas: Canvas) -> None:
     values = {
         "Team name:": team["name"],
         "Team leader name:": team["leader"] or "",
-        "Problem Statement:": team["category"],
+        # The chosen theme: the FAQ reads "one solution under one problem statement/theme".
+        "Problem Statement:": team["theme"],
     }
     filled = 0
     for paragraph in details.text_frame.paragraphs:
@@ -61,7 +62,8 @@ def fill_cover(slide: object, data: dict, canvas: Canvas) -> None:
             p(r("Gapline", (FAMILY_SEMIBOLD, 34, INK))),
             p(r("Descriptions that fit", LEAD)),
             p(r("between the lines.", LEAD), space_after=8),
-            p(r(f"Theme: {team['theme']}", LABEL)),
+            # The themes page also asks for a category (Healthcare, Education, ... Accessibility).
+            p(r(f"Category: {team['category']}", LABEL)),
         ],
         "product",
     )
