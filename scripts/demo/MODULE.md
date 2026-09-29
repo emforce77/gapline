@@ -146,6 +146,16 @@ OpenRouter) on the cloud page. It never ticks the human watch-through.
 
 ## Debug log
 
+- [2026-09-29] The owner saw the result scene's fit meter read "Spoken 3.7 s" under a caption
+  saying "3.6 seconds of voice". Measured: the line's trimmed audio is 3.6458 s and its recorded
+  length 3.65 s; the app rounds that recorded value half up with `Intl.NumberFormat` (3.7), while the
+  storyboard used `toFixed(1)`, which rounds the binary double 3.6499… down (3.6). Every second the
+  film prints (captions, `secs` on the pages, the page-side counter) now goes through `tenths` in
+  `facts.ts`: 0.01 s first, then the app's `formatTenths` (`src/lib/format.ts`). A before/after dump
+  of every caption and page text in both languages changed only that caption (3.6 → 3.7); lengths
+  and caption starts are identical, so the recordings still hold. A test pins the caption to the
+  meter's number from the run's own cue.
+
 - [2026-09-29] The owner settled the length: under 3 minutes, not 3 to 4 (the pasted rule was the
   odd one out; the template says "3 minutes", the FAQ "under 3 minutes"). The checks and next
   scenes left the film (`pages/checks.ts`, `pages/next.ts`, and the newspaper, launch-call and price
@@ -315,9 +325,11 @@ OpenRouter) on the cloud page. It never ticks the human watch-through.
 recordings: EN 176.6 s (2:56.57), KO 176.8 s (2:56.83). Every kept scene has its old length, and its
 captions and sync are unchanged. The length, sync, loudness and caption boxes pass. The still-picture
 box stays open only for the replay stretches it flagged before (EN 6.2 s at 85.2 s, KO 5.1 s), and
-the human watch-through box is still open. Release v0.2.0-preview now serves these files: anonymous
-downloads match by SHA-256 (EN `538c78217f1835212b0e36448e0e6be162a6c7ea35a38349271c31347874ffa3`,
-25,908,696 bytes; KO `550d2072…`). The Google Drive submission link still plays the 3:30 cut until
+the human watch-through box is still open. Rebuilt the same evening with the result caption's
+seconds rounded as the app's meter shows them (3.7, debug log): only that caption's 139 EN and 115 KO
+frames differ. Release v0.2.0-preview serves these files: anonymous downloads match by SHA-256 (EN
+`c4969c93de1f43a03555fb455493b45b33aee6338445bd0a1e6a1a4c5fda3fff`, 25,908,467 bytes; KO
+`ec3e47b7…`). The Google Drive submission link still plays the 3:30 cut until
 the owner uploads this film as a new version of the same file.
 
 2026-09-29, 3:30 (superseded the same evening):

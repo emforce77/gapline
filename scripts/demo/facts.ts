@@ -6,6 +6,7 @@
 import { readFileSync } from "node:fs";
 import { MAX_UPLOAD_SECONDS } from "../../src/lib/api-contract";
 import { GUIDELINE_RULES } from "../../src/lib/pipeline/guidelines";
+import { formatTenths, toRecordedSeconds } from "../../src/lib/format";
 import { GEMINI_ACCESS_LABEL, MODELS } from "../../src/lib/models";
 import { liveCheck } from "../deck/data/live-check";
 import { pin } from "../deck/data/runs";
@@ -81,6 +82,12 @@ export const film = {
   /** The deck's benchmarking table (vendor pages and code read 23 Sep 2026). */
   compare: { columns: COMPARE_COLUMNS, competitors: COMPETITORS, gapline: SCENE_ROW },
 };
+
+/**
+ * Seconds to one decimal, as the app prints them (src/lib/format.ts): from the 0.01 s recorded
+ * value, rounded half up. The app's fit meter reads a 3.65 s line as 3.7; `toFixed(1)` gives 3.6.
+ */
+export const tenths = (seconds: number): string => formatTenths(toRecordedSeconds(seconds), "en");
 
 /** "5 min 49 s" / "5분 49초" */
 export function minutesSeconds(seconds: number, lang: "en" | "ko"): string {

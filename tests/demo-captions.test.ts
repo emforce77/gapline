@@ -1,14 +1,16 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 import { SPEC } from "../scripts/deck/data/deploy";
+import { line as sampleLine, run as sampleRun } from "../scripts/deck/data/sample";
 import { SUBMISSION } from "../scripts/deck/facts";
 import { assDocument, CAPTION_CHARS, captionGroups, sayEvent } from "../scripts/demo/ass";
 import { HEIGHT, MAX_SECONDS } from "../scripts/demo/config";
-import { film, GEMINI_NAME } from "../scripts/demo/facts";
+import { film, GEMINI_NAME, tenths } from "../scripts/demo/facts";
 import { labels } from "../scripts/demo/labels";
 import { PAGES } from "../scripts/demo/pages/index";
 import { buildStoryboard, LISTEN, type PageId, type Scene } from "../scripts/demo/storyboard";
 import { MIN_CAPTION_S, planScene, READING_CPS, readingSeconds } from "../scripts/demo/timing";
+import { formatSeconds, toRecordedSeconds } from "../src/lib/format";
 
 const lines = (text: string, lang: "en" | "ko") => captionGroups(text, lang).flat();
 const LANGS = ["en", "ko"] as const;
@@ -187,6 +189,25 @@ describe("the film's storyboard", () => {
       sentences("ko").filter((s) => retired.test(s)),
       [],
     );
+  });
+
+  it("captions the result line's seconds as the app's fit meter prints them", () => {
+    // The owner saw "Spoken 3.7 s" on the meter under a caption saying 3.6 (2026-09-29): the line
+    // records 3.65 s, which toFixed(1) rounds down and the app rounds up.
+    assert.equal(tenths(3.65), "3.7");
+    const cue = sampleRun.cues.find((c) => c.id === sampleLine.cueId)!;
+    const measured = cue.seconds ?? cue.versions.at(-1)!.voice!.seconds;
+    const room = cue.windowEnd - cue.start;
+    const result = scenes.find((s) => s.id === "result")!;
+    const said = result.parts.find((p) => "caption" in p)!;
+    if (!("caption" in said)) throw new Error("the result scene opens without a caption");
+    for (const lang of LANGS) {
+      const text = said.caption[lang];
+      for (const shown of [measured, room]) {
+        const number = formatSeconds(toRecordedSeconds(shown), lang).replace(/ s$|초$/, "");
+        assert.ok(text.includes(number), `${lang}: "${text}" lacks the meter's ${number}`);
+      }
+    }
   });
 
   it("starts the listen after the voice of the line before it", () => {

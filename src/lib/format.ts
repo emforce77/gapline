@@ -37,10 +37,19 @@ export function toRecordedSeconds(seconds: number): number {
   return Math.round(seconds * 100) / 100;
 }
 
-export function formatSeconds(seconds: number, lang: UiLang): string {
-  const n = new Intl.NumberFormat(LOCALE[lang], {
+/**
+ * One decimal, rounded half up on the decimal value (3.65 reads 3.7). `toFixed` rounds the binary
+ * double instead (3.65 is stored as 3.6499…, so it reads 3.6); anything printed next to the app's
+ * seconds must use this.
+ */
+export function formatTenths(seconds: number, lang: UiLang): string {
+  return new Intl.NumberFormat(LOCALE[lang], {
     maximumFractionDigits: 1,
     minimumFractionDigits: 1,
   }).format(seconds);
+}
+
+export function formatSeconds(seconds: number, lang: UiLang): string {
+  const n = formatTenths(seconds, lang);
   return lang === "ko" ? `${n}초` : `${n} s`;
 }

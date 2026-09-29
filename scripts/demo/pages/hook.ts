@@ -6,7 +6,7 @@
  * with the sentence that says so, then Generate and what one press of it runs (a product claim).
  */
 import { dictionary } from "../../../src/i18n";
-import { film } from "../facts";
+import { film, tenths } from "../facts";
 import { textLang } from "../../deck/glosses";
 import { labels, lineGloss } from "../labels";
 import { masterCut } from "../master";
@@ -19,7 +19,7 @@ const KO_DISPLAY_CSS = "font-family:var(--sans); font-style:normal; font-weight:
 
 /** A number with its unit; the Korean unit is set in Pretendard, whatever face the number uses. */
 const unit = (x: number, lang: PageTiming["lang"]): string =>
-  lang === "ko" ? `${x.toFixed(1)}<span class="u">초</span>` : esc(secs(x, lang));
+  lang === "ko" ? `${tenths(x)}<span class="u">초</span>` : esc(secs(x, lang));
 
 const DARK = { ctx: 52, close: 360, count: 318, meter: 412, nowords: 438, sum: 270, dlg: 616 };
 

@@ -9,7 +9,7 @@
  * optional edit once, as an offer. The words drawn over the app live in labels.ts.
  */
 import type { Language } from "../../src/lib/pipeline/schemas";
-import { film } from "./facts";
+import { film, tenths } from "./facts";
 
 export type Beat = "upload" | "replay" | "review" | "edit" | "result";
 export type PageId = "dark" | "seven" | "stakes" | "constraint" | "cloud" | "compare" | "close";
@@ -82,13 +82,13 @@ export function buildStoryboard(): Scene[] {
   });
   const courtKo = `${court.getUTCFullYear()}년 ${court.getUTCMonth() + 1}월`;
   const hand = film.handMade;
-  const silence = film.hook.silence.toFixed(1);
+  const silence = tenths(film.hook.silence);
   const wonKo = `${(hand.wonMillions * 100).toLocaleString("en-US")}만 원`;
   const gaps = film.opening.gaps.length;
-  const shortest = film.opening.shortest.toFixed(1);
+  const shortest = tenths(film.opening.shortest);
   const clip = film.original.clipSeconds;
-  const voiced = film.line.voiced.toFixed(1);
-  const room = film.line.room.toFixed(1);
+  const voiced = tenths(film.line.voiced);
+  const room = tenths(film.line.room);
   // The review scene says the draft named a city before the picture shows one.
   if (film.line.rejectedBy !== "review" || !/\bcity\b/i.test(film.line.draft.quote))
     throw new Error(

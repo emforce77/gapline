@@ -14,6 +14,7 @@ import type { Language } from "../../../src/lib/pipeline/schemas";
 import { PRETENDARD_STATIC, VENDORED_FONTS } from "../../deck/paths";
 import { BASE_CSS, FONT_FILES } from "../../deck/theme";
 import { CLIP_FILE, CONTENT_HEIGHT, PAGES_DIR, WIDTH } from "../config";
+import { tenths } from "../facts";
 
 export const STAGE = { w: WIDTH, h: CONTENT_HEIGHT, margin: 96 };
 
@@ -38,9 +39,9 @@ const NOTE_MAX_CHARS = 96;
 /** A page's words in the film's language. */
 export const pick = <T>(lang: Language, words: Record<Language, T>): T => words[lang];
 
-/** Seconds as the pages print them: one decimal, as the captions say them ("2.1 s", "2.1초"). */
+/** Seconds as the pages print them: one decimal, as the captions and the app do ("2.1 s", "2.1초"). */
 export const secs = (x: number, lang: Language): string =>
-  lang === "ko" ? `${x.toFixed(1)}초` : `${x.toFixed(1)} s`;
+  lang === "ko" ? `${tenths(x)}초` : `${tenths(x)} s`;
 
 /** A footnote (HTML), checked to stay short enough for one line. */
 export function note(html: string): string {
@@ -71,7 +72,10 @@ const $ = (s) => document.querySelector(s);
 const $$ = (s) => [...document.querySelectorAll(s)];
 function reveal(el, p, dy = 18) { el.style.opacity = p; el.style.transform = 'translateY(' + ((1 - p) * dy) + 'px)'; }
 function fadeOut(el, p) { el.style.opacity = 1 - p; }
-const fmt = (x, d = 1) => x.toFixed(d);
+// Rounded half up on the decimal value, like the app's seconds (not toFixed's binary rounding).
+const fmt = (x, d = 1) =>
+  new Intl.NumberFormat('en-US', { minimumFractionDigits: d, maximumFractionDigits: d })
+    .format(Math.round(x * 100) / 100);
 `;
 
 export function pageHtml(p: {
