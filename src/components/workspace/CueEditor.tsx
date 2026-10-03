@@ -1,12 +1,14 @@
 "use client";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { runErrorMessage } from "@/lib/client/api-errors";
+import { formatDuration } from "@/lib/format";
 import type { Cue, Gap, Language } from "@/lib/pipeline/schemas";
 import { editErrorMessage, type EditFailureText } from "./edit-errors";
 import { postEdit } from "./edit-request";
 import { RemoveLine } from "./RemoveLine";
+import { useElapsedSeconds } from "./use-elapsed";
 
 export interface EditorProps {
   projectId: string;
@@ -31,13 +33,21 @@ function editState(cue: Cue, cues: Cue[], gaps: Gap[]): "ok" | "legacy" | "none"
   return "ok";
 }
 
+/** What went wrong with the last edit or removal, under the form that made it. */
+interface EditFailure {
+  action: "edit" | "remove";
+  text: EditFailureText;
+}
+
 /**
  * "Edit this line", folded until the editor asks for it, so the review history reads first. A line
- * in the track can also be removed from here; while either request runs, both are locked.
+ * in the track can also be removed from here; while either request runs, both are locked. Only the
+ * latest request's error shows: starting an edit or a removal clears the one before.
  */
 export function EditLine(props: EditorProps) {
   const { t } = useI18n();
   const [locked, setLocked] = useState(false);
+  const [failure, setFailure] = useState<EditFailure | null>(null);
   const state = editState(props.cue, props.cues, props.gaps);
   if (state === "none") return null;
   if (state === "legacy") return <p className="label">{t.editor.legacy}</p>;
@@ -48,7 +58,13 @@ export function EditLine(props: EditorProps) {
   return (
     <details className="edit-line">
       <summary className="button">{t.editor.title}</summary>
-      <CueEditor {...props} onBusy={onBusy} locked={locked} />
+      <CueEditor
+        {...props}
+        onBusy={onBusy}
+        locked={locked}
+        error={failure?.action === "edit" ? failure.text : null}
+        onError={(text) => setFailure(text && { action: "edit", text })}
+      />
       {props.cue.status === "fits" ? (
         <RemoveLine
           projectId={props.projectId}
@@ -57,6 +73,8 @@ export function EditLine(props: EditorProps) {
           onSaved={props.onSaved}
           onBusy={onBusy}
           locked={locked}
+          error={failure?.action === "remove" ? failure.text : null}
+          onError={(text) => setFailure(text && { action: "remove", text })}
         />
       ) : null}
     </details>
@@ -73,13 +91,24 @@ function CueEditor({
   onSaved,
   onBusy,
   locked,
-}: EditorProps & { locked: boolean }) {
+  error,
+  onError: setError,
+}: EditorProps & {
+  locked: boolean;
+  error: EditFailureText | null;
+  onError: (error: EditFailureText | null) => void;
+}) {
   const { t, lang } = useI18n();
   const [text, setText] = useState(cue.versions.at(-1)!.text);
   const [start, setStart] = useState(String(cue.start));
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<EditFailureText | null>(null);
   const request = useRef<{ value: string; id: string } | null>(null);
+  const elapsed = useElapsedSeconds(busy);
+  const errorNote = useRef<HTMLParagraphElement>(null);
+  // The message renders under the Save button, often below the inspector's fold: bring it into view.
+  useEffect(() => {
+    if (error) errorNote.current?.scrollIntoView({ block: "nearest" });
+  }, [error]);
   const gap = gaps.find((g) => g.id === cue.gapId)!;
   const peers = cues
     .filter((c) => (c.status === "fits" || c.id === cue.id) && c.gapId === cue.gapId)
@@ -166,10 +195,18 @@ function CueEditor({
         type="submit"
         disabled={locked || !text.trim() || unchanged}
       >
-        {busy ? t.editor.saving : t.editor.save}
+        {busy ? (
+          <>
+            <span className="spinner" aria-hidden="true" />
+            {fill(t.editor.saving, { elapsed: formatDuration(elapsed, lang) })}
+          </>
+        ) : (
+          t.editor.save
+        )}
       </button>
       {error ? (
-        <p className="ws-error" role="alert">
+        <p className="ws-error" role="alert" ref={errorNote}>
+          <span aria-hidden="true">⚠ </span>
           {error.text}
           {error.reviewer ? (
             <>

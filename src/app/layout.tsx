@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
-import localFont from "next/font/local";
 import { cookies } from "next/headers";
 import { asUiLang, dictionary, UI_LANG_COOKIE } from "@/i18n";
+// Self-hosted unicode-range subsets (font-display: swap): a page fetches only the subsets its
+// text uses instead of the 2 MB full variable font.
+import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
 import "@/styles/tokens.css";
 import "@/styles/landing-story.css";
 import "@/styles/landing.css";
@@ -9,13 +11,6 @@ import "@/styles/workspace.css";
 import "@/styles/player.css";
 import "@/styles/inspector.css";
 import "@/styles/timeline.css";
-
-const pretendard = localFont({
-  src: "../../node_modules/pretendard/dist/web/variable/woff2/PretendardVariable.woff2",
-  display: "swap",
-  weight: "45 920",
-  variable: "--font-pretendard",
-});
 
 export async function generateMetadata(): Promise<Metadata> {
   const lang = asUiLang((await cookies()).get(UI_LANG_COOKIE)?.value);
@@ -27,7 +22,7 @@ export default async function RootLayout({ children }: { children: React.ReactNo
   const lang = asUiLang((await cookies()).get(UI_LANG_COOKIE)?.value);
   const t = dictionary(lang);
   return (
-    <html lang={lang} className={pretendard.variable}>
+    <html lang={lang}>
       <body>
         <a className="skip-link" href="#main">
           {t.nav.skip}

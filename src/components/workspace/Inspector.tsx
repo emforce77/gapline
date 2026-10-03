@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type Ref } from "react";
 import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { sentBackByFinalCheck } from "@/components/landing/RejectionStory";
@@ -12,18 +12,22 @@ import { listedStages } from "./listed-stages";
 import { VersionHistory } from "./VersionHistory";
 
 /**
- * Stage list with elapsed time for the running stage. clockRate is 1 while live, the replay speed
- * during a replay, and 0 for a finished run. trace is the whole saved run during a replay, null
- * otherwise; which stages are listed is decided by listedStages.
+ * Stage list with elapsed time for the running stage; where a failed or interrupted run stopped
+ * reads "Stopped", and where the page lost touch with it "Connection lost". clockRate is 1 while
+ * live, the replay speed during a replay, and 0 for a finished run. trace is the whole saved run
+ * during a replay, null otherwise; which stages are listed is decided by listedStages. `ref` lets
+ * the page move focus here when the control that had it goes away.
  */
 export function StageList({
   view,
   trace,
   clockRate,
+  ref,
 }: {
   view: RunView;
   trace: RunView | null;
   clockRate: number;
+  ref?: Ref<HTMLOListElement>;
 }) {
   const { t, lang } = useI18n();
   const [now, setNow] = useState(() => Date.now());
@@ -39,7 +43,7 @@ export function StageList({
   const stages = listedStages(view, trace);
 
   return (
-    <ol className="stages">
+    <ol ref={ref} className="stages" tabIndex={-1}>
       {stages.map((stage) => {
         const s = view.stages[stage];
         let status: React.ReactNode = <span className="label">{t.stages.waiting}</span>;
@@ -63,6 +67,20 @@ export function StageList({
             <span className="label">
               <span aria-hidden="true">✓ </span>
               {t.stages.reused}
+            </span>
+          );
+        } else if (s.state === "stopped") {
+          status = (
+            <span className="label">
+              <span aria-hidden="true">✕ </span>
+              {t.stages.stopped}
+            </span>
+          );
+        } else if (s.state === "lost") {
+          status = (
+            <span className="label">
+              <span aria-hidden="true">⚠ </span>
+              {t.stages.lost}
             </span>
           );
         }

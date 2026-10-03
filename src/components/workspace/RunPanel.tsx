@@ -22,6 +22,7 @@ export function RunPanel({
   canReplay,
   replaySpeed,
   emptyHint,
+  sample,
   onChooseRun,
   onNarration,
   onDensity,
@@ -39,6 +40,8 @@ export function RunPanel({
   canReplay: boolean;
   replaySpeed: number;
   emptyHint: string | null;
+  /** The shared sample: what this viewer generates or edits on it is theirs alone. */
+  sample: boolean;
   onChooseRun: (runId: string) => void;
   onNarration: (language: Language) => void;
   onDensity: (density: Density) => void;
@@ -139,6 +142,7 @@ export function RunPanel({
       </div>
       {current ? <p className="label run-note">{t.workspace.liveNote}</p> : null}
       {!current && emptyHint ? <p className="label run-note">{emptyHint}</p> : null}
+      {sample ? <p className="label run-note">{t.workspace.samplePrivate}</p> : null}
       {mode === "replay" ? (
         <p className="replay-badge">
           <span aria-hidden="true">▶▶</span> {fill(t.workspace.replaying, { speed: replaySpeed })}

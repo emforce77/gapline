@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useI18n } from "@/i18n/client";
-import type { ActiveRun, LiveStatus } from "@/lib/api-contract";
+import type { ActiveRun, LiveStatus, RunStatus } from "@/lib/api-contract";
 import type { TimedRunEvent } from "@/lib/pipeline/events";
 import type { Density, Language } from "@/lib/pipeline/schemas";
 import type { RunListing } from "@/lib/store/projects";
@@ -25,13 +25,30 @@ export interface LiveRunHandlers {
   /** A run is about to be shown from its first event: reset the view and enter live mode. */
   onBegin: () => void;
   onEvent: (event: TimedRunEvent) => void;
-  /** The full event list of the followed run so far (each poll). */
-  onEvents: (events: TimedRunEvent[]) => void;
+  /**
+   * The full event list of the followed run so far (each poll), with its status: an "interrupted"
+   * run has no final event, so only the status says it stopped.
+   */
+  onEvents: (events: TimedRunEvent[], status: RunStatus) => void;
   /**
    * The run is over. `runs` is the refreshed list; `finishedRunId` is set when it produced a result;
    * `started` is false when it never began (refused, or unreachable), so nothing of it is worth showing.
    */
   onEnd: (runs: RunListing[] | null, finishedRunId: string | null, started: boolean) => void;
+  /** The followed run failed (run_failed) or was interrupted; `message` says why and what next. */
+  onStopped: (message: string) => void;
+  /**
+   * The page stopped checking on the followed run `runId`: the server could not be reached for about
+   * a minute. The run may still finish there; `message` says so and that it can be checked again.
+   */
+  onLost: (runId: string, message: string) => void;
+  /**
+   * Checking again on a run the page lost (checkAgain): enter live mode but keep the view, since
+   * only a check that answers says more. The first that does replaces it (onEvents); if none does,
+   * onLost comes again.
+   */
+  onCheckAgain: () => void;
+  /** Anything else: a refused start, an unreachable server, a list that did not load. */
   onError: (message: string) => void;
 }
 
@@ -111,16 +128,16 @@ export function useLiveRun({
           const { events, status: runStatus } = await fetchRun(projectId, runId);
           if (own !== generation.current) return;
           failures = 0;
-          latest.current.onEvents(events);
+          latest.current.onEvents(events, runStatus);
           if (runStatus === "running") {
             timer.current = window.setTimeout(check, POLL_MS);
             return;
           }
           if (runStatus === "failed") {
             const failed = events.findLast((e) => e.type === "run_failed");
-            latest.current.onError(runErrorMessage(failed ?? {}, t, lang, runId));
+            latest.current.onStopped(runErrorMessage(failed ?? {}, t, lang, runId));
           }
-          if (runStatus === "interrupted") latest.current.onError(t.live.interrupted);
+          if (runStatus === "interrupted") latest.current.onStopped(t.live.interrupted);
           await end(runStatus === "done" ? runId : null);
         } catch (error) {
           if (own !== generation.current) return;
@@ -132,8 +149,10 @@ export function useLiveRun({
           failures += 1;
           console.warn(`run ${runId}: check ${failures} failed`, error);
           if (failures >= MAX_POLL_FAILURES) {
-            latest.current.onError(t.live.unreachable);
-            await end(null);
+            // Not end(): its run list request would fail the same way and replace this message.
+            setConnection(null);
+            setFollowed(null);
+            latest.current.onLost(runId, t.live.unreachable);
             return;
           }
           timer.current = window.setTimeout(check, POLL_MS);
@@ -152,6 +171,17 @@ export function useLiveRun({
       setFollowed(runId);
       setConnection("resumed");
       setActive((list) => list.filter((a) => a.runId !== runId));
+      poll(runId);
+    },
+    [poll],
+  );
+
+  /** Polls a run the page lost touch with (onLost) again, keeping what the page showed of it. */
+  const checkAgain = useCallback(
+    (runId: string) => {
+      latest.current.onCheckAgain();
+      setFollowed(runId);
+      setConnection("resumed");
       poll(runId);
     },
     [poll],
@@ -177,7 +207,7 @@ export function useLiveRun({
         if (event.type === "run_done") seen.outcome = "done";
         if (event.type === "run_failed") {
           seen.outcome = "failed";
-          latest.current.onError(runErrorMessage(event, t, lang, seen.runId));
+          latest.current.onStopped(runErrorMessage(event, t, lang, seen.runId));
         }
         latest.current.onEvent(event);
       });
@@ -231,5 +261,5 @@ export function useLiveRun({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  return { connection, followed, active, status, start, follow };
+  return { connection, followed, active, status, start, follow, checkAgain };
 }

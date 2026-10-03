@@ -133,6 +133,31 @@
   color: var(--muted);
 }
 
+/* A seek in buffered media waits a few frames; the cue shows only for a wait one would notice.
+   The delay is not motion, so it stays under reduced motion. */
+.seven-caption .loading {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  animation: seven-appear 0s 250ms both;
+}
+
+.seven-controls .spinner {
+  animation:
+    spin 800ms linear infinite,
+    seven-appear 0s 250ms both;
+}
+
+@keyframes seven-appear {
+  from {
+    visibility: hidden;
+  }
+}
+
+.seven-caption .failed {
+  color: var(--danger);
+}
+
 /* The whole window is one room to speak; the lines sit inside it. */
 .seven-window {
   position: relative;

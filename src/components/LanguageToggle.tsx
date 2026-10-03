@@ -9,7 +9,7 @@ export function LanguageToggle({ lang, label }: { lang: UiLang; label: string })
   return (
     <button
       type="button"
-      className="button ghost"
+      className="button ghost lang-toggle"
       lang={lang === "en" ? "ko" : "en"}
       onClick={() => {
         const next: UiLang = lang === "en" ? "ko" : "en";

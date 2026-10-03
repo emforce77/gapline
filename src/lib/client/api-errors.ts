@@ -170,11 +170,21 @@ export function uploadErrorMessage(
 export interface RunFailure {
   code?: string;
   resetAt?: string;
+  /** run_failed's flag: false when trying again would fail the same way (the page offers no retry). */
+  retryable?: boolean;
+}
+
+type NoRetryCode = keyof Dictionary["live"]["noRetry"];
+
+/** Codes whose failure may or may not repeat have a second sentence for when it would. */
+function hasNoRetryText(code: RunFailureCode, t: Dictionary): code is NoRetryCode {
+  return Object.hasOwn(t.live.noRetry, code);
 }
 
 /**
  * The sentence for a run that did not start or did not finish. Budget refusals name the renewal
  * time; other failures after the run started carry the run id as a reference for the server log.
+ * A code that may or may not repeat follows the run's `retryable` flag, like the page's retry button.
  */
 export function runErrorMessage(
   failure: RunFailure,
@@ -189,7 +199,12 @@ export function runErrorMessage(
     return `${errors.budget_daily} ${fill(t.live.renews, formatReset(failure.resetAt, lang, now))}`;
   }
   if (isBudgetCode(failure.code)) return errors[failure.code];
-  const message = isRunFailureCode(failure.code) ? errors[failure.code] : errors.unknown;
+  const code = isRunFailureCode(failure.code) ? failure.code : null;
+  const message = !code
+    ? errors.unknown
+    : failure.retryable === false && hasNoRetryText(code, t)
+      ? t.live.noRetry[code]
+      : errors[code];
   return runId ? `${message} ${fill(t.live.reference, { runId })}` : message;
 }
 

@@ -19,6 +19,10 @@ export interface NarrationTrack {
 }
 
 type Version = "original" | "described";
+type TrackLanguage = NarrationTrack["language"];
+
+/** Screen readers hear "Loading" only for a wait a listener would notice, not a seek in buffered media. */
+const ANNOUNCE_LOADING_AFTER_MS = 1_000;
 
 /**
  * The landing's proof: one short window of the sample, played as the film's own soundtrack or with
@@ -43,19 +47,33 @@ export function SevenSeconds({
     idle: string;
     soundtrack: string;
     waiting: string;
+    quiet: string;
+    loading: string;
+    paused: string;
+    ended: string;
+    failed: string;
     pause: string;
   };
 }) {
   const video = useRef<HTMLVideoElement>(null);
   const pendingPlay = useRef(false);
   const [version, setVersion] = useState<Version | null>(null);
-  const [trackIndex, setTrackIndex] = useState(0);
+  // The visitor's narration, kept by language: the list is ordered by UI language, which a refresh
+  // can change. Until they pick one or play the described version, the first (the UI's) stands.
+  const [chosen, setChosen] = useState<TrackLanguage | null>(null);
   const [playing, setPlaying] = useState(false);
+  // From a press until sound plays, and again whenever playback stops to wait for data.
+  const [loading, setLoading] = useState(false);
+  const [slowLoading, setSlowLoading] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const [failed, setFailed] = useState(false);
   const [time, setTime] = useState(windowStart);
   const [hidden, setHidden] = useState(false);
-  const track = tracks[trackIndex];
-  const src =
-    version === "described" ? track.describedUrl : `${originalUrl}#t=${windowStart.toFixed(1)}`;
+  const trackIn = (lang: TrackLanguage) => tracks.find((tr) => tr.language === lang);
+  // A refresh can drop the chosen narration (its result was unpinned); the first one stands in.
+  const track = (chosen && trackIn(chosen)) ?? tracks[0];
+  const originalSrc = `${originalUrl}#t=${windowStart.toFixed(1)}`;
+  const src = version === "described" ? track.describedUrl : originalSrc;
 
   // Poll while playing: timeupdate fires only every ~250 ms, too coarse to stop on the window's end.
   useEffect(() => {
@@ -68,6 +86,7 @@ export function SevenSeconds({
         el.pause();
         el.currentTime = windowStart;
         setTime(windowEnd);
+        setEnded(true);
         return;
       }
       setTime(el.currentTime);
@@ -77,37 +96,65 @@ export function SevenSeconds({
     return () => cancelAnimationFrame(frame);
   }, [playing, windowStart, windowEnd]);
 
+  useEffect(() => {
+    if (!loading) return;
+    const timer = window.setTimeout(() => setSlowLoading(true), ANNOUNCE_LOADING_AFTER_MS);
+    return () => {
+      window.clearTimeout(timer);
+      setSlowLoading(false);
+    };
+  }, [loading]);
+
   function startFromWindow(el: HTMLVideoElement) {
     if (el.currentTime < windowStart || el.currentTime >= windowEnd - 0.05) {
       el.currentTime = windowStart;
     }
-    void el.play();
+    setTime(el.currentTime);
+    el.play().catch((error: unknown) => {
+      // A pause or a new source interrupts a pending play; that was the visitor's own choice.
+      if (error instanceof DOMException && error.name === "AbortError") return;
+      setLoading(false);
+      throw error;
+    });
+    // play() unpauses at once; its play event follows a task later.
+    setPlaying(!el.paused);
   }
 
-  function press(next: Version, nextTrack = trackIndex) {
+  function press(next: Version, nextLanguage = track.language) {
     const el = video.current;
     if (!el) return;
-    if (next === version && nextTrack === trackIndex && playing) {
+    if (next === version && nextLanguage === track.language && (playing || loading)) {
+      pendingPlay.current = false;
       el.pause();
+      // pause() pauses at once; its pause event follows a task later.
+      setPlaying(false);
+      setLoading(false);
       return;
     }
-    const nextSrc =
-      next === "described"
-        ? tracks[nextTrack].describedUrl
-        : `${originalUrl}#t=${windowStart.toFixed(1)}`;
+    const nextSrc = next === "described" ? trackIn(nextLanguage)!.describedUrl : originalSrc;
     setVersion(next);
-    setTrackIndex(nextTrack);
-    if (nextSrc === src) {
+    if (next === "described") setChosen(nextLanguage);
+    setEnded(false);
+    setFailed(false);
+    if (nextSrc === src && !el.error) {
       startFromWindow(el);
       return;
     }
-    // The new source starts loading after this render; onLoadedMetadata seeks and plays it.
+    // The new source starts loading after this render (a failed one loads again now), and
+    // onLoadedMetadata plays it from the window's start. Loading drops the pause event that
+    // pause() queued, so the paused state is set here rather than by onPause.
     el.pause();
+    if (nextSrc === src) el.load();
+    setPlaying(false);
+    setTime(windowStart);
     pendingPlay.current = true;
+    setLoading(true);
   }
 
   const spoken =
     version === "described" ? track.lines.find((l) => time >= l.start && time <= l.end) : undefined;
+  // Only promise a next description while one is still ahead in the window.
+  const lineAhead = track.lines.some((l) => l.start > time);
   const progress = Math.min(1, Math.max(0, (time - windowStart) / (windowEnd - windowStart)));
   const pct = (s: number) => `${((s - windowStart) / (windowEnd - windowStart)) * 100}%`;
 
@@ -120,7 +167,22 @@ export function SevenSeconds({
           preload="auto"
           playsInline
           onPlay={() => setPlaying(true)}
-          onPause={() => setPlaying(false)}
+          onPause={() => {
+            setPlaying(false);
+            // Switching sources pauses the old one; the press stays loading until the new one plays.
+            if (!pendingPlay.current) setLoading(false);
+          }}
+          onWaiting={(e) => {
+            if (!e.currentTarget.paused) setLoading(true);
+          }}
+          onPlaying={() => setLoading(false)}
+          onError={(e) => {
+            pendingPlay.current = false;
+            setPlaying(false);
+            setLoading(false);
+            setFailed(true);
+            console.error("seven seconds: media failed", e.currentTarget.error);
+          }}
           onLoadedMetadata={(e) => {
             if (!pendingPlay.current) return;
             pendingPlay.current = false;
@@ -129,7 +191,19 @@ export function SevenSeconds({
         />
       </div>
       <div className="seven-caption" aria-live="off">
-        {version === null ? (
+        {loading ? (
+          <span className="idle loading">
+            <span className="spinner" aria-hidden="true" />
+            {labels.loading}
+          </span>
+        ) : failed ? (
+          <span className="idle failed">
+            <span aria-hidden="true">⚠ </span>
+            {labels.failed}
+          </span>
+        ) : ended ? (
+          <span className="idle">{labels.ended}</span>
+        ) : version === null ? (
           <span className="idle">{labels.idle}</span>
         ) : version === "original" ? (
           <span className="idle">{labels.soundtrack}</span>
@@ -140,10 +214,15 @@ export function SevenSeconds({
             </span>
             {spoken.gloss ? <span className="gloss">{spoken.gloss}</span> : null}
           </>
+        ) : !playing ? (
+          <span className="idle">{labels.paused}</span>
         ) : (
-          <span className="idle">{labels.waiting}</span>
+          <span className="idle">{lineAhead ? labels.waiting : labels.quiet}</span>
         )}
       </div>
+      <p className="sr-only" aria-live="polite">
+        {slowLoading ? labels.loading : failed ? labels.failed : ended ? labels.ended : ""}
+      </p>
       <div className="seven-window" aria-hidden="true">
         {track.lines.map((l) => (
           <span
@@ -160,7 +239,7 @@ export function SevenSeconds({
       </div>
       <div className="seven-controls">
         {(["original", "described"] as Version[]).map((v) => {
-          const active = version === v && playing;
+          const active = version === v && (playing || loading);
           return (
             <button
               key={v}
@@ -169,7 +248,11 @@ export function SevenSeconds({
               aria-pressed={active}
               onClick={() => press(v)}
             >
-              <span aria-hidden="true">{active ? "❚❚" : "▶"}</span>
+              {active && loading ? (
+                <span className="spinner" aria-hidden="true" />
+              ) : (
+                <span aria-hidden="true">{active ? "❚❚" : "▶"}</span>
+              )}
               {active ? `${labels.pause}` : v === "original" ? labels.original : labels.described}
             </button>
           );
@@ -178,13 +261,19 @@ export function SevenSeconds({
       <div className="seven-options">
         {tracks.length > 1 ? (
           <div className="segmented" role="group" aria-label={labels.narration}>
-            {tracks.map((tr, i) => (
+            {tracks.map((tr) => (
               <button
                 key={tr.language}
                 type="button"
                 lang={tr.language}
-                aria-pressed={i === trackIndex}
-                onClick={() => (version === "described" ? press("described", i) : setTrackIndex(i))}
+                aria-pressed={tr.language === track.language}
+                onClick={() => {
+                  if (version === "described" && tr.language !== track.language) {
+                    press("described", tr.language);
+                  } else {
+                    setChosen(tr.language);
+                  }
+                }}
               >
                 {tr.name}
               </button>

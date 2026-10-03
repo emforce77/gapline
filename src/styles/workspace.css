@@ -6,28 +6,48 @@
 .ws-header {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "mark title lang";
   align-items: center;
   gap: 24px;
   min-height: 64px;
+  padding: 10px 0;
   border-bottom: 1px solid var(--border);
   margin-bottom: 20px;
 }
 
+.ws-header > .wordmark {
+  grid-area: mark;
+  justify-self: start;
+}
+
+.ws-header > .lang-toggle {
+  grid-area: lang;
+  white-space: nowrap;
+}
+
+/* The credit sits beside the title while both fit, and drops under it when they do not. */
 .ws-title {
+  grid-area: title;
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 12px;
+  gap: 2px 12px;
   min-width: 0;
 }
 
+/* An upload is titled by its file name (up to 80 characters): it wraps, and past two lines the
+   rest is clamped on screen while the whole name stays in the text a screen reader reads. */
 .ws-title h1 {
   margin: 0;
   font-size: var(--step-1);
   font-weight: 700;
+  line-height: 1.35;
   color: var(--text-strong);
-  white-space: nowrap;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 
 .ws-main {
@@ -66,6 +86,20 @@
   background: var(--danger-soft);
   color: var(--danger);
   overflow-wrap: anywhere;
+}
+
+/* A stopped run's message, with its next action beside it (under it on a narrow column). */
+.run-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px 16px;
+}
+
+.run-error > p {
+  flex: 1 1 280px;
+  margin: 0;
 }
 
 /* Metrics: the label is first in the markup (dt before dd), the value is first on screen. */
@@ -122,10 +156,12 @@
 }
 
 /* Inspector */
+/* One column capped at the panel's width: its scroller would otherwise clip what is wider. */
 .ws-inspector {
   position: sticky;
   top: 16px;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
   max-height: calc(100vh - 32px);
   overflow-y: auto;
@@ -166,8 +202,10 @@
   gap: 16px;
 }
 
+/* The two run buttons stack when their labels do not fit side by side. */
 .run-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -200,12 +238,14 @@
   list-style: none;
 }
 
+/* The stage name keeps its line; on a narrow panel the status beside it wraps instead. */
 .stage {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  height: 36px;
-  padding: 0 12px;
+  gap: 12px;
+  min-height: 36px;
+  padding: 4px 12px;
   border-radius: var(--radius-sm);
   color: var(--muted);
   transition: background 200ms ease;
@@ -221,13 +261,37 @@
   color: var(--text);
 }
 
+/* A stage cut short when the run failed or was interrupted: the ✕ and the word carry it. */
+.stage.stopped {
+  background: var(--danger-soft);
+  color: var(--text-strong);
+}
+
+.stage.stopped > .label {
+  color: var(--danger);
+}
+
+/* A stage the page lost touch with: it may still finish, so it is marked, not failed. */
+.stage.lost {
+  background: var(--surface-3);
+  color: var(--text-strong);
+}
+
 /* The re-listen row also says what it heard, on a second line. */
 .stage.has-detail {
   flex-wrap: wrap;
-  height: auto;
-  min-height: 36px;
   padding-block: 8px;
   row-gap: 2px;
+}
+
+.stage > span:first-child {
+  flex: none;
+}
+
+/* A zero basis keeps the status on the name's line even in the wrapping re-listen row. */
+.stage > .label {
+  flex: 1 1 0;
+  text-align: end;
 }
 
 .stage-detail {
@@ -299,19 +363,20 @@
   .ws {
     padding: 0 16px 24px;
   }
+  /* A phone gives the title its own full-width row under the wordmark and the language switch. */
   .ws-header {
-    gap: 12px;
-    padding: 10px 0;
-  }
-  .ws-title {
-    flex-direction: column;
-    gap: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    grid-template-areas:
+      "mark lang"
+      "title title";
+    gap: 8px 12px;
+    padding: 10px 0 12px;
   }
   .ws-title .label {
     font-size: 11px;
     line-height: 1.4;
   }
-  .ws-header > .button {
+  .ws-header > .lang-toggle {
     height: 36px;
     padding: 0 10px;
     font-size: var(--step--1);

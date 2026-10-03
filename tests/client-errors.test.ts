@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
+import { fill } from "../src/i18n";
 import { en } from "../src/i18n/en";
 import { ko } from "../src/i18n/ko";
 import { MAX_UPLOAD_BYTES, MAX_UPLOAD_SECONDS } from "../src/lib/api-contract";
@@ -127,6 +128,32 @@ describe("runErrorMessage", () => {
       runErrorMessage({ code: "speech_failed" }, en, "en", "r-1"),
       `${en.live.errors.speech_failed} Reference: r-1.`,
     );
+  });
+
+  it("follows the run's retryable flag where the code alone does not say if it would repeat", () => {
+    for (const [dict, lang] of [
+      [en, "en"],
+      [ko, "ko"],
+    ] as const) {
+      for (const code of ["speech_failed", "voice_failed"] as const) {
+        assert.equal(
+          runErrorMessage({ code, retryable: false }, dict, lang),
+          dict.live.noRetry[code],
+        );
+        assert.equal(
+          runErrorMessage({ code, retryable: true }, dict, lang),
+          dict.live.errors[code],
+        );
+        // Edit failures and older runs do not say; the page offers a retry for those too.
+        assert.equal(runErrorMessage({ code }, dict, lang), dict.live.errors[code]);
+        assert.notEqual(dict.live.noRetry[code], dict.live.errors[code]);
+      }
+      // describeFailure never marks media_failed retryable: its one sentence is for that case.
+      assert.equal(
+        runErrorMessage({ code: "media_failed", retryable: false }, dict, lang, "r-1"),
+        `${dict.live.errors.media_failed} ${fill(dict.live.reference, { runId: "r-1" })}`,
+      );
+    }
   });
 
   it("never shows raw text from runs recorded before the codes existed", () => {

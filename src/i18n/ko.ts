@@ -26,6 +26,11 @@ export const ko: Dictionary = {
       idle: "버튼을 누르면 이 7초를 재생합니다.",
       soundtrack: "말소리 없이 배경음만 흐릅니다.",
       waiting: "침묵. 곧 다음 해설이 나옵니다.",
+      quiet: "다음 대사가 나올 때까지 침묵이 이어집니다.",
+      loading: "불러오는 중…",
+      paused: "일시정지했습니다.",
+      ended: "재생이 끝났습니다. 버튼을 누르면 이 7초를 다시 재생합니다.",
+      failed: "소리를 불러오지 못했습니다. 버튼을 다시 누르면 다시 불러옵니다.",
       pause: "일시정지",
     },
     timelineTitle: "해설은 아무도 말하지 않는 곳에서만 말합니다.",
@@ -177,13 +182,15 @@ export const ko: Dictionary = {
     active: "{time}에 시작한 {language} 해설이 아직 만들어지고 있습니다.",
     follow: "이어서 보기",
     unreachable:
-      "갭라인에 연결할 수 없습니다. 인터넷 연결을 확인한 뒤 이 페이지를 새로 고쳐 결과를 확인해 주세요.",
+      "갭라인이 응답하지 않아 이 페이지가 생성 진행 확인을 멈췄습니다. 생성은 서버에서 계속되어 끝날 수 있으니, 연결이 돌아오면 다시 확인하거나 나중에 이 페이지를 새로 고쳐 주세요.",
     interrupted: "생성이 끝나지 못하고 멈춰 결과가 저장되지 않았습니다. 다시 생성할 수 있습니다.",
     notStarted: "생성이 시작되지 않았습니다. 다시 시도해 주세요.",
     notFound: "이 생성 기록을 찾을 수 없습니다. 다른 브라우저에서 시작한 것일 수 있습니다.",
     loadFailed: "결과를 불러오지 못했습니다. 페이지를 새로 고쳐 주세요.",
     renews: "{time}에 다시 채워집니다({wait}).",
     reference: "참조 번호: {runId}.",
+    retry: "다시 시도",
+    checkAgain: "다시 확인",
     littleRoom:
       "이 영상에서 대사가 없는 구간은 {room}뿐입니다. 해설을 제대로 넣으려면 {needed} 이상이 필요합니다. 해설은 아무도 말하지 않는 곳에만 들어가므로, 대사나 내레이션이 계속되는 영상에는 해설이 거의 들어가지 않습니다. 말 사이에 쉼이 있는 장면이 더 잘 맞습니다.",
     status: {
@@ -203,11 +210,11 @@ export const ko: Dictionary = {
       model_output:
         "모델의 답이 정해진 형식을 벗어나, 추측하지 않고 생성을 멈췄습니다. 다시 시도하면 대개 됩니다.",
       speech_failed:
-        "Google Speech-to-Text가 이 영상의 소리를 처리하지 못했습니다. 다시 시도하고, 두 번 실패하면 다른 영상을 써 보세요.",
+        "Google Speech-to-Text에 연결할 수 없거나 요청이 몰려 생성이 멈췄습니다. 1분 뒤 다시 시도해 주세요.",
       voice_failed:
         "Google Text-to-Speech가 해설을 낭독하다 실패했습니다. 1분 뒤 다시 시도해 주세요.",
       media_failed:
-        "해설 음성을 영상에 섞다가 실패했습니다. 다시 시도하고, 두 번 실패하면 다른 영상을 써 보세요.",
+        "영상을 처리하다가 실패했습니다. 다시 시도해도 같은 이유로 실패할 가능성이 높으니 다른 영상을 써 보세요.",
       internal: "서버에서 문제가 생겨 생성이 멈췄습니다. 다시 시도해 주세요.",
       forbidden:
         "이 페이지에서 보낸 요청이 아니어서 거부되었습니다. 페이지를 새로 고친 뒤 다시 시도해 주세요.",
@@ -216,6 +223,12 @@ export const ko: Dictionary = {
       connection:
         "갭라인에 연결할 수 없어 생성이 시작되지 않았습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.",
       unknown: "생성이 끝나지 못하고 멈췄습니다. 다시 시도해 주세요.",
+    },
+    noRetry: {
+      speech_failed:
+        "Google Speech-to-Text가 요청을 거부해 생성이 멈췄습니다. 다시 시도해도 같은 이유로 실패할 가능성이 높습니다. 다른 영상은 될 수도 있지만, 그 영상도 실패하면 저희 쪽 문제입니다.",
+      voice_failed:
+        "Google Text-to-Speech가 해설 낭독 요청을 거부해 생성이 멈췄습니다. 저희 쪽 문제이니 나중에 다시 시도해 주세요.",
     },
   },
   notFound: {
@@ -240,6 +253,7 @@ export const ko: Dictionary = {
     generating: "생성하는 중…",
     liveNote:
       "실시간 생성은 유료 API를 호출하고 10분 안팎 걸립니다. 기록된 결과는 그대로 남습니다.",
+    samplePrivate: "이 샘플에서 만든 버전은 이 브라우저에서 나만 볼 수 있습니다.",
     replay: "과정 다시 보기",
     replaying: "{speed}배속으로 다시 보는 중",
     stopReplay: "다시 보기 멈춤",
@@ -301,6 +315,9 @@ export const ko: Dictionary = {
     done: "{seconds}초",
     doneState: "완료",
     runningState: "진행 중",
+    stopped: "중단됨",
+    lost: "연결 끊김",
+    stoppedState: "중단됨",
     relistenFound: "침묵 {gaps}곳 · 들린 단어 {words}개 · 줄어든 침묵 {blocked}",
     relistenQuiet: "침묵 {gaps}곳 · 들린 말 없음",
   },

@@ -15,7 +15,11 @@ export const STAGES: StageId[] = [
 ];
 
 export interface StageView {
-  state: "waiting" | "running" | "done" | "reused";
+  /**
+   * "stopped": where the run failed or was interrupted (see endRunning). "lost": where the run was
+   * when the page could no longer reach the server, so whether it finished is not known.
+   */
+  state: "waiting" | "running" | "done" | "reused" | "stopped" | "lost";
   startedAt?: number;
   seconds?: number;
 }
@@ -34,7 +38,16 @@ export interface RunView {
   coverage: { round: number; missing: MissingItem[] }[];
   summary: RunSummary | null;
   files: RunFiles | null;
+  /**
+   * Why the run stopped: the run_failed code (raw text in runs before 2026-09-23), or
+   * "interrupted" when it had no final event within the time limit. Null while it goes or once done.
+   */
   error: string | null;
+  /**
+   * run_failed's `retryable`: false when trying again would fail the same way (run_allowance,
+   * provider_failed, media_failed). Null when the run did not fail, or its failure did not say.
+   */
+  retryable: boolean | null;
   /** Set when the clip leaves too little room to describe much (little_room event). */
   littleRoom: { gapSeconds: number; thresholdSeconds: number } | null;
   /** What this run's re-listen of each silence found; null when it did not run one. */
@@ -59,6 +72,7 @@ export function emptyRun(clipSeconds: number): RunView {
     summary: null,
     files: null,
     error: null,
+    retryable: null,
     littleRoom: null,
     relisten: null,
     t: 0,
@@ -173,10 +187,51 @@ export function reduceRun(view: RunView, event: TimedRunEvent): RunView {
         files: event.files,
       };
     case "run_failed":
-      return { ...next, error: event.code ?? event.error };
+      return {
+        ...next,
+        stages: endRunning(next.stages, "stopped"),
+        error: event.code ?? event.error,
+        retryable: event.retryable ?? null,
+      };
   }
+}
+
+/**
+ * Where a run that ended without finishing (or that the page lost) ends, as `to`, so the stage list
+ * never reads as a success beside the alert: the stages still running. When none was (it failed
+ * between two stages, e.g. encoding the watching copy after "gaps", or saving the result after
+ * "mix"), the stage after the last one it reached, or that last one when none follows; with none
+ * reached, the first. The rest keep their state, and a view that already ended stays as it is.
+ */
+function endRunning(stages: RunView["stages"], to: "stopped" | "lost"): RunView["stages"] {
+  const states = STAGES.map((s) => stages[s].state);
+  if (states.some((s) => s === "stopped" || s === "lost")) return stages;
+  if (states.includes("running"))
+    return Object.fromEntries(
+      STAGES.map((s) => [
+        s,
+        stages[s].state === "running" ? { ...stages[s], state: to } : stages[s],
+      ]),
+    ) as RunView["stages"];
+  const reached = states.findLastIndex((s) => s !== "waiting");
+  const at = STAGES[Math.min(reached + 1, STAGES.length - 1)];
+  return { ...stages, [at]: { ...stages[at], state: to } };
 }
 
 export function foldRun(events: TimedRunEvent[], clipSeconds: number): RunView {
   return events.reduce(reduceRun, emptyRun(clipSeconds));
+}
+
+/** A run with no final event past the time limit (RunStatus "interrupted"): it stopped where it was. */
+export function interruptRun(view: RunView): RunView {
+  return { ...view, stages: endRunning(view.stages, "stopped"), error: "interrupted" };
+}
+
+/**
+ * A followed run the page stopped checking on because the server could not be reached: where it was
+ * reads "lost", and no error is set, since the run may still finish on the server. Checking again
+ * keeps the lost view, so one that is lost a second time stays as it was.
+ */
+export function loseRun(view: RunView): RunView {
+  return { ...view, stages: endRunning(view.stages, "lost") };
 }

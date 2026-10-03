@@ -1,10 +1,13 @@
 "use client";
 import { useEffect, useId, useRef, useState } from "react";
 import { useI18n } from "@/i18n/client";
+import { fill } from "@/i18n";
 import { runErrorMessage } from "@/lib/client/api-errors";
+import { formatDuration } from "@/lib/format";
 import type { Cue } from "@/lib/pipeline/schemas";
 import { editErrorMessage, type EditFailureText } from "./edit-errors";
 import { postEdit } from "./edit-request";
+import { useElapsedSeconds } from "./use-elapsed";
 
 /** The edit route's code for a request that is still being made; retrying it must reuse its id. */
 const STILL_RUNNING = "running";
@@ -20,6 +23,8 @@ export function RemoveLine({
   onSaved,
   onBusy,
   locked,
+  error,
+  onError: setError,
 }: {
   projectId: string;
   runId: string;
@@ -27,21 +32,30 @@ export function RemoveLine({
   onSaved: (runId: string) => Promise<void>;
   onBusy: (busy: boolean) => void;
   locked: boolean;
+  /** This removal's error; null when the latest request (edit or removal) was not a removal. */
+  error: EditFailureText | null;
+  /** Null clears the error of any earlier request, the editor's included. */
+  onError: (error: EditFailureText | null) => void;
 }) {
   const { t, lang } = useI18n();
   const r = t.editor.remove;
   const [confirming, setConfirming] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<EditFailureText | null>(null);
   // One id per removal attempt: a retry after no answer finds the same result instead of a second one.
   const request = useRef<string | null>(null);
   const openButton = useRef<HTMLButtonElement>(null);
   const wasConfirming = useRef(false);
   const questionId = useId();
+  const elapsed = useElapsedSeconds(busy);
+  const errorNote = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     if (wasConfirming.current && !confirming) openButton.current?.focus();
     wasConfirming.current = confirming;
   }, [confirming]);
+  // The message renders at the bottom of the inspector, often below its fold: bring it into view.
+  useEffect(() => {
+    if (error) errorNote.current?.scrollIntoView({ block: "nearest" });
+  }, [error]);
 
   async function remove() {
     if (busy || locked) return;
@@ -88,7 +102,7 @@ export function RemoveLine({
               {busy ? (
                 <>
                   <span className="spinner" aria-hidden="true" />
-                  {r.removing}
+                  {fill(r.removing, { elapsed: formatDuration(elapsed, lang) })}
                 </>
               ) : (
                 r.yes
@@ -101,7 +115,7 @@ export function RemoveLine({
               autoFocus
               onClick={() => {
                 setConfirming(false);
-                setError(null);
+                if (error) setError(null);
               }}
             >
               {r.no}
@@ -120,7 +134,8 @@ export function RemoveLine({
         </button>
       )}
       {error ? (
-        <p className="ws-error" role="alert">
+        <p className="ws-error" role="alert" ref={errorNote}>
+          <span aria-hidden="true">⚠ </span>
           {error.text}
         </p>
       ) : null}

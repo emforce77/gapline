@@ -26,6 +26,11 @@ export const en = {
       idle: "Press a button to play the seven seconds.",
       soundtrack: "No words here. Only the soundtrack.",
       waiting: "Silence. The next description starts in a moment.",
+      quiet: "Silence until the next line of dialogue.",
+      loading: "Loading…",
+      paused: "Paused.",
+      ended: "Finished. Press a button to play the seven seconds again.",
+      failed: "The sound didn't load. Press the button again to retry.",
       pause: "Pause",
     },
     timelineTitle: "Narration may only speak where nobody else does.",
@@ -183,7 +188,8 @@ export const en = {
     active: "You started a description in {language} at {time}. It is still being made.",
     follow: "Follow it",
     unreachable:
-      "Gapline cannot be reached. Check your connection, then reload this page to see how the run ended.",
+      "Gapline stopped answering, so this page stopped checking on the run. It may still finish on the server: check again once you are back online, or reload this page later.",
+    checkAgain: "Check again",
     interrupted:
       "The run stopped without finishing, so no result was saved. You can generate again.",
     notStarted: "The run did not start. Try again.",
@@ -191,6 +197,7 @@ export const en = {
     loadFailed: "This result could not be loaded. Reload the page.",
     renews: "It renews at {time} ({wait}).",
     reference: "Reference: {runId}.",
+    retry: "Try again",
     littleRoom:
       "This clip has {room} without speech; Gapline needs at least {needed} to describe much. Descriptions only go where nobody speaks, so constant dialogue or voice-over leaves few or no lines. A scene with pauses works better.",
     status: {
@@ -210,10 +217,10 @@ export const en = {
       model_output:
         "The model's answer came back in the wrong shape, so the run stopped instead of guessing. Trying again usually works.",
       speech_failed:
-        "Google Speech-to-Text could not process this clip's sound. Try again; if it fails twice, try another clip.",
+        "Google Speech-to-Text could not be reached or was overloaded, so the run stopped. Try again in a minute.",
       voice_failed: "Google Text-to-Speech failed while voicing the lines. Try again in a minute.",
       media_failed:
-        "Mixing the narration into the video failed. Try again; if it fails twice, try another clip.",
+        "Processing the video failed. Trying again would likely fail the same way; try another clip.",
       internal: "Something broke on our side and the run stopped. Try again.",
       forbidden:
         "The request was refused because it did not come from this page. Reload the page and try again.",
@@ -222,6 +229,13 @@ export const en = {
       connection:
         "Gapline could not be reached, so the run did not start. Check your connection and try again.",
       unknown: "The run stopped before finishing. Try again.",
+    },
+    /** For a code whose failure may or may not repeat, when the run said it would (retryable: false). */
+    noRetry: {
+      speech_failed:
+        "Google Speech-to-Text refused the request, so the run stopped. Trying again would likely fail the same way. Another clip may work; if it fails too, the problem is on our side.",
+      voice_failed:
+        "Google Text-to-Speech refused to voice the lines, so the run stopped. The problem is on our side; try again later.",
     },
   },
   notFound: {
@@ -245,6 +259,7 @@ export const en = {
     regenerate: "Generate again",
     generating: "Generating…",
     liveNote: "A live run calls paid APIs and takes about 10 minutes. The recorded result stays.",
+    samplePrivate: "Versions you make on this sample are visible only to you, in this browser.",
     replay: "Replay the run",
     replaying: "Replaying at {speed}× speed",
     stopReplay: "Stop replay",
@@ -307,6 +322,9 @@ export const en = {
     done: "{seconds} s",
     doneState: "done",
     runningState: "working",
+    stopped: "Stopped",
+    lost: "Connection lost",
+    stoppedState: "stopped",
     relistenFound: "Silences: {gaps} · words heard: {words} · room closed: {blocked}",
     relistenQuiet: "Silences: {gaps} · no words heard",
   },

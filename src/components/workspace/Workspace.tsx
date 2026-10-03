@@ -1,13 +1,22 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { fill } from "@/i18n";
 import { useI18n } from "@/i18n/client";
 import { fetchRun } from "@/lib/client/run-stream";
 import { useLiveRun } from "@/lib/client/use-live-run";
 import type { TimedRunEvent } from "@/lib/pipeline/events";
 import { findGaps } from "@/lib/pipeline/gaps";
-import { emptyRun, foldRun, reduceRun, STAGES, type RunView } from "@/lib/pipeline/reduce";
+import {
+  emptyRun,
+  foldRun,
+  interruptRun,
+  loseRun,
+  reduceRun,
+  STAGES,
+  type RunView,
+} from "@/lib/pipeline/reduce";
 import type { Density, Language, SceneMap, SpeechSegment } from "@/lib/pipeline/schemas";
 import type { Project, RunListing } from "@/lib/store/projects";
 import { EditLine } from "./CueEditor";
@@ -56,13 +65,25 @@ export function Workspace({
   const [replaySpeed, setReplaySpeed] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
   const [time, setTime] = useState(0);
-  const [error, setError] = useState<string | null>(null);
+  // The alert under the player. `ownFailure`: it is the stopped run's own reason (not a refused
+  // start or a load error), the only case a retry of that run answers. Only then does the notice
+  // on whether a run could start show beside it; a refusal already says why none can. `lostRunId`:
+  // the page stopped checking on that run because the server could not be reached.
+  const [error, setError] = useState<{
+    message: string;
+    ownFailure: boolean;
+    lostRunId?: string;
+  } | null>(null);
   const [editing, setEditing] = useState(false);
   const [chosenRunId, setChosenRunId] = useState<string | null>(initialRunId ?? null);
   const [announcement, setAnnouncement] = useState("");
   const player = useRef<PlayerHandle>(null);
+  const stageList = useRef<HTMLOListElement>(null);
   const timers = useRef<number[]>([]);
   const viewBeforeRun = useRef<RunView | null>(null);
+  // Counts live runs begun on this page. A shown result's fetch that resolves after one began
+  // must not replace the live view with the old run's stages.
+  const liveRuns = useRef(0);
   const { labels, notes } = useRunLabels(project.id, runs);
 
   const current =
@@ -91,16 +112,17 @@ export function Workspace({
     setError(null);
     if (!current) return;
     let cancelled = false;
+    const begun = liveRuns.current;
     fetchRun(project.id, current.runId)
       .then(({ events: loaded }) => {
-        if (cancelled) return;
+        if (cancelled || liveRuns.current !== begun) return;
         setEvents(loaded);
         setView(foldRun(loaded, project.clipSeconds));
       })
       .catch((e: unknown) => {
-        if (cancelled) return;
+        if (cancelled || liveRuns.current !== begun) return;
         console.error(e);
-        setError(t.live.loadFailed);
+        setError({ message: t.live.loadFailed, ownFailure: false });
       });
     return () => {
       cancelled = true;
@@ -109,18 +131,27 @@ export function Workspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [current?.runId]);
 
-  // Stage changes during a live run or a replay are announced once each, politely.
+  // Stage changes during a live run or a replay are announced once each, politely. When a run
+  // stops, the stage it stopped in is announced (the alert under the player says why and what next).
   const stageKey = view ? STAGES.map((s) => view.stages[s].state).join(",") : "";
   useEffect(() => {
     if (!view || mode === "idle") return;
+    // Checking again on a lost run: nothing new is known until a check answers.
+    if (STAGES.some((s) => view.stages[s].state === "lost")) return;
+    const stopped = STAGES.find((s) => view.stages[s].state === "stopped");
+    if (view.error && !stopped) return;
     const running = STAGES.find((s) => view.stages[s].state === "running");
     const last = [...STAGES].reverse().find((s) => view.stages[s].state === "done");
-    const stage = running ?? last;
+    const stage = stopped ?? running ?? last;
     if (!stage) return;
     setAnnouncement(
       fill(t.workspace.stageAnnounce, {
         stage: t.stages[stage],
-        state: running ? t.stages.runningState : t.stages.doneState,
+        state: stopped
+          ? t.stages.stoppedState
+          : running
+            ? t.stages.runningState
+            : t.stages.doneState,
       }),
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -133,6 +164,7 @@ export function Workspace({
     finishedRunIds: initialRuns.map((r) => r.runId),
     handlers: {
       onBegin: () => {
+        liveRuns.current += 1;
         viewBeforeRun.current = view;
         stopReplay();
         setMode("live");
@@ -141,13 +173,14 @@ export function Workspace({
         setView(emptyRun(project.clipSeconds));
       },
       onEvent: (event) => setView((v) => reduceRun(v ?? emptyRun(project.clipSeconds), event)),
-      onEvents: (loaded) => {
+      onEvents: (loaded, status) => {
         const started = loaded[0];
         if (started?.type === "run_started") {
           setNarration(started.language);
           setDensity(started.density);
         }
-        setView(foldRun(loaded, project.clipSeconds));
+        const folded = foldRun(loaded, project.clipSeconds);
+        setView(status === "interrupted" ? interruptRun(folded) : folded);
       },
       onEnd: (list, finishedRunId, started) => {
         if (!started) setView(viewBeforeRun.current);
@@ -160,7 +193,20 @@ export function Workspace({
         }
         setMode("idle");
       },
-      onError: setError,
+      onStopped: (message) => setError({ message, ownFailure: true }),
+      onLost: (runId, message) => {
+        setView((v) => v && loseRun(v));
+        setError({ message, ownFailure: false, lostRunId: runId });
+        setMode("idle");
+      },
+      onCheckAgain: () => {
+        liveRuns.current += 1;
+        stopReplay();
+        setMode("live");
+        setError(null);
+        setSelected(null);
+      },
+      onError: (message) => setError({ message, ownFailure: false }),
     },
   });
 
@@ -221,6 +267,18 @@ export function Workspace({
   const parentRunId = final?.summary?.parentRunId;
   const littleRoom = littleRoomOf(view, shown, Boolean(analysis), project.clipSeconds);
   const editNote = final?.runId ? notes[final.runId] : null;
+  // A run that started and then failed or was interrupted can be tried again with its settings, while
+  // the alert gives its own reason, that reason would not simply repeat, and a run could start now.
+  const stoppedRun =
+    mode === "idle" &&
+    error?.ownFailure &&
+    view?.error &&
+    view.retryable !== false &&
+    view.language &&
+    view.density &&
+    live.status?.canStart !== false
+      ? { language: view.language, density: view.density }
+      : null;
 
   function select(id: string) {
     if (editing) return;
@@ -255,10 +313,35 @@ export function Workspace({
           />
 
           {error ? (
-            <p className="ws-error" role="alert">
-              <span aria-hidden="true">⚠ </span>
-              {error}
-            </p>
+            <div className="ws-error run-error">
+              <p role="alert">
+                <span aria-hidden="true">⚠ </span>
+                {error.message}
+              </p>
+              {stoppedRun ? (
+                <button
+                  type="button"
+                  className="button small"
+                  onClick={() => void live.start(stoppedRun)}
+                >
+                  <span aria-hidden="true">↻</span> {t.live.retry}
+                </button>
+              ) : null}
+              {error.lostRunId ? (
+                <button
+                  type="button"
+                  className="button small"
+                  onClick={() => {
+                    const runId = error.lostRunId!;
+                    flushSync(() => live.checkAgain(runId));
+                    // This alert and its button are gone now; the stage list says where the run is.
+                    stageList.current?.focus();
+                  }}
+                >
+                  <span aria-hidden="true">↻</span> {t.live.checkAgain}
+                </button>
+              ) : null}
+            </div>
           ) : null}
 
           {shown ? (
@@ -331,6 +414,7 @@ export function Workspace({
                         if (!response.ok) throw new Error(t.editor.failed);
                         setRuns((await response.json()).runs);
                         setChosenRunId(id);
+                        setAnnouncement(t.editor.saved);
                       }}
                     />
                   ) : null
@@ -360,6 +444,7 @@ export function Workspace({
                       )
                     : null
                 }
+                sample={project.kind === "sample"}
                 onChooseRun={setChosenRunId}
                 onNarration={setNarration}
                 onDensity={setDensity}
@@ -375,7 +460,7 @@ export function Workspace({
                 connection={live.connection}
                 active={live.active}
                 status={live.status}
-                showStatus={mode !== "live" && !error}
+                showStatus={mode !== "live" && (!error || error.ownFailure)}
                 littleRoom={littleRoom}
                 busy={busy}
                 onFollow={live.follow}
@@ -385,6 +470,7 @@ export function Workspace({
               ) : null}
               {view && !parentRunId ? (
                 <StageList
+                  ref={stageList}
                   view={view}
                   trace={mode === "replay" ? trace : null}
                   clockRate={mode === "live" ? 1 : mode === "replay" ? replaySpeed : 0}
