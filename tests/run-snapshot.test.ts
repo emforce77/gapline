@@ -11,6 +11,7 @@ it("polling survives startup and partial appends, and delivers the result before
   const dir = await mkdtemp(join(tmpdir(), "scene-run-snapshot-"));
   process.env.DATA_DIR = dir;
   const now = Date.now();
+  const project = { id: "snapshot-project", kind: "upload" } as const;
   try {
     const root = runDir("snapshot-project", "snapshot-run");
     await mkdir(root, { recursive: true });
@@ -42,13 +43,13 @@ it("polling survives startup and partial appends, and delivers the result before
     await writeFile(join(root, "script.json"), "{}");
     assert.equal((await snapshot()).status, "running");
     assert.equal((await listActiveRuns("snapshot-project", "viewer", now)).length, 1);
-    assert.deepEqual(await listRuns("snapshot-project"), []);
+    assert.deepEqual(await listRuns(project, "viewer"), []);
     await appendFile(eventsFile, '{"type":"run_done","t":2}\n');
     const done = await snapshot();
     assert.equal(done.status, "done");
     assert.equal(done.events.at(-1)?.type, "run_done");
     assert.deepEqual(await listActiveRuns("snapshot-project", "viewer", now), []);
-    assert.equal((await listRuns("snapshot-project"))[0]?.runId, "snapshot-run");
+    assert.equal((await listRuns(project, "viewer"))[0]?.runId, "snapshot-run");
 
     await writeFile(eventsFile, JSON.stringify(first) + '\n{"type":"run_failed","t":2}\n');
     assert.equal((await snapshot()).status, "failed");

@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
 import { readCallRecords, summarizeCosts } from "../llm/ledger";
@@ -10,7 +10,7 @@ import { sameWords } from "../pipeline/cues";
 import type { Cue, Gap, Language } from "../pipeline/schemas";
 import { synthesizeLine } from "../pipeline/voice";
 import { updateJson } from "../store/atomic";
-import { readProject, runDir } from "../store/projects";
+import { canSeeRun, readProject, RUN_EDITOR_FILE, runDir, type RunEditor } from "../store/projects";
 import { reserveRun, settleRun, withRunBudget, type BudgetScope } from "./budget";
 import { writeEditedRun, type EditBase, type HumanEdit } from "./edit-track";
 
@@ -185,6 +185,9 @@ export async function editRun(
 ): Promise<{ runId: string }> {
   const input = EditSchema.parse(raw);
   const project = await readProject(projectId);
+  // Another viewer's version of the sample is not there for this one, exactly like a missing run.
+  const notFound = () => new EditError("not_found", "Original run not found.", 404);
+  if (!(await canSeeRun(project, baseRunId, owner))) throw notFound();
   const baseDir = runDir(projectId, baseRunId);
   let base: EditBase;
   let first: Extract<TimedRunEvent, { type: "run_started" }>;
@@ -192,7 +195,7 @@ export async function editRun(
     base = JSON.parse(await readFile(join(baseDir, "script.json"), "utf8"));
     first = JSON.parse((await readFile(join(baseDir, "events.jsonl"), "utf8")).split("\n")[0]);
   } catch {
-    throw new EditError("not_found", "Original run not found.", 404);
+    throw notFound();
   }
   if (first.type !== "run_started")
     throw new EditError("legacy", "Generate a new result before editing this older run.");
@@ -253,6 +256,9 @@ export async function editRun(
     await withRunBudget(reservation, async () => {
       const started = Date.now();
       await mkdir(join(dir, "voice"), { recursive: true });
+      // Before any result file: on the sample, the edit belongs to its editor from the start.
+      const editor: RunEditor = { ownerHash: owner };
+      await writeFile(join(dir, RUN_EDITOR_FILE), JSON.stringify(editor));
       const cues = structuredClone(base.cues);
       const at = new Date().toISOString();
       const run = { projectId, project, base, baseRunId, first, runId, dir, ledgerFile, started };

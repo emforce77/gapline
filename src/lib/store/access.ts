@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-import { readProject, type Project } from "./projects";
+import { assertSafeId, canSeeRun, readProject, type Project } from "./projects";
 
 export const OWNER_COOKIE = "scene-owner";
 export function ownerHash(token: string): string {
@@ -34,6 +34,25 @@ export async function accessibleProject(id: string): Promise<Project | null> {
   } catch {
     return null;
   }
+}
+/** This browser's owner hash, if it has a session; it decides which sample runs it sees. */
+export async function viewerHash(): Promise<string | undefined> {
+  const token = await sessionToken();
+  return token ? ownerHash(token) : undefined;
+}
+/**
+ * The project, if this viewer may open it and see this run of it (canSeeRun). Another viewer's run
+ * on the sample answers null, the same as a run that does not exist.
+ */
+export async function accessibleRun(id: string, runId: string): Promise<Project | null> {
+  try {
+    assertSafeId(runId);
+  } catch {
+    return null;
+  }
+  const project = await accessibleProject(id);
+  if (!project) return null;
+  return (await canSeeRun(project, runId, await viewerHash())) ? project : null;
 }
 export function publicProject(project: Project): Omit<Project, "ownerHash"> {
   const { ownerHash: _owner, ...visible } = project;

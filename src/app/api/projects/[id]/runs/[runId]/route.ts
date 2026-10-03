@@ -1,6 +1,6 @@
 import type { ApiErrorBody, RequestErrorCode } from "@/lib/api-contract";
 import { assertSafeId, readRunSnapshot } from "@/lib/store/projects";
-import { accessibleProject } from "@/lib/store/access";
+import { accessibleRun } from "@/lib/store/access";
 
 export const runtime = "nodejs";
 
@@ -22,7 +22,8 @@ export async function GET(
   } catch {
     return notFound();
   }
-  if (!(await accessibleProject(id))) return notFound();
+  // Another viewer's run on the sample is answered exactly like a run that does not exist.
+  if (!(await accessibleRun(id, runId))) return notFound();
   let snapshot: Awaited<ReturnType<typeof readRunSnapshot>>;
   try {
     snapshot = await readRunSnapshot(id, runId);

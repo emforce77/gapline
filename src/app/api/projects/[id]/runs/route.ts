@@ -4,7 +4,13 @@ import { BudgetExhaustedError, reserveRun } from "@/lib/runs/budget";
 import { describeFailure } from "@/lib/runs/failure";
 import { executeRun, prepareRun } from "@/lib/runs/start-run";
 import { listActiveRuns, listRuns } from "@/lib/store/projects";
-import { accessibleProject, ownerHash, sameOrigin, sessionToken } from "@/lib/store/access";
+import {
+  accessibleProject,
+  ownerHash,
+  sameOrigin,
+  sessionToken,
+  viewerHash,
+} from "@/lib/store/access";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -21,15 +27,16 @@ function fail(status: number, body: ApiErrorBody<RequestErrorCode | RunErrorCode
   return Response.json(body, { status });
 }
 
-/** Finished runs, plus the viewer's own runs that are still going (to resume after a reload). */
+/**
+ * Finished runs this viewer may see (on the sample: the public ones and their own), plus the
+ * viewer's own runs that are still going (to resume after a reload).
+ */
 export async function GET(_request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  if (!(await accessibleProject(id))) return fail(404, { error: "not_found" });
-  const token = await sessionToken();
-  const [runs, active] = await Promise.all([
-    listRuns(id),
-    listActiveRuns(id, token ? ownerHash(token) : undefined),
-  ]);
+  const project = await accessibleProject(id);
+  if (!project) return fail(404, { error: "not_found" });
+  const viewer = await viewerHash();
+  const [runs, active] = await Promise.all([listRuns(project, viewer), listActiveRuns(id, viewer)]);
   return Response.json({ runs, active }, { headers: { "Cache-Control": "private, no-store" } });
 }
 

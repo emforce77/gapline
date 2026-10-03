@@ -226,6 +226,10 @@ track ([evaluation](EVALUATION.md#edits-on-the-earlier-sample-track)).
   the token's SHA-256 hash. Every route that reads or changes a project checks it, and changes must come
   from the site's own pages. The media route serves only the clip, poster, thumbnail strip, each run's
   four outputs and its per-line WAVs.
+- **What a visitor makes on a sample is theirs alone.** A run or edit started from the web records the
+  same cookie hash (`owner.json`, `editor.json`). On a sample, every listing, run read, media file and
+  edit shows such a run only to that browser, and to anyone else it is not found, like a run that does
+  not exist; the curated results have no owner and stay public. The landing page reads public runs only.
 - **Every paid call is covered before it starts.** A run or an edit reserves an amount against the
   daily allowance (`DAILY_BUDGET_USD`), and each call inside it reserves its own maximum before it is
   sent. When the run ends, the reservation settles to the logged API cost. Direct Gemini costs are

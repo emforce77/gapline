@@ -1,7 +1,7 @@
 import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { startRun } from "../src/lib/runs/start-run";
-import { listRuns, runDir } from "../src/lib/store/projects";
+import { listRuns, readProject, runDir } from "../src/lib/store/projects";
 import type { Language } from "../src/lib/pipeline/schemas";
 import { readCallRecords } from "../src/lib/llm/ledger";
 const root = "runtime/evaluation";
@@ -20,7 +20,7 @@ async function main() {
   }
   // The first real upgrade run is the baseline opening case; count it against the twelve-run limit.
   if (!rows.length) {
-    const run = (await listRuns("tos-opening")).find(
+    const run = (await listRuns(await readProject("tos-opening"), undefined)).find(
       (r) => r.runId === "20260922t051536291-ko-standard-d88b71",
     );
     if (!run) throw new Error("Opening smoke baseline is missing");

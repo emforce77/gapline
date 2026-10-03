@@ -1,8 +1,17 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
+import { z } from "zod";
 import type { RunSummary } from "../pipeline/events";
 import type { Cue, SpeechSegment } from "../pipeline/schemas";
-import { dataDir, listProjects, listRuns, runDir, type Project, type RunListing } from "./projects";
+import {
+  dataDir,
+  listProjects,
+  listRuns,
+  readProject,
+  runDir,
+  type Project,
+  type RunListing,
+} from "./projects";
 
 export interface Showcase {
   project: Project;
@@ -17,36 +26,100 @@ export interface Showcase {
   } | null;
 }
 
-/** The first sample project with its finished runs, read from disk for the landing page. */
-export async function loadShowcase(preferredLanguage: string): Promise<Showcase | null> {
-  const project = (await listProjects()).find((p) => p.kind === "sample");
-  if (!project) return null;
-  const runs = await listRuns(project.id);
-  const standard = runs.filter((r) => r.density === "standard" && r.summary);
-  let selected: { projectId: string; runs: Record<string, string> } | null = null;
+/** showcase.json at the top of DATA_DIR: the sample and, per language, the run it shows. */
+const ShowcasePinSchema = z.object({
+  projectId: z.string(),
+  runs: z.record(z.string(), z.string()),
+});
+type ShowcasePin = z.infer<typeof ShowcasePinSchema>;
+
+/**
+ * Every page reads the pin, so a wrong one fails them all; each way it can be wrong names
+ * showcase.json instead of being skipped (docs/DEPLOY.md, "Add the sample").
+ */
+async function readPin(): Promise<ShowcasePin | null> {
+  const file = join(dataDir(), "showcase.json");
+  let raw: string;
   try {
-    selected = JSON.parse(await readFile(join(dataDir(), "showcase.json"), "utf8"));
+    raw = await readFile(file, "utf8");
   } catch (e) {
     if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    return null;
   }
-  const chosen = selected?.projectId === project.id ? selected.runs[preferredLanguage] : undefined;
-  const pick =
-    standard.find((r) => r.runId === chosen) ??
-    standard.find((r) => r.language === preferredLanguage) ??
-    standard[0];
-  if (!pick) return { project, runs, preview: null };
-  const script = JSON.parse(
-    await readFile(join(runDir(project.id, pick.runId), "script.json"), "utf8"),
-  );
-  return {
-    project,
-    runs,
-    preview: {
-      runId: pick.runId,
-      language: pick.language,
-      speech: script.speech,
-      cues: (script.cues as Cue[]).filter((c) => c.status === "fits"),
-      summary: script.summary,
-    },
+  const pin = ShowcasePinSchema.safeParse(JSON.parse(raw));
+  if (!pin.success) throw new Error(`${file} is malformed:\n${z.prettifyError(pin.error)}`);
+  return pin.data;
+}
+
+/**
+ * The pinned sample, read on its own, so the landing page costs the same however many clips
+ * visitors upload. Without a pin, the newest sample, which takes reading every project.
+ */
+async function showcaseProject(pin: ShowcasePin | null): Promise<Project | null> {
+  if (!pin) return (await listProjects()).find((p) => p.kind === "sample") ?? null;
+  let project: Project;
+  try {
+    project = await readProject(pin.projectId);
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+    throw new Error(`showcase.json pins ${pin.projectId}, which is not in ${dataDir()}/projects`, {
+      cause: e,
+    });
+  }
+  // Everyone sees the landing page; a visitor's upload must never be shown there.
+  if (project.kind !== "sample")
+    throw new Error(`showcase.json pins ${pin.projectId}, which is not a sample`);
+  return project;
+}
+
+/**
+ * The sample with its public finished runs and its preview in each of `languages`, read from disk
+ * once for the landing page. Everyone sees the same page, so no visitor's own version can become
+ * its preview or its figures.
+ */
+export async function loadShowcases<L extends string>(
+  languages: readonly L[],
+): Promise<Record<L, Showcase> | null> {
+  const pin = await readPin();
+  const project = await showcaseProject(pin);
+  if (!project) return null;
+  const runs = await listRuns(project, undefined);
+  const standard = runs.filter((r) => r.density === "standard" && r.summary);
+  // Two languages can fall back to the same run; its script is read once.
+  const scripts = new Map<string, Promise<string>>();
+  const readScript = (runId: string) => {
+    if (!scripts.has(runId))
+      scripts.set(runId, readFile(join(runDir(project.id, runId), "script.json"), "utf8"));
+    return scripts.get(runId)!;
   };
+  const showcases = await Promise.all(
+    languages.map(async (language): Promise<[L, Showcase]> => {
+      const pick =
+        standard.find((r) => r.runId === pin?.runs[language]) ??
+        standard.find((r) => r.language === language) ??
+        standard[0];
+      if (!pick) return [language, { project, runs, preview: null }];
+      const script = JSON.parse(await readScript(pick.runId));
+      return [
+        language,
+        {
+          project,
+          runs,
+          preview: {
+            runId: pick.runId,
+            language: pick.language,
+            speech: script.speech,
+            cues: (script.cues as Cue[]).filter((c) => c.status === "fits"),
+            summary: script.summary,
+          },
+        },
+      ];
+    }),
+  );
+  return Object.fromEntries(showcases) as Record<L, Showcase>;
+}
+
+/** loadShowcases for one language. */
+export async function loadShowcase(preferredLanguage: string): Promise<Showcase | null> {
+  return (await loadShowcases([preferredLanguage]))?.[preferredLanguage] ?? null;
 }
