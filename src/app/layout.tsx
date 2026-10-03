@@ -36,10 +36,13 @@ const WATCH_LOAD_FAILURES = `addEventListener("error", function (event) {
   else show();
 }, true);`;
 
-/** The public origin, so og:image is absolute. Behind Cloud Run it is the forwarded one. */
+/**
+ * The public origin, so og:image is absolute. Cloud Run routes by Host and sets the proto itself;
+ * a client's X-Forwarded-Host reaches the app unchanged, so it is never used (store/access.ts).
+ */
 async function requestOrigin(): Promise<URL> {
   const request = await headers();
-  const host = request.get("x-forwarded-host") ?? request.get("host");
+  const host = request.get("host");
   if (!host) throw new Error("The request has no Host header, so the page cannot name its origin");
   const protocol = request.get("x-forwarded-proto")?.split(",")[0].trim() ?? "http";
   return new URL(`${protocol}://${host}`);
@@ -54,7 +57,14 @@ export async function generateMetadata(): Promise<Metadata> {
     description: t.meta.description,
     // No title or description here: Next fills each page's own into the card. The image is
     // app/opengraph-image.png, the same for every page, so a card never shows a private upload.
-    openGraph: { type: "website", siteName: t.nav.home, locale: lang === "ko" ? "ko_KR" : "en_US" },
+    // url "./" is resolved against each request's path (Next 16 resolveRelativeUrl), so every page
+    // names itself as og:url, without its query string.
+    openGraph: {
+      type: "website",
+      url: "./",
+      siteName: t.nav.home,
+      locale: lang === "ko" ? "ko_KR" : "en_US",
+    },
     twitter: { card: "summary_large_image" },
   };
 }

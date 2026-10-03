@@ -144,13 +144,15 @@ export function LiveRunNotices({
         </p>
       ) : null}
       {pendingEdit ? (
-        <p className={styles.notice} role="status">
+        <p className={styles.notice}>
           <span className="spinner" aria-hidden="true" />
-          <span className={styles.text}>
-            {fill(t.live.editPending, {
-              line: pendingEdit.line,
-              elapsed: formatDuration(editSeconds, lang),
-            })}
+          {/* Only the sentence is a live region: the counter beside it changes every second, and
+              in the region it would be said again each time. */}
+          <span className={styles.text} role="status">
+            {fill(t.live.editPending, { line: pendingEdit.line })}
+          </span>
+          <span className={styles.quiet}>
+            {fill(t.live.editPendingElapsed, { elapsed: formatDuration(editSeconds, lang) })}
           </span>
         </p>
       ) : null}

@@ -1,6 +1,7 @@
 /**
  * The sentence for an edit the server refused or could not finish (POST .../edits). Failures that
- * are not the editor's to fix (allowance, model, voice, media) use the run catalog through
+ * are not the editor's to fix (allowance, model, voice, media) are said in edit terms where the run
+ * catalog's sentence would describe a run (editor.errors.stopped), and otherwise through
  * runErrorMessage; the ones the editor can act on (too long, a broken rule, a start out of range)
  * get their own sentence. The server's English `message` is never shown, with one exception: for a
  * rejected edit from a server that does not send `reasons` it is the reviewer's own reasons, written
@@ -58,6 +59,17 @@ const BUSY_CODES = ["running", "request_conflict"];
 
 function isEditorCode(code: string | undefined): code is EditorCode {
   return EDITOR_CODES.includes(code as EditorCode);
+}
+
+type StoppedCode = keyof Dictionary["editor"]["errors"]["stopped"];
+type StoppedNoRetryCode = keyof Dictionary["editor"]["errors"]["stoppedNoRetry"];
+
+/** A failure whose run sentence says "the run" (stopped, did not start): an edit has its own. */
+function stoppedText(code: string, retryable: boolean | undefined, t: Dictionary): string | null {
+  const errors = t.editor.errors;
+  if (retryable === false && Object.hasOwn(errors.stoppedNoRetry, code))
+    return errors.stoppedNoRetry[code as StoppedNoRetryCode];
+  return Object.hasOwn(errors.stopped, code) ? errors.stopped[code as StoppedCode] : null;
 }
 
 /** A value in hundredths, rounded at 1e-4 first so that 15 never reads as 1499.999…. */
@@ -148,6 +160,8 @@ export function editErrorMessage(
 ): EditFailureText {
   const errors = t.editor.errors;
   const code = body?.error === "edit_failed" ? body.cause : body?.error;
+  const stopped = code ? stoppedText(code, body?.retryable, t) : null;
+  if (stopped) return { text: stopped };
   if (isRunFailureCode(code))
     return {
       text: runErrorMessage({ code, resetAt: body?.resetAt, retryable: body?.retryable }, t, lang),

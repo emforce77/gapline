@@ -205,7 +205,15 @@ export function UploadCard({
     >
       <h3>{labels.title}</h3>
       <p className="label" id={HINT_ID}>
-        {dragging ? t.upload.drop : labels.hint}
+        {dragging ? (
+          t.upload.drop
+        ) : (
+          <>
+            {/* Dragging a file needs a mouse; a touch screen hides this sentence (tokens.css). */}
+            <span className="pointer-hint">{t.upload.dropHint} </span>
+            {labels.hint}
+          </>
+        )}
       </p>
       <input
         ref={input}

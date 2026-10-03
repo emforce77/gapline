@@ -1,6 +1,12 @@
 import { koEditor } from "./editor";
 import type { Dictionary } from "./en";
 
+/** How long generating takes: the same measured numbers as RUN_WAIT in en.ts (see there). */
+const RUN_WAIT = {
+  detail: "짧은 영상이면 대개 1~3분, 해설할 쉼이 많은 영상이면 9분 가까이",
+  range: "영상에 따라 1~9분",
+} as const;
+
 export const ko: Dictionary = {
   meta: {
     title: "갭라인 — 대사와 대사 사이에 맞춘 화면해설",
@@ -12,7 +18,7 @@ export const ko: Dictionary = {
   landing: {
     eyebrow: "시각장애인을 위한 화면해설",
     title: "대사와 대사 사이에 꼭 맞는 화면해설.",
-    lede: "생성하기를 한 번 누르면 모든 단계가 이어집니다. 갭라인은 실제 침묵에 맞춰 해설 문장을 쓰고, 한국의 공개 가이드라인으로 검수하고, 낭독해 길이를 잰 뒤, 최종 점검에서 반려된 문장을 다시 써서 믹스합니다. 다른 표현을 원하면 어떤 문장이든 고칠 수 있고, 갭라인은 그 문장만 다시 낭독하고 트랙 전체를 다시 점검합니다.",
+    lede: "생성하기를 한 번 누르면 모든 단계가 이어집니다. 갭라인은 실제 침묵에 맞춰 해설 문장을 쓰고, 한국의 공개 가이드라인으로 검수하고, 낭독해 길이를 잰 뒤, 최종 점검에서 반려된 문장을 다시 써서 믹스합니다. 다른 표현을 원하면 어떤 문장이든 고칠 수 있고, 갭라인은 그 문장만 다시 낭독해 화면과 나머지 해설에 비춰 검수합니다.",
     ctaSample: "샘플 열어 보기",
     ctaUpload: "내 영상으로 해 보기",
     seven: {
@@ -45,7 +51,7 @@ export const ko: Dictionary = {
       narration: "해설",
       narrationStat: "{n}문장",
     },
-    shortest: "가장 짧은 곳: {s}",
+    shortest: "가장 짧은 침묵: {s}",
     sevenMark: "문제의 7초",
     timelineNote:
       "침묵 구간은 음성 인식기(Chirp 3)의 단어 시각에서 계산하고, 구간마다 한 번 더 따로 들어 봅니다. 두 번째로 들을 때 인식기가 2초 앞에 붙였던 첫 발사 교신을 찾아내, 그 위에는 해설을 넣지 않습니다.",
@@ -129,7 +135,7 @@ export const ko: Dictionary = {
       },
       {
         figure: "3개월",
-        text: "배리어프리 영화 한 편을 만드는 데 지금도 걸리는 시간입니다. 전문가 10여 명과 1,400만 원(화면해설·자막 포함)이 듭니다.",
+        text: "2019년 보도 기준, 배리어프리 영화 한 편을 만드는 데 걸리는 시간입니다. 전문가 10여 명이 참여하며, 배리어프리영화위원회 FAQ에 따르면 비용은 1,400만 원(화면해설·자막 포함)입니다.",
         sources: [
           {
             label: "배리어프리영화위원회 FAQ(날짜 미표기)",
@@ -144,11 +150,10 @@ export const ko: Dictionary = {
     ],
     whyClose:
       "갭라인은 이 간극을 메우려고 만들었습니다. 생성하기를 한 번 누르면 영화의 침묵에 맞는 화면해설 트랙을 쓰고, 검수하고, 낭독해 믹스까지 마칩니다.",
-    uploadIntro:
-      "90초, 30MB 이하 영상을 받습니다. 영상 준비는 1분 안에 끝납니다. 해설 생성은 보통 2~6분 걸리고(길거나 내용이 많은 영상은 더 걸립니다) 유료 Google Cloud와 Gemini API를 호출합니다. 생성 한도는 하루 단위이며 모든 방문자가 함께 씁니다. 올린 영상은 그 브라우저에서만 열 수 있습니다.",
+    uploadIntro: `90초, 30MB 이하 영상을 받습니다. 영상 준비는 1분 안에 끝납니다. 해설 생성은 ${RUN_WAIT.detail} 걸리며, 유료 Google Cloud와 Gemini API를 호출합니다. 생성 한도는 하루 단위이며 모든 방문자가 함께 씁니다. 올린 영상은 그 브라우저에서만 열 수 있습니다.`,
     uploadTitle: "내 영상",
     uploadHint:
-      "MP4, MOV, WebM, 3초~90초, 30MB 이하. 파일을 여기에 끌어 놓거나 골라 주세요. 65초 샘플의 {language} 해설은 생성에 {time} 걸렸고, 비용은 {cost}입니다.",
+      "MP4, MOV, WebM, 3초~90초, 30MB 이하. 65초 샘플의 {language} 해설은 생성에 {time} 걸렸고, 비용은 {cost}입니다.",
     uploadChoose: "영상 고르기",
     uploadWorking: "영상을 준비하는 중…",
     uploadTooLong: "90초보다 긴 영상입니다. 한 장면으로 잘라서 다시 올려 주세요.",
@@ -166,6 +171,7 @@ export const ko: Dictionary = {
   },
   upload: {
     drop: "놓으면 바로 올라갑니다.",
+    dropHint: "영상을 여기에 끌어 놓거나 골라 주세요.",
     checking: "파일을 확인하는 중…",
     uploading: "올리는 중 {percent}",
     progressLabel: "업로드 진행률",
@@ -176,7 +182,8 @@ export const ko: Dictionary = {
     errors: {
       too_large:
         "이 파일은 {size}입니다. {max}까지 올릴 수 있습니다. 720p로 내보내거나 한 장면으로 잘라서 다시 올려 주세요.",
-      too_long: "이 영상은 {length}입니다. 90초까지 받습니다. 한 장면으로 잘라서 다시 올려 주세요.",
+      too_long:
+        "이 영상은 {length}입니다. {max}까지 받습니다. 한 장면으로 잘라서 다시 올려 주세요.",
       too_short:
         "3초보다 짧은 영상이거나 사진 한 장입니다. 설명을 넣을 틈을 찾으려면 3초 이상인 장면이 필요합니다.",
       not_video: "영상 파일이 아닙니다. MP4, MOV, WebM 파일을 골라 주세요.",
@@ -191,8 +198,7 @@ export const ko: Dictionary = {
       unexpected: "갭라인이 오류로 응답했습니다(HTTP {status}). 1분 뒤 다시 시도해 주세요.",
     },
     status: {
-      budget_busy:
-        "지금은 다른 방문자들이 시작한 해설 생성이 오늘 한도의 남은 몫을 쓰고 있습니다. 영상은 지금 올릴 수 있고, 그중 하나가 끝나면 새로 생성할 수 있습니다. 생성은 보통 2~6분 걸립니다.",
+      budget_busy: `지금은 다른 방문자의 생성 작업이 오늘 남은 한도를 쓰고 있습니다. 영상은 지금 올릴 수 있고, 그중 하나가 끝나면 생성할 수 있습니다. 생성은 ${RUN_WAIT.range} 걸립니다.`,
       budget_daily:
         "오늘의 실시간 생성 한도를 다 썼습니다. 영상은 지금 올려 두고 한도가 다시 채워진 뒤 생성할 수 있으며, 샘플의 기록된 결과는 언제든 재생됩니다.",
     },
@@ -201,8 +207,7 @@ export const ko: Dictionary = {
     leaveNote: "연결이 끊기면 이 페이지를 새로 고치세요. 진행 중인 생성을 이어서 보여 줍니다.",
     lost: "연결이 끊겼지만 생성은 서버에서 계속됩니다. 몇 초마다 진행 상황을 확인합니다…",
     following: "시작한 생성을 이어서 보고 있습니다. 몇 초마다 진행 상황을 확인합니다…",
-    elapsed:
-      "생성을 시작한 지 {elapsed} 지났습니다. 대부분 2~6분 걸리며, 길거나 내용이 많은 영상은 더 걸립니다.",
+    elapsed: `생성을 시작한 지 {elapsed} 지났습니다. 생성은 ${RUN_WAIT.detail} 걸립니다.`,
     confirming: "생성을 시작하는 순간 연결이 끊겼습니다. 서버에서 생성이 시작됐는지 확인하는 중…",
     active: "{time}에 시작한 {language} {density} 해설이 아직 만들어지고 있습니다.",
     follow: "이어서 보기",
@@ -217,7 +222,8 @@ export const ko: Dictionary = {
     savedNotListed:
       "수정한 내용은 새 결과로 저장됐지만, 이 페이지에서 아직 열지 못했습니다. 페이지를 새로 고치면 볼 수 있습니다.",
     editPending:
-      "{line} 수정을 아직 낭독하고 점검하는 중입니다(지금까지 {elapsed}). 저장되면 새 버전이 여기에서 열립니다.",
+      "{line} 수정을 아직 낭독하고 점검하는 중입니다. 저장되면 새 버전이 여기에서 열립니다.",
+    editPendingElapsed: "지금까지 {elapsed}",
     editStopped:
       "{line} 수정이 저장되기 전에 멈췄습니다. 수정하기 전 결과는 그대로이니, 이 문장을 다시 수정할 수 있습니다.",
     editUnknown:
@@ -229,8 +235,7 @@ export const ko: Dictionary = {
     littleRoom:
       "이 영상에서 해설을 넣을 만큼 긴 침묵은 모두 {room}뿐입니다. 해설을 제대로 넣으려면 {needed} 이상이 필요합니다. 해설은 아무도 말하지 않는 약 {pause} 이상의 쉼에만 들어가므로, 대사나 내레이션이 계속되는 영상에는 해설이 거의 들어가지 않습니다. 쉼이 긴 장면이 더 잘 맞습니다.",
     status: {
-      budget_busy:
-        "지금은 다른 방문자들이 시작한 해설 생성이 오늘 한도의 남은 몫을 쓰고 있습니다. 그중 하나가 끝나면 새로 시작할 수 있습니다. 생성은 보통 2~6분 걸립니다.",
+      budget_busy: `지금은 다른 방문자의 생성 작업이 오늘 남은 한도를 쓰고 있습니다. 그중 하나가 끝나면 새로 시작할 수 있습니다. 생성은 ${RUN_WAIT.range} 걸립니다.`,
       budget_daily: "오늘의 실시간 생성 한도를 다 썼습니다. 이미 만든 결과는 계속 재생됩니다.",
       visitor_busy:
         "직접 시작한 다른 해설 생성이나 수정이 아직 진행 중입니다. 방문자마다 한 번에 하나씩 만들 수 있어, 그 작업이 끝나면 새로 시작할 수 있습니다.",
@@ -238,8 +243,7 @@ export const ko: Dictionary = {
         "오늘 쓸 수 있는 실시간 생성 몫을 다 썼습니다. 이미 만든 결과는 계속 재생됩니다.",
     },
     errors: {
-      budget_busy:
-        "지금은 다른 방문자들이 시작한 해설 생성이 오늘 한도의 남은 몫을 쓰고 있어 생성을 시작하지 못했습니다. 그중 하나가 끝나면 다시 시도해 주세요. 생성은 보통 2~6분 걸립니다.",
+      budget_busy: `지금은 다른 방문자의 생성 작업이 오늘 남은 한도를 쓰고 있어 생성을 시작하지 못했습니다. 그중 하나가 끝나면 다시 시도해 주세요. 생성은 ${RUN_WAIT.range} 걸립니다.`,
       budget_daily: "오늘의 실시간 생성 한도를 다 썼습니다. 이미 만든 결과는 계속 재생됩니다.",
       visitor_busy:
         "먼저 시작한 해설 생성이나 수정이 아직 진행 중입니다. 방문자마다 한 번에 하나씩만 할 수 있으니, 그 작업이 끝나면 다시 시도해 주세요.",
@@ -300,8 +304,7 @@ export const ko: Dictionary = {
     generate: "생성하기",
     regenerate: "다시 생성",
     generating: "생성하는 중…",
-    liveNote:
-      "실시간 생성은 유료 API를 호출합니다. 보통 2~6분 걸리며, 길거나 내용이 많은 영상은 더 걸립니다. 새 결과가 나올 때까지 지금 결과는 계속 재생됩니다.",
+    liveNote: `실시간 생성은 유료 API를 호출하며, ${RUN_WAIT.detail} 걸립니다. 새 결과가 나올 때까지 지금 결과는 계속 재생됩니다.`,
     newVersion: "새 버전 (생성하는 중…)",
     unfinishedVersion: "새 버전 (완료되지 않음)",
     loadingRun: "결과를 불러오는 중…",
@@ -317,6 +320,9 @@ export const ko: Dictionary = {
     noRun: "생성하기를 누르면 {language} 트랙을 만듭니다.",
     noRunHint: "65초 샘플의 {language} 해설 생성에 {time}, {cost}가 들었습니다.",
     noRunHintHere: "이 영상의 {language} 해설 생성에 {time}, {cost}가 들었습니다.",
+    noRunHintFirst:
+      "이 수치에는 샘플이 이전 실행에서 재사용한 듣기·보기가 빠져 있습니다. 이 영상의 첫 생성은 둘 다 새로 하므로 더 오래 걸립니다.",
+    paidNote: "실시간 생성은 유료 API를 호출합니다.",
     adOn: "해설 켬",
     adOff: "해설 끔",
     eyesClosed: "눈 감고 듣기",
@@ -364,6 +370,7 @@ export const ko: Dictionary = {
     relistenSpeech: "다시 들어 찾은 대사, {from}부터 {to}까지: {text}",
   },
   stages: {
+    title: "진행 상황",
     hear: "듣기",
     relisten: "침묵 구간 다시 듣기",
     watch: "보기",
@@ -440,7 +447,8 @@ export const ko: Dictionary = {
     },
     evidence: "모델의 장면 메모 (읽지 않음)",
     pickHint:
-      "타임라인이나 ‘문장 선택’ 목록에서 해설 문장을 고르면(키보드로는 해당 문장으로 옮긴 뒤 Enter) 쓰기·검수·낭독 과정을 볼 수 있습니다.",
+      "타임라인이나 ‘문장 선택’ 목록에서 해설 문장을 고르면 쓰기·검수·낭독 과정을 볼 수 있습니다.",
+    pickHintKeys: "키보드로는 목록에서 문장으로 옮긴 뒤 Enter를 누르면 열립니다.",
     play: "여기부터 재생",
     close: "진행 상황으로",
   },

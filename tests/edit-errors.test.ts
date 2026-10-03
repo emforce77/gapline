@@ -163,7 +163,7 @@ describe("editErrorMessage", () => {
 
   it("gives the allowed starts with two decimals, the end of the room excluded", () => {
     const { text, field } = editErrorMessage({ error: "placement" }, placement, en, "en");
-    assert.match(text, /between 53\.97 and 56\.99 seconds/);
+    assert.match(text, /between 53\.97 and 56\.99\u00a0seconds/);
     assert.equal(field, "start");
   });
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { useI18n } from "@/i18n/client";
 
 /**
@@ -19,23 +20,37 @@ export interface Alert {
 
 /**
  * The alert and what can be done about it: try the stopped run again (`onRetry`, when it may work
- * now), check again on a lost run, or load the shown result again.
+ * now), check again on a lost run, or load the shown result again. It sits under the player; where
+ * the run panel stacks below the player (a phone or tablet), the Generate button pressed is far
+ * below it, so a new message out of view is scrolled to, once the page around it has its layout
+ * back (`settled`: no run shown live; a refused start says why while its live view is still up, and
+ * the result coming back then moves the page). Focus stays where it was: role="alert" already says
+ * the message.
  */
 export function RunAlert({
   alert,
   onRetry,
   onCheckAgain,
   onReload,
+  settled,
 }: {
   alert: Alert;
+  settled: boolean;
   onRetry: (() => void) | null;
   onCheckAgain: (runId: string) => void;
   onReload: () => void;
 }) {
   const { t } = useI18n();
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = box.current;
+    if (!el || !settled) return;
+    const { top, bottom } = el.getBoundingClientRect();
+    if (bottom < 0 || top > window.innerHeight) el.scrollIntoView({ block: "center" });
+  }, [alert.message, settled]);
   const lost = alert.lostRunId;
   return (
-    <div className="ws-error run-error">
+    <div className="ws-error run-error" ref={box}>
       <p role="alert">
         <span aria-hidden="true">⚠ </span>
         {alert.message}

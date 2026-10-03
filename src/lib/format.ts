@@ -20,13 +20,35 @@ export function formatClock(seconds: number): string {
   return `${m}:${(tenths - m * 60).toFixed(1).padStart(4, "0")}`;
 }
 
-/** "2 min 16 s" / "2분 16초", for durations of work. */
+/**
+ * A no-break space (U+00A0) between a number and its English unit, so a narrow phone never wraps
+ * "6 min 27 s" into "6 / min 27 s" (QA round 3, 390 px). Korean writes the unit against the number.
+ */
+const NBSP = "\u00a0";
+
+/** "2 min 16 s" / "2분 16초", for durations of work; each number stays on the line of its unit. */
 export function formatDuration(seconds: number, lang: UiLang): string {
   const total = Math.round(seconds);
   const m = Math.floor(total / 60);
   const s = total % 60;
   if (lang === "ko") return m > 0 ? `${m}분 ${s}초` : `${s}초`;
-  return m > 0 ? `${m} min ${s} s` : `${s} s`;
+  return m > 0 ? `${m}${NBSP}min ${s}${NBSP}s` : `${s}${NBSP}s`;
+}
+
+/**
+ * "91 seconds" / "91초": a clip length next to the upload limit, in the unit the limit is written in
+ * ("Clips up to 90 seconds"), so the two read as one comparison.
+ */
+export function formatWholeSeconds(seconds: number, lang: UiLang): string {
+  return new Intl.NumberFormat(LOCALE[lang], {
+    style: "unit",
+    unit: "second",
+    unitDisplay: "long",
+    maximumFractionDigits: 0,
+  })
+    .formatToParts(Math.round(seconds))
+    .map((part) => (part.type === "literal" ? part.value.replaceAll(" ", NBSP) : part.value))
+    .join("");
 }
 
 /**
@@ -52,5 +74,5 @@ export function formatTenths(seconds: number, lang: UiLang): string {
 
 export function formatSeconds(seconds: number, lang: UiLang): string {
   const n = formatTenths(seconds, lang);
-  return lang === "ko" ? `${n}초` : `${n} s`;
+  return lang === "ko" ? `${n}초` : `${n}${NBSP}s`;
 }

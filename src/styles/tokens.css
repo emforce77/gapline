@@ -31,9 +31,14 @@
   --radius-sm: 6px;
   --shadow: 0 1px 2px rgba(0, 0, 0, 0.4);
 
-  /* "Pretendard Variable" is the self-hosted subset family imported in the root layout. */
+  /*
+   * "Pretendard Variable" is the self-hosted subset family imported in the root layout. "Gapline
+   * Symbols" comes first: its unicode-range (fonts/symbols.css) limits it to a few marks and the
+   * characters an English page would otherwise fetch Hangul subsets for; everything else falls
+   * through to Pretendard.
+   */
   --font-sans:
-    "Pretendard Variable", Pretendard, "Gapline Symbols", -apple-system, BlinkMacSystemFont,
+    "Gapline Symbols", "Pretendard Variable", Pretendard, -apple-system, BlinkMacSystemFont,
     system-ui, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
   --font-mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
 
@@ -103,6 +108,16 @@ a {
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/*
+ * A sentence about dragging with a mouse or pressing keys, inside a hint that stays: a phone or tablet
+ * has neither, so it reads the hint without it (like .keys-hint in player.css).
+ */
+@media (hover: none) and (pointer: coarse) {
+  .pointer-hint {
+    display: none;
+  }
 }
 
 .skip-link {

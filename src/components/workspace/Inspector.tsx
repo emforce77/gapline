@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type Ref } from "react";
+import { useEffect, useId, useRef, useState, type Ref } from "react";
 import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { sentBackByFinalCheck } from "@/components/landing/RejectionStory";
@@ -17,7 +17,8 @@ import { VersionHistory } from "./VersionHistory";
  * reads "Stopped", and where the page lost touch with it "Connection lost". clockRate is 1 while
  * live, the replay speed during a replay, and 0 for a finished run. trace is the whole saved run
  * during a replay, null otherwise; which stages are listed is decided by listedStages. `ref` lets
- * the page move focus here when the control that had it goes away.
+ * the page move focus here when the control that had it goes away. A "Progress" heading names the
+ * list, so focus landing on it, or a move by heading, says what it is.
  */
 export function StageList({
   view,
@@ -34,6 +35,7 @@ export function StageList({
   ref?: Ref<HTMLOListElement>;
 }) {
   const { t, lang } = useI18n();
+  const headingId = useId();
   const [now, setNow] = useState(() => Date.now());
   // The run clock advances between events: last event time plus wall time since it arrived.
   const [anchor, setAnchor] = useState(() => ({ wall: Date.now(), t: view.t }));
@@ -52,78 +54,85 @@ export function StageList({
   const stages = listedStages(view, trace);
 
   return (
-    <ol ref={ref} className="stages" tabIndex={-1}>
-      {stages.map((stage) => {
-        const s = view.stages[stage];
-        let status: React.ReactNode = <span className="label">{t.stages.waiting}</span>;
-        if (s.state === "running") {
-          const elapsed = Math.max(0, runClock - (s.startedAt ?? runClock));
-          status = (
-            <span className="stage-running">
-              <span className="spinner" aria-hidden="true" />
-              {fill(t.stages.running, { elapsed: formatSeconds(elapsed, lang) })}
-            </span>
+    <div className="stage-progress">
+      <h2 className="inspector-heading" id={headingId}>
+        {t.stages.title}
+      </h2>
+      <ol ref={ref} className="stages" tabIndex={-1} aria-labelledby={headingId}>
+        {stages.map((stage) => {
+          const s = view.stages[stage];
+          let status: React.ReactNode = <span className="label">{t.stages.waiting}</span>;
+          if (s.state === "running") {
+            const elapsed = Math.max(0, runClock - (s.startedAt ?? runClock));
+            status = (
+              <span className="stage-running">
+                <span className="spinner" aria-hidden="true" />
+                {fill(t.stages.running, { elapsed: formatSeconds(elapsed, lang) })}
+              </span>
+            );
+          } else if (s.state === "done") {
+            // The ✓ is not spoken; the other states name themselves, so "done" is said in words.
+            status = (
+              <span className="label">
+                <span aria-hidden="true">✓ </span>
+                <span className="sr-only">{t.stages.doneState}, </span>
+                {fill(t.stages.done, { seconds: (s.seconds ?? 0).toFixed(1) })}
+              </span>
+            );
+          } else if (s.state === "skipped") {
+            status = (
+              <span className="label">
+                <span aria-hidden="true">✓ </span>
+                {t.stages.skipped}
+              </span>
+            );
+          } else if (s.state === "reused") {
+            status = (
+              <span className="label">
+                <span aria-hidden="true">✓ </span>
+                {t.stages.reused}
+              </span>
+            );
+          } else if (s.state === "stopped") {
+            status = (
+              <span className="label">
+                <span aria-hidden="true">✕ </span>
+                {t.stages.stopped}
+              </span>
+            );
+          } else if (s.state === "lost") {
+            status = (
+              <span className="label">
+                <span aria-hidden="true">⚠ </span>
+                {t.stages.lost}
+              </span>
+            );
+          }
+          const found = stage === "relisten" ? view.relisten : null;
+          return (
+            <li key={stage} className={`stage ${s.state}${found ? " has-detail" : ""}`}>
+              <span>{t.stages[stage]}</span>
+              {status}
+              {found ? (
+                <small className="stage-detail">
+                  {found.soundless
+                    ? t.stages.relistenSoundless
+                    : found.wordsFound > 0
+                      ? fill(t.stages.relistenFound, {
+                          gaps: found.gapsChecked,
+                          words: found.wordsFound,
+                          blocked: formatSeconds(found.blockedSeconds, lang),
+                        })
+                      : found.gapsChecked === 0
+                        ? t.stages.relistenNone
+                        : fill(t.stages.relistenQuiet, { gaps: found.gapsChecked })}
+                </small>
+              ) : null}
+            </li>
           );
-        } else if (s.state === "done") {
-          status = (
-            <span className="label">
-              <span aria-hidden="true">✓ </span>
-              {fill(t.stages.done, { seconds: (s.seconds ?? 0).toFixed(1) })}
-            </span>
-          );
-        } else if (s.state === "skipped") {
-          status = (
-            <span className="label">
-              <span aria-hidden="true">✓ </span>
-              {t.stages.skipped}
-            </span>
-          );
-        } else if (s.state === "reused") {
-          status = (
-            <span className="label">
-              <span aria-hidden="true">✓ </span>
-              {t.stages.reused}
-            </span>
-          );
-        } else if (s.state === "stopped") {
-          status = (
-            <span className="label">
-              <span aria-hidden="true">✕ </span>
-              {t.stages.stopped}
-            </span>
-          );
-        } else if (s.state === "lost") {
-          status = (
-            <span className="label">
-              <span aria-hidden="true">⚠ </span>
-              {t.stages.lost}
-            </span>
-          );
-        }
-        const found = stage === "relisten" ? view.relisten : null;
-        return (
-          <li key={stage} className={`stage ${s.state}${found ? " has-detail" : ""}`}>
-            <span>{t.stages[stage]}</span>
-            {status}
-            {found ? (
-              <small className="stage-detail">
-                {found.soundless
-                  ? t.stages.relistenSoundless
-                  : found.wordsFound > 0
-                    ? fill(t.stages.relistenFound, {
-                        gaps: found.gapsChecked,
-                        words: found.wordsFound,
-                        blocked: formatSeconds(found.blockedSeconds, lang),
-                      })
-                    : found.gapsChecked === 0
-                      ? t.stages.relistenNone
-                      : fill(t.stages.relistenQuiet, { gaps: found.gapsChecked })}
-              </small>
-            ) : null}
-          </li>
-        );
-      })}
-    </ol>
+        })}
+      </ol>
+    </div>
   );
 }
 

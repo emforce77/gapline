@@ -1,9 +1,16 @@
-"""Builds src/styles/fonts/GaplineSymbols.woff2: the status glyphs the interface draws next to its
-words (check, cross, warning, the two circular arrows, minus), cut from Pretendard Variable.
+"""Builds src/styles/fonts/GaplineSymbols.woff2, cut from Pretendard Variable, for two jobs:
 
-Pretendard's own web subsets (imported in src/app/layout.tsx) leave these code points out of every
-unicode-range, so without this file they fall back to whatever symbol font the system has. The slice
-keeps the weight axis, so a bold label gets a bold mark.
+1. The status glyphs the interface draws next to its words (check, cross, warning, the two circular
+   arrows, minus). Pretendard's own web subsets (imported in src/app/layout.tsx) leave these code
+   points out of every unicode-range, so without this file they fall back to whatever symbol font the
+   system has.
+2. The few characters an English page uses outside Pretendard's Latin subset (91). Pretendard cuts its
+   subsets by how often characters appear in Korean text, so "$", "|", "§", "…", "₩", "≈" and the
+   "한국어" of the language toggle each sit in a different Hangul-heavy subset: the English landing
+   fetched 8 subsets, 208,596 B (QA round 3, 2026-10-03). Listed first in --font-sans (tokens.css),
+   this face serves them instead, and an English page needs subset 91 and this file.
+
+The slice keeps the weight axis, so a bold label gets a bold mark.
 
 Pretendard is licensed under the SIL OFL 1.1 with the Reserved Font Name "Pretendard". A subset is a
 Modified Version, so this one is renamed "Gapline Symbols"; the copyright and licence records stay in
@@ -25,7 +32,13 @@ OUTPUT = ROOT / "src/styles/fonts/GaplineSymbols.woff2"
 FAMILY = "Gapline Symbols"
 POSTSCRIPT_FAMILY = "GaplineSymbols"
 # ✓ ✗ ⚠ ↺ ↻ −
-CODEPOINTS = [0x2713, 0x2717, 0x26A0, 0x21BA, 0x21BB, 0x2212]
+STATUS = [0x2713, 0x2717, 0x26A0, 0x21BA, 0x21BB, 0x2212]
+# ASCII outside subset 91: # $ % & + < = > @ ^ _ ` | ~
+ASCII = [0x23, 0x24, 0x25, 0x26, 0x2B, 0x3C, 0x3D, 0x3E, 0x40, 0x5E, 0x5F, 0x60, 0x7C, 0x7E]
+# § × ‘ ’ • … ₩ ← ↑ → ↓ ≈ ■ ▶, then 한 국 어 (the English page's language toggle)
+PUNCTUATION = [0xA7, 0xD7, 0x2018, 0x2019, 0x2022, 0x2026, 0x20A9, 0x2190, 0x2191, 0x2192, 0x2193]
+PUNCTUATION += [0x2248, 0x25A0, 0x25B6, 0xD55C, 0xAD6D, 0xC5B4]
+CODEPOINTS = STATUS + ASCII + PUNCTUATION
 # ✕ drawn with ✗'s glyph.
 ALIASES = {0x2715: 0x2717}
 # Copyright, trademark notice, licence description and licence URL keep the original wording: the

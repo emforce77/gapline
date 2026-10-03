@@ -1,14 +1,30 @@
 "use client";
 
-import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useReducer,
+  useRef,
+  useState,
+} from "react";
 import { fill } from "@/i18n";
 import { useI18n } from "@/i18n/client";
 import { formatClock } from "@/lib/format";
 import type { Cue, Language, SpeechSegment } from "@/lib/pipeline/schemas";
 import { webVtt } from "@/lib/srt";
 import { PlayIcon } from "../PlayIcon";
+import { restated } from "./announcements";
 import { Gloss } from "./glosses";
-import { dialogueLang, narrationText, speechText, spokenDuration } from "./text-tracks";
+import {
+  keyBelongsToControl,
+  nextSliderHold,
+  seekFromHold,
+  seekKeyTarget,
+  sliderPosition,
+} from "./player-controls";
+import { narrationText, speechText, speechTrackLang, spokenDuration } from "./text-tracks";
 
 export interface PlayerHandle {
   seek: (seconds: number, play?: boolean) => void;
@@ -19,23 +35,14 @@ export interface PlayerHandle {
  * black in most films. Only positions past this are restored after a source switch.
  */
 const RESUME_MIN_SECONDS = 0.05;
-/** Arrow keys on the position slider move this far (Shift: five times as far). */
-const SEEK_KEY_SECONDS = 1;
-const SEEK_KEY_SHIFT_FACTOR = 5;
-const SEEK_KEYS: Record<string, -1 | 1> = {
-  ArrowLeft: -1,
-  ArrowDown: -1,
-  ArrowRight: 1,
-  ArrowUp: 1,
-};
 
-/** Keys stay with the control that has focus: typing, native button activation, sliders. */
-function keyBelongsToControl(target: EventTarget | null, key: string): boolean {
-  if (!(target instanceof HTMLElement)) return false;
-  if (target.isContentEditable) return true;
-  const tag = target.tagName;
-  if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
-  return key === " " && (tag === "BUTTON" || tag === "A" || tag === "SUMMARY");
+function focusedControl(target: EventTarget | null) {
+  if (!(target instanceof HTMLElement)) return null;
+  return {
+    tag: target.tagName,
+    type: target instanceof HTMLInputElement ? target.type : undefined,
+    editable: target.isContentEditable,
+  };
 }
 
 /** A pause or a new source interrupts a pending play: the viewer's own choice, not a failure. */
@@ -102,16 +109,26 @@ export const Player = forwardRef<
   const [adOn, setAdOn] = useState(true);
   const [eyesClosed, setEyesClosed] = useState(false);
   const [time, setTime] = useState(0);
+  // The spot the position slider reports during playback while focus is on it, unless a pointer
+  // pressed it (player-controls.ts). The clock beside it keeps time; a pause reports where the film
+  // is, once.
+  const [seekHold, holdSlider] = useReducer(nextSliderHold, null);
+  // A pointer pressed the slider since it last lost focus: its thumb follows the film.
+  const sliderPressed = useRef(false);
   const [duration, setDuration] = useState(0);
   const [playing, setPlaying] = useState(false);
   const [ratio, setRatio] = useState<number | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+  // What the player's own polite live region says after a letter key: the new track or picture.
+  // Clicking the buttons needs no words; the pressed button already says its new state.
+  const [keySaid, setKeySaid] = useState("");
   const resume = useRef<{ time: number; playing: boolean } | null>(null);
   // A result with no voiced line has a "described" file that is the film as it was.
   const describable = describedUrl !== null && cues.some((c) => c.status === "fits");
   const described = adOn && describable;
   const src = described ? describedUrl : originalUrl;
-  const speechLang = dialogueLang(filmLanguage);
+  const speechLang = useMemo(() => speechTrackLang(speech, filmLanguage), [speech, filmLanguage]);
+  const sliderTime = sliderPosition(time, seekHold, playing);
 
   const descriptionsVtt = useMemo(
     () => (described ? webVtt(narrationText(cues)) : null),
@@ -134,6 +151,7 @@ export const Player = forwardRef<
     const clamped = Math.min(Math.max(0, seconds), el.duration || 0);
     el.currentTime = clamped;
     setTime(clamped);
+    holdSlider({ type: "seek", to: clamped });
   }
 
   useImperativeHandle(ref, () => ({
@@ -171,16 +189,33 @@ export const Player = forwardRef<
 
   function onPlayerKey(event: React.KeyboardEvent<HTMLDivElement>) {
     if (event.altKey || event.ctrlKey || event.metaKey) return;
-    if (keyBelongsToControl(event.target, event.key)) return;
+    const control = focusedControl(event.target);
+    if (control && keyBelongsToControl(control, event.key)) return;
     const key = event.key.toLowerCase();
     if (key === " " || key === "k") {
       event.preventDefault();
       togglePlay();
     } else if (key === "d" && describable) {
-      setAdOn((on) => !on);
+      // describable here, so what plays (described) is adOn.
+      setAdOn(!adOn);
+      setKeySaid((said) => restated(said, adOn ? t.workspace.adOff : t.workspace.adOn));
     } else if (key === "e") {
-      setEyesClosed((closed) => !closed);
+      setEyesClosed(!eyesClosed);
+      setKeySaid((said) =>
+        restated(said, eyesClosed ? t.workspace.eyesOpen : t.workspace.eyesClosed),
+      );
     }
+  }
+
+  // A button press says its new state itself, so the shortcut's last words would now be stale.
+  function chooseTrack(on: boolean) {
+    setAdOn(on);
+    setKeySaid("");
+  }
+
+  function choosePicture(closed: boolean) {
+    setEyesClosed(closed);
+    setKeySaid("");
   }
 
   function retryLoad() {
@@ -212,7 +247,13 @@ export const Player = forwardRef<
           playsInline
           preload="auto"
           onClick={togglePlay}
-          onPlay={() => setPlaying(true)}
+          onPlay={(e) => {
+            // Played again after a pause: a held slider holds this spot, not an older one. A source
+            // switch plays the new file without a pause in between and keeps the hold, so the
+            // slider stays silent on D.
+            if (!playing) holdSlider({ type: "resume", at: e.currentTarget.currentTime });
+            setPlaying(true);
+          }}
           onPause={() => setPlaying(false)}
           onError={() => {
             console.error("Video failed to load", video.current?.error);
@@ -230,6 +271,9 @@ export const Player = forwardRef<
             if (saved.playing) startPlaying(el);
           }}
           onTimeUpdate={(e) => {
+            // A new source reports 0 before its metadata restores the position: not where the
+            // film is, and a focused slider would say "0 seconds" between the two.
+            if (resume.current) return;
             setTime(e.currentTarget.currentTime);
             onTime(e.currentTarget.currentTime);
           }}
@@ -312,21 +356,42 @@ export const Player = forwardRef<
           className="player-seek"
           aria-label={t.editor.seek}
           aria-valuetext={fill(t.editor.seekValue, {
-            time: spokenDuration(time, lang),
+            time: spokenDuration(sliderTime, lang),
             total: spokenDuration(duration, lang),
           })}
           type="range"
           min={0}
           max={duration || 0}
           step={0.1}
-          value={Math.min(time, duration || 0)}
-          onChange={(e) => seekTo(Number(e.target.value))}
+          value={Math.min(sliderTime, duration || 0)}
+          onChange={(e) => {
+            const next = Number(e.target.value);
+            const el = video.current;
+            // Keys are handled in onKeyDown; a change here while the slider shows a held spot
+            // came from a screen reader stepping from that spot.
+            const held = playing && seekHold !== null && !sliderPressed.current;
+            seekTo(held && el ? seekFromHold(next, seekHold, el.currentTime, duration) : next);
+          }}
+          // Pointer events come before focus; a screen reader moving focus sends none.
+          onPointerDown={() => {
+            sliderPressed.current = true;
+            holdSlider({ type: "press" });
+          }}
+          onFocus={() => holdSlider({ type: "focus", byPointer: sliderPressed.current, at: time })}
+          onBlur={() => {
+            sliderPressed.current = false;
+            holdSlider({ type: "blur" });
+          }}
           onKeyDown={(e) => {
-            const direction = SEEK_KEYS[e.key];
-            if (!direction || !video.current) return;
+            const el = video.current;
+            if (!el) return;
+            const target = seekKeyTarget(e.key, e.shiftKey, el.currentTime, el.duration || 0);
+            // Space, K, D and E go on to the player and leave a clicked thumb moving.
+            if (target === null) return;
             e.preventDefault();
-            const step = SEEK_KEY_SECONDS * (e.shiftKey ? SEEK_KEY_SHIFT_FACTOR : 1);
-            seekTo(video.current.currentTime + direction * step);
+            sliderPressed.current = false;
+            holdSlider({ type: "key", at: time });
+            seekTo(target);
           }}
         />
         {/* What is pressed is what plays: before a result exists, only the film is there. */}
@@ -335,7 +400,7 @@ export const Player = forwardRef<
             type="button"
             aria-pressed={described}
             disabled={!describable}
-            onClick={() => setAdOn(true)}
+            onClick={() => chooseTrack(true)}
           >
             {t.workspace.adOn}
           </button>
@@ -343,21 +408,24 @@ export const Player = forwardRef<
             type="button"
             aria-pressed={!described}
             disabled={!describable}
-            onClick={() => setAdOn(false)}
+            onClick={() => chooseTrack(false)}
           >
             {t.workspace.adOff}
           </button>
         </div>
         <div className="segmented" role="group" aria-label={t.editor.picture}>
-          <button type="button" aria-pressed={!eyesClosed} onClick={() => setEyesClosed(false)}>
+          <button type="button" aria-pressed={!eyesClosed} onClick={() => choosePicture(false)}>
             {t.workspace.eyesOpen}
           </button>
-          <button type="button" aria-pressed={eyesClosed} onClick={() => setEyesClosed(true)}>
+          <button type="button" aria-pressed={eyesClosed} onClick={() => choosePicture(true)}>
             {t.workspace.eyesClosed}
           </button>
         </div>
       </div>
       <p className="label keys-hint">{t.workspace.keys}</p>
+      <p className="sr-only" aria-live="polite">
+        {keySaid}
+      </p>
     </div>
   );
 });

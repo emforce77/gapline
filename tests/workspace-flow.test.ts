@@ -301,7 +301,7 @@ describe("what a live run's stages announce", () => {
     assert.equal(stageAnnouncement(finished, en, "en"), null);
     assert.equal(
       runFinishedAnnouncement(finished, en),
-      fill(en.workspace.runFinished, { lines: "7 lines" }),
+      fill(en.workspace.runFinished, { lines: "7\u00a0lines" }),
     );
     const empty = view({ mix: "done" }, { summary: { cuesShipped: 0 } as RunSummary });
     assert.equal(runFinishedAnnouncement(empty, en), en.workspace.runFinishedEmpty);

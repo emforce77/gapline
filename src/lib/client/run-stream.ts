@@ -25,6 +25,11 @@ const CONFIRM_DELAYS_MS: readonly number[] = [500, 1_500, 3_000];
 
 export const sleep = (ms: number) => new Promise<void>((done) => setTimeout(done, ms));
 
+/** Whether an HTTP status says "not now" (TRANSIENT_STATUSES): the same request may work shortly. */
+export function isTransientStatus(status: number): boolean {
+  return TRANSIENT_STATUSES.includes(status);
+}
+
 /** The API answered a run request with an error status instead of a stream or data. */
 export class RunRequestError extends Error {
   constructor(
@@ -37,7 +42,7 @@ export class RunRequestError extends Error {
 
   /** Whether the same request may succeed a moment later. */
   get transient(): boolean {
-    return TRANSIENT_STATUSES.includes(this.status);
+    return isTransientStatus(this.status);
   }
 }
 

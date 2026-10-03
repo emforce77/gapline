@@ -131,11 +131,15 @@ export function useLiveRun({
 
   // Answers in a row that said another run is going (statusRecheckMs).
   const busyAnswers = useRef(0);
+  // Bumped per question: only the latest one's answer counts (recheckStatus can ask while a timed
+  // question is still out, and an older answer arriving last must not undo a newer one).
+  const asked = useRef(0);
   const refreshStatus = useCallback(function refresh() {
     const own = generation.current;
+    const question = ++asked.current;
     fetchLiveStatus()
       .then((s) => {
-        if (own !== generation.current) return;
+        if (own !== generation.current || question !== asked.current) return;
         setStatus(s);
         if (renewal.current !== null) window.clearTimeout(renewal.current);
         renewal.current = null;
@@ -146,6 +150,19 @@ export function useLiveRun({
       })
       .catch((error: unknown) => console.error("live status unavailable", error));
   }, []);
+
+  /**
+   * Asks now whether a run or edit could start, after one of this page's edits ended (saved, or
+   * stopped after a reload). An edit found after a reload reads as over a moment before its charge
+   * is settled, so a busy answer then is the first of a new series (asked again after
+   * BUSY_RECHECK_FIRST_MS), not the next one of the series its going held.
+   */
+  const recheckStatus = useCallback(() => {
+    if (renewal.current !== null) window.clearTimeout(renewal.current);
+    renewal.current = null;
+    busyAnswers.current = 0;
+    refreshStatus();
+  }, [refreshStatus]);
 
   /** Lists the viewer's unfinished runs and edits, leaving out the run that just ended. */
   const showUnfinished = useCallback((list: RunList, endedRunId: string | null) => {
@@ -376,7 +393,18 @@ export function useLiveRun({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [projectId]);
 
-  return { connection, followed, since, active, edits, status, start, follow, checkAgain };
+  return {
+    connection,
+    followed,
+    since,
+    active,
+    edits,
+    status,
+    start,
+    follow,
+    checkAgain,
+    recheckStatus,
+  };
 }
 
 /** The shared allowance or this visitor's share is spent for today: it renews at resetAt. */

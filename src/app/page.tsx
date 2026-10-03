@@ -12,7 +12,6 @@ import { formatClock, formatDuration, formatSeconds, formatUsd } from "@/lib/for
 import { findGaps, mergeSpans } from "@/lib/pipeline/gaps";
 import { GUIDELINE_RULES } from "@/lib/pipeline/guidelines";
 import type { Language } from "@/lib/pipeline/schemas";
-import { readAnalysis } from "@/lib/store/projects";
 import { loadShowcases, type Showcase } from "@/lib/store/showcase";
 
 export const dynamic = "force-dynamic";
@@ -91,15 +90,15 @@ function narrationTrack(projectId: string, preview: Preview, lang: UiLang): Narr
 export default async function LandingPage() {
   const lang = asUiLang((await cookies()).get(UI_LANG_COOKIE)?.value);
   const t = dictionary(lang);
-  // One read of the sample and its runs serves both languages.
-  const showcases = await loadShowcases(["en", "ko"]);
+  // One read of the sample, its runs and its analysis serves both languages.
+  const showcases = await loadShowcases(["en", "ko"], { analysis: true });
   const english = showcases?.en ?? null;
   const korean = showcases?.ko ?? null;
   const showcase = lang === "ko" ? korean : english;
   // The story follows the pinned result in the viewer's language (runtime/showcase.json), else the other.
   const featured = showcase?.preview ?? (lang === "ko" ? english : korean)?.preview ?? null;
   const project = showcase?.project ?? null;
-  const analysis = project ? await readAnalysis(project.id) : null;
+  const analysis = showcase?.analysis ?? null;
   const gaps =
     project && analysis
       ? findGaps({ speech: analysis.speech, sounds: analysis.scene.sounds }, project.clipSeconds)

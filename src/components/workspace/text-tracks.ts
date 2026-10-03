@@ -26,6 +26,15 @@ export function dialogueLang(filmLanguageCode: string): string {
   return filmLanguageCode === "auto" ? "" : filmLanguageCode;
 }
 
+/**
+ * The language of the dialogue track: the one language the recognizer heard in every segment it
+ * tagged, else the film's own setting (dialogueLang). A clip heard in two languages stays "".
+ */
+export function speechTrackLang(speech: SpeechSegment[], filmLanguageCode: string): string {
+  const heard = new Set(speech.flatMap((s) => (s.lang ? [s.lang] : [])));
+  return heard.size === 1 ? [...heard][0] : dialogueLang(filmLanguageCode);
+}
+
 /** "1 minute 5 seconds" / "1분 5초", whole seconds, for a slider's spoken value. */
 export function spokenDuration(seconds: number, lang: UiLang): string {
   const total = Math.floor(Math.max(0, seconds));

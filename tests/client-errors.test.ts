@@ -12,6 +12,7 @@ import {
   uploadErrorMessage,
 } from "../src/lib/client/api-errors";
 import { checkClipFile } from "../src/lib/client/upload";
+import { formatWholeSeconds } from "../src/lib/format";
 
 const labels = { tooLong: en.landing.uploadTooLong, failed: en.landing.uploadFailed };
 const json = (status: number, body: unknown) => ({
@@ -89,10 +90,24 @@ describe("uploadErrorMessage", () => {
     );
   });
 
+  // QA round 3: "This clip runs 1 min 31 s; … up to 90 seconds" made the reader convert units.
+  it("states a refused clip's length in the unit of the limit, from the limit itself", () => {
+    assert.equal(
+      uploadErrorMessage({ code: "too_long", seconds: 90.6 }, en, "en", labels),
+      "This clip runs 91\u00a0seconds; Gapline takes clips up to 90\u00a0seconds. Trim it to one scene and try again.",
+    );
+    assert.equal(
+      uploadErrorMessage({ code: "too_long", seconds: 600 }, ko, "ko", labels),
+      "이 영상은 600초입니다. 90초까지 받습니다. 한 장면으로 잘라서 다시 올려 주세요.",
+    );
+    assert.equal(formatWholeSeconds(1, "en"), "1\u00a0second");
+    assert.equal(formatWholeSeconds(1234.4, "en"), "1,234\u00a0seconds");
+  });
+
   it("says the clip length when it is known, and the page label when it is not", () => {
     assert.equal(
       uploadErrorMessage({ code: "too_long", seconds: 125 }, en, "en", labels),
-      "This clip runs 2 min 5 s; Gapline takes clips up to 90 seconds. Trim it to one scene and try again.",
+      "This clip runs 125\u00a0seconds; Gapline takes clips up to 90\u00a0seconds. Trim it to one scene and try again.",
     );
     assert.equal(uploadErrorMessage({ code: "too_long" }, en, "en", labels), labels.tooLong);
     assert.equal(uploadErrorMessage({ code: "unreadable" }, en, "en", labels), labels.failed);
@@ -104,7 +119,7 @@ describe("uploadErrorMessage", () => {
     }
     assert.match(
       uploadErrorMessage({ code: "too_long", seconds: 125 }, ko, "ko", labels),
-      /2분 5초.*90초까지/,
+      /이 영상은 125초입니다\. 90초까지 받습니다/,
     );
   });
 });

@@ -10,7 +10,8 @@ import {
   findSavedRun,
   READ_RETRY_DELAYS_MS,
 } from "@/lib/client/run-stream";
-import { pinRunInUrl, runInUrl, unpinRunInUrl } from "@/lib/client/run-url";
+import { liveStatusNotice } from "@/lib/client/api-errors";
+import { pinRunInUrl, pinSettingInUrl, runInUrl, unpinRunInUrl } from "@/lib/client/run-url";
 import { useLiveRun } from "@/lib/client/use-live-run";
 import { usePendingEdit } from "@/lib/client/use-pending-edit";
 import type { TimedRunEvent } from "@/lib/pipeline/events";
@@ -68,6 +69,8 @@ export function Workspace({
   measured,
   measuredHere,
   initialRunId,
+  initialSetting,
+  initialResult,
   missingRunId,
   pins,
 }: {
@@ -80,6 +83,13 @@ export function Workspace({
   measuredHere: boolean;
   /** A finished result to open on, or a run of this viewer's that has not finished (followed). */
   initialRunId?: string;
+  /** The narration language and density the address names (?narration=&density=), without a run. */
+  initialSetting?: { language?: Language; density?: Density };
+  /**
+   * The saved events of the result the page opens on, read with the page, so it shows (and its
+   * described film loads) without a fetch first. Ignored unless it is the result shown.
+   */
+  initialResult?: { runId: string; events: TimedRunEvent[] };
   /** The ?run= of the link, when it names nothing this viewer can open. */
   missingRunId?: string;
   /** The sample's pinned run per narration language: the default result for that language. */
@@ -87,15 +97,28 @@ export function Workspace({
 }) {
   const { t, lang } = useI18n();
   const pinned = initialRuns.find((r) => r.runId === initialRunId);
-  const [narration, setNarration] = useState<Language>((pinned?.language as Language) ?? lang);
-  const [density, setDensity] = useState<Density>((pinned?.density as Density) ?? "standard");
+  const [narration, setNarration] = useState<Language>(
+    (pinned?.language as Language) ?? initialSetting?.language ?? lang,
+  );
+  const [density, setDensity] = useState<Density>(
+    (pinned?.density as Density) ?? initialSetting?.density ?? "standard",
+  );
   const [runs, setRuns] = useState(initialRuns);
   // The version shown for each narration language and density (settingKey), once one is chosen.
   const [chosen, setChosen] = useState<Record<string, string>>(
     pinned ? { [settingKey(pinned)]: pinned.runId } : {},
   );
-  const [events, setEvents] = useState<TimedRunEvent[] | null>(null);
-  const [view, setView] = useState<RunView | null>(null);
+  // The result opened on, when its events came with the page (first render: the initial setting).
+  const [events, setEvents] = useState<TimedRunEvent[] | null>(() =>
+    initialResult &&
+    shownRun(initialRuns, { language: narration, density }, chosen, pins)?.runId ===
+      initialResult.runId
+      ? initialResult.events
+      : null,
+  );
+  const [view, setView] = useState<RunView | null>(() =>
+    events ? foldRun(events, project.clipSeconds) : null,
+  );
   // The finished result shown before a live run began: it stays playable until the new one is ready.
   const [held, setHeld] = useState<RunView | null>(null);
   // A run named in the address without a finished result is followed from the first render.
@@ -127,9 +150,12 @@ export function Workspace({
   const { labels, notes } = useRunLabels(project.id, runs);
 
   const current = shownRun(runs, { language: narration, density }, chosen, pins);
-  // The result the address names (or, with no ?run=, the one it opens on): the address is written
-  // only when the shown result changes.
-  const pinnedInUrl = useRef<string | null>((resuming ? initialRunId : current?.runId) ?? null);
+  // What the address names: the result shown, or the narration language and density shown when
+  // they have no result yet, so a reload or a link opens the same choice.
+  const shownKey = current?.runId ?? settingKey({ language: narration, density });
+  // The result or setting the address names (or, with no ?run=, the one it opens on): the address
+  // is written only when what is shown changes.
+  const pinnedInUrl = useRef<string | null>(resuming ? initialRunId! : shownKey);
   // The result being fetched, or fetched, to play while a run is made (held), when none was loaded.
   const holding = useRef<string | null>(null);
 
@@ -162,16 +188,18 @@ export function Workspace({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // The address names the result on screen, so a reload, a bookmark or a shared link comes back to
-  // it. A live run names itself (use-live-run); a run that stopped keeps its name until another
-  // result is shown, so reloading shows why it stopped.
+  // The address names the result on screen, or the setting chosen when it has none, so a reload, a
+  // bookmark or a shared link comes back to it. A live run names itself (use-live-run); a run that
+  // stopped keeps its name until another result or setting is shown, so reloading shows why it
+  // stopped.
   useEffect(() => {
-    if (mode === "live" || !current || current.runId === pinnedInUrl.current) return;
-    pinnedInUrl.current = current.runId;
-    pinRunInUrl(current.runId);
-    // Only when the shown result changes.
+    if (mode === "live" || shownKey === pinnedInUrl.current) return;
+    pinnedInUrl.current = shownKey;
+    if (current) pinRunInUrl(current.runId);
+    else pinSettingInUrl({ language: narration, density });
+    // Only when what is shown changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.runId]);
+  }, [shownKey]);
 
   useEffect(() => {
     if (mode === "live") return;
@@ -358,6 +386,8 @@ export function Workspace({
     },
     onEnded: (edit, code) => {
       setSettledEdits((s) => [...s, edit.runId]);
+      // Its reservation no longer holds this visitor busy.
+      live.recheckStatus();
       const line = fill(t.line.title, { n: numbers.get(edit.cueId) ?? "" });
       setError({
         message: fill(code ? t.live.editStopped : t.live.editUnknown, { line }),
@@ -369,9 +399,11 @@ export function Workspace({
   /**
    * Opens the result an edit saved, as `listed` (the save's own answer) has it, or as a new read
    * of the list once it does: never another version in its place. Until then the version it was
-   * made from stays on screen.
+   * made from stays on screen. Whether another run or edit could start is asked again: the one
+   * just saved held this visitor busy (after a reload) and may have spent what was left today.
    */
   async function showSaved(runId: string, cueId: string, listed?: RunListing[]) {
+    live.recheckStatus();
     const found = await findSavedRun(
       runId,
       listed,
@@ -395,6 +427,8 @@ export function Workspace({
     if (!events) return;
     stopReplay();
     setSelected(null);
+    // A message about a stopped or lost run belongs to that run, which the replay replaces.
+    setError((e) => (e && (e.ownFailure || e.lostRunId) ? null : e));
     const replayed = events.filter((e) => e.type !== "writer_delta");
     const lastT = replayed[replayed.length - 1]?.t ?? 0;
     const speed = Math.max(MIN_REPLAY_SPEED, Math.ceil(lastT / REPLAY_TARGET_SECONDS));
@@ -467,6 +501,33 @@ export function Workspace({
   // A run of this clip the viewer started elsewhere (another tab, before Back) is still going, or
   // today's allowance is spent: the server would refuse, and the notices say why.
   const blocked = live.active.length > 0 || live.status?.canStart === false;
+  // An edit reserves what a run does, so while a run could not start, neither could an edit. Not
+  // while one is being made: its own reservation reads as this visitor's run going.
+  const editRefusal = !editing && live.status ? liveStatusNotice(live.status, t, lang) : null;
+  // The page shows a run that ended without a result (stopped, or no longer answering).
+  const unfinished = mode === "idle" && view !== null && !final;
+  // The saved events can be replayed when they are the result on screen and a run made them: an
+  // edit's events have no stages to replay (only its final event, at its whole duration).
+  const canReplay =
+    Boolean(events) && mode !== "live" && !unfinished && !trace?.summary?.parentRunId;
+  // Before a result for this setting: what a run took. "Reused from an earlier run of this clip"
+  // is said only of this clip's own figures (its run, or the sample's on the sample); quoting the
+  // sample's on a clip not yet heard and watched says that its first run does both.
+  const measuredReused =
+    measured?.summary?.analysisReused?.speech || measured?.summary?.analysisReused?.scene;
+  const measuredOwn = measuredHere || project.kind === "sample";
+  const measuredHint = measured?.summary
+    ? [
+        fill(
+          measuredHere ? t.workspace.noRunHintHere : t.workspace.noRunHint,
+          sampleRunFigures(measured.language, measured.summary, lang),
+        ),
+        measuredReused && measuredOwn ? t.landing.measuredReused : null,
+        measuredReused && !measuredOwn && !analysis ? t.workspace.noRunHintFirst : null,
+      ]
+        .filter(Boolean)
+        .join(" ")
+    : null;
   const cueLanguage = shown?.language ?? narration;
   const sceneEvidence = shown?.scene?.shots
     .filter((s) => selectedCue && selectedCue.start >= s.start && selectedCue.start < s.end)
@@ -538,9 +599,17 @@ export function Workspace({
           {error ? (
             <RunAlert
               alert={error}
+              settled={mode !== "live"}
               onRetry={stoppedRun ? () => thenFocusStages(() => void live.start(stoppedRun)) : null}
               onCheckAgain={(runId) => thenFocusStages(() => live.checkAgain(runId))}
-              onReload={() => setLoadAttempt((n) => n + 1)}
+              onReload={() => {
+                setLoadAttempt((n) => n + 1);
+                // This button goes with the alert while the result loads again: focus waits on the
+                // version being loaded (the picker always shows one when a load can fail).
+                document
+                  .querySelector<HTMLElement>(".result-picker select:not(:disabled)")
+                  ?.focus();
+              }}
             />
           ) : null}
 
@@ -568,7 +637,6 @@ export function Workspace({
               language={cueLanguage}
               openCueId={selected}
               disabled={busy}
-              describedBy={pickHint}
               onOpen={select}
             />
           ) : null}
@@ -621,6 +689,7 @@ export function Workspace({
                       cues={final.cues}
                       gaps={final.gaps}
                       language={cueLanguage}
+                      unavailable={editRefusal}
                       onBusy={setEditing}
                       onSaved={(id: string, listed?: RunListing[]) =>
                         showSaved(id, selectedCue.id, listed)
@@ -644,26 +713,11 @@ export function Workspace({
                 mode={mode}
                 busy={busy}
                 blocked={blocked}
-                canReplay={Boolean(events) && mode !== "live"}
+                canReplay={canReplay}
                 replaySpeed={replaySpeed}
-                emptyHint={
-                  measured?.summary
-                    ? [
-                        fill(
-                          measuredHere ? t.workspace.noRunHintHere : t.workspace.noRunHint,
-                          sampleRunFigures(measured.language, measured.summary, lang),
-                        ),
-                        measured.summary.analysisReused?.speech ||
-                        measured.summary.analysisReused?.scene
-                          ? t.landing.measuredReused
-                          : null,
-                      ]
-                        .filter(Boolean)
-                        .join(" ")
-                    : null
-                }
+                emptyHint={measuredHint}
                 sample={project.kind === "sample"}
-                unfinished={mode === "idle" && view !== null && !final}
+                unfinished={unfinished}
                 onChooseRun={act((runId: string) => {
                   const run = runs.find((r) => r.runId === runId);
                   if (!run) return;
@@ -738,7 +792,7 @@ export function Workspace({
               ) : null}
               {final?.cues.length ? (
                 <p className="label hint" id={pickHint}>
-                  {t.line.pickHint}
+                  {t.line.pickHint} <span className="pointer-hint">{t.line.pickHintKeys}</span>
                 </p>
               ) : null}
             </>

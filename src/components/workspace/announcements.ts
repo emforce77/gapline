@@ -54,3 +54,12 @@ export function runFinishedAnnouncement(finished: RunView, t: Dictionary): strin
         lines: fill(t.editor.lines[shipped === 1 ? "one" : "other"], { n: shipped }),
       });
 }
+
+/**
+ * The text to put in a live region so that saying the same words again is still said: a region
+ * whose text does not change says nothing, so a repeat gets a trailing no-break space, which
+ * screen readers do not speak.
+ */
+export function restated(previous: string, text: string): string {
+  return previous === text ? `${text}\u00a0` : text;
+}

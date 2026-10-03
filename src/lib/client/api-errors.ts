@@ -15,7 +15,7 @@ import {
   type RunErrorCode,
   type UploadErrorCode,
 } from "@/lib/api-contract";
-import { formatDuration } from "@/lib/format";
+import { formatWholeSeconds } from "@/lib/format";
 
 const BYTES_PER_MB = 1024 * 1024;
 const MS_PER_MINUTE = 60_000;
@@ -164,8 +164,9 @@ export function uploadErrorMessage(
       return failure.seconds === undefined
         ? fallbacks.tooLong
         : fill(errors.too_long, {
-            length: formatDuration(failure.seconds, lang),
-            max: formatDuration(MAX_UPLOAD_SECONDS, lang),
+            // Both in whole seconds, the unit the card states its limit in ("up to 90 seconds").
+            length: formatWholeSeconds(failure.seconds, lang),
+            max: formatWholeSeconds(MAX_UPLOAD_SECONDS, lang),
           });
     case "unreadable":
       return fallbacks.failed;
@@ -220,8 +221,27 @@ export function runErrorMessage(
 }
 
 /**
+ * Codes whose run sentence is true of a start that was refused: why none could start (allowance,
+ * this visitor's own limit, a busy model), or what to do about the request itself. The others say
+ * a run stopped, which one refused before it began never did.
+ */
+const START_REFUSAL_CODES: readonly RunFailureCode[] = [
+  "budget_busy",
+  "budget_daily",
+  "visitor_busy",
+  "visitor_daily",
+  "provider_busy",
+  "forbidden",
+  "not_found",
+  "invalid_request",
+  "run_active",
+];
+
+/**
  * The sentence for a start the server refused before any stream. An answer without the API's JSON
  * came from the platform in front of it: busy when it says to retry, otherwise the run did not start.
+ * A failure code the run catalog words as a run that stopped ("internal", a failed model or media
+ * step) is said as a run that did not start.
  */
 export function refusedStartMessage(
   refusal: { body: Partial<ApiErrorBody>; transient: boolean },
@@ -229,8 +249,10 @@ export function refusedStartMessage(
   lang: UiLang,
   now = Date.now(),
 ): string {
-  if (refusal.body.error)
-    return runErrorMessage({ ...refusal.body, code: refusal.body.error }, t, lang, null, now);
+  const code = refusal.body.error;
+  if (code && START_REFUSAL_CODES.includes(code as RunFailureCode))
+    return runErrorMessage({ ...refusal.body, code }, t, lang, null, now);
+  if (code) return t.live.notStarted;
   return refusal.transient ? t.live.errors.server_busy : t.live.notStarted;
 }
 

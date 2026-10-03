@@ -1,4 +1,5 @@
 import type { EditSaved } from "@/lib/api-contract";
+import { isTransientStatus } from "@/lib/client/run-stream";
 import type { RunListing } from "@/lib/store/projects";
 import type { EditFailureBody } from "./edit-errors";
 
@@ -15,12 +16,17 @@ export type EditRequestBody =
 
 /**
  * The edits route's answer: the new result's id with the runs listed after it was saved (EditSaved;
- * absent from older servers), a refusal with its JSON body, or no answer.
+ * absent from older servers), a refusal with its JSON body, no answer, or "busy": the platform in
+ * front of the app answered for it ("not now" without the app's JSON, such as Cloud Run's 429
+ * "Rate exceeded." or a gateway's 502 page), so whether the edit was made is not known yet. Like no
+ * answer, a busy one keeps the request's id: asking again answers the saved edit, says it is still
+ * running, or makes a failed attempt again, but never makes a second edit.
  */
 export type EditAnswer =
   | { kind: "saved"; runId: string; runs?: RunListing[] }
   | { kind: "refused"; status: number; body: EditFailureBody | null }
-  | { kind: "offline" };
+  | { kind: "offline" }
+  | { kind: "busy"; status: number };
 
 /** The answer body as JSON, or null when it is not JSON (a proxy's HTML error page, for example). */
 async function readJson(
@@ -53,6 +59,12 @@ export async function postEdit(
     return { kind: "offline" };
   }
   const result = await readJson(response);
+  if (result === null && isTransientStatus(response.status)) {
+    console.warn(
+      `edit: HTTP ${response.status} without the app's answer; the same request may work`,
+    );
+    return { kind: "busy", status: response.status };
+  }
   if (!response.ok || typeof result?.runId !== "string") {
     console.warn(`edit refused: HTTP ${response.status} ${result?.error ?? "no code"}`);
     return { kind: "refused", status: response.status, body: result };

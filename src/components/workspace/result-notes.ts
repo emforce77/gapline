@@ -8,7 +8,10 @@ import type { Cue, Gap, Verdict } from "@/lib/pipeline/schemas";
  */
 export type ResultCoverage = "none" | "little" | "enough";
 
-/** Why a result has no line: no silence to speak in, none written, all removed, or all dropped. */
+/**
+ * Why a result has no line: no silence to speak in, none written, every voiced line removed by an
+ * editor, or every line dropped by Gapline.
+ */
 export type NoLinesReason = "no_room" | "unwritten" | "removed" | "dropped";
 
 export interface FinalCheckLine {
@@ -73,6 +76,8 @@ export function readResult(summary: RunSummary, cues: Cue[], gaps: Gap[]): Resul
 function noLinesReason(summary: RunSummary, cues: Cue[]): NoLinesReason {
   if (summary.gapCount === 0) return "no_room";
   if (cues.length === 0) return "unwritten";
-  if (cues.every((c) => c.status === "removed")) return "removed";
+  // Only a voiced line can be removed (edit-run.ts), so with none voiced, any removed line means an
+  // editor took out every line that was being spoken; the rest were dropped before.
+  if (cues.some((c) => c.status === "removed")) return "removed";
   return "dropped";
 }

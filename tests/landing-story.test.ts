@@ -105,7 +105,7 @@ describe("landing rejection story", () => {
 
   it("ends Gapline's own rewrite with its measured fit, and says who sent the draft back", () => {
     for (const [t, lang, fitted] of [
-      [en, "en", "Voiced in 1.7 s of the 2.6 s available"],
+      [en, "en", "Voiced in 1.7\u00a0s of the 2.6\u00a0s available"],
       [ko, "ko", "주어진 2.6초 가운데 1.7초 동안 읽음"],
     ] as const) {
       const html = renderToStaticMarkup(

@@ -124,7 +124,7 @@ function textOf(html: string, className: string): string {
 describe("line inspector", () => {
   it("prints the same voiced seconds in the meter as in the version history", () => {
     for (const [t, lang, seconds] of [
-      [en, "en", "2.8 s"],
+      [en, "en", "2.8\u00a0s"],
       [ko, "ko", "2.8초"],
     ] as const) {
       const html = render(line7, t, lang);

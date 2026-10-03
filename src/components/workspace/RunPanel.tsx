@@ -15,8 +15,9 @@ const NEW_VERSION = "new";
 /**
  * Which result is shown and how to make another. Once a result exists, playing it is the primary
  * action (in the player); generating again is a paid live run, so it stays secondary and says so.
- * While the page is busy (a run or an edit), Generate is marked disabled but keeps its focus, so a
- * keyboard user stays where they pressed; while a run cannot start (`blocked`), it is disabled.
+ * While a run goes, Generate is marked disabled but keeps its focus, so a keyboard user stays where
+ * they pressed and the label says why; while an edit is pending or a run cannot start (`blocked`),
+ * it is disabled.
  */
 export function RunPanel({
   runs,
@@ -55,6 +56,7 @@ export function RunPanel({
   blocked: boolean;
   canReplay: boolean;
   replaySpeed: number;
+  /** Before any result for this setting: what a run of it took, said after the paid-API note. */
   emptyHint: string | null;
   /** The shared sample: what this viewer generates or edits on it is theirs alone. */
   sample: boolean;
@@ -151,8 +153,8 @@ export function RunPanel({
         <button
           type="button"
           className={`${current ? "button ghost" : "button primary"} ${styles.generate}`}
-          aria-disabled={busy || undefined}
-          disabled={blocked || mode === "replay"}
+          aria-disabled={live || undefined}
+          disabled={blocked || mode === "replay" || (busy && !live)}
           onClick={() => {
             if (!busy) onGenerate();
           }}
@@ -168,8 +170,13 @@ export function RunPanel({
           )}
         </button>
       </div>
-      {current ? <p className="label run-note">{t.workspace.liveNote}</p> : null}
-      {!current && emptyHint ? <p className="label run-note">{emptyHint}</p> : null}
+      {current ? (
+        <p className="label run-note">{t.workspace.liveNote}</p>
+      ) : (
+        <p className="label run-note">
+          {emptyHint ? `${t.workspace.paidNote} ${emptyHint}` : t.workspace.paidNote}
+        </p>
+      )}
       {sample ? <p className="label run-note">{t.workspace.samplePrivate}</p> : null}
       {mode === "replay" ? (
         <p className="replay-badge">

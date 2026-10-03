@@ -22,6 +22,7 @@ export function RemoveLine({
   onSaved,
   onBusy,
   locked,
+  unavailable,
   error,
   onError: setError,
 }: {
@@ -30,7 +31,10 @@ export function RemoveLine({
   cue: Cue;
   onSaved: (runId: string, runs?: RunListing[]) => Promise<void>;
   onBusy: (busy: boolean) => void;
+  /** An edit's request is running: everything waits, "Keep it" and Escape included. */
   locked: boolean;
+  /** A removal would be refused now (EditLine says why): it cannot be asked, but can be dismissed. */
+  unavailable: boolean;
   /** This removal's error; null when the latest request (edit or removal) was not a removal. */
   error: EditFailureText | null;
   /** Null clears the error of any earlier request, the editor's included. */
@@ -67,7 +71,7 @@ export function RemoveLine({
   }
 
   async function remove() {
-    if (busy || locked) return;
+    if (busy || locked || unavailable) return;
     request.current ??= crypto.randomUUID();
     setBusy(true);
     onBusy(true);
@@ -80,6 +84,10 @@ export function RemoveLine({
       });
       if (answer.kind === "offline") {
         setError({ text: runErrorMessage({ code: "connection" }, t, lang) });
+        return;
+      }
+      if (answer.kind === "busy") {
+        setError({ text: t.editor.errors.server_busy });
         return;
       }
       if (answer.kind === "refused") {
@@ -121,7 +129,7 @@ export function RemoveLine({
             <button
               type="button"
               className="button danger"
-              disabled={locked && !busy}
+              disabled={(locked || unavailable) && !busy}
               aria-disabled={busy || undefined}
               onClick={remove}
             >
@@ -153,7 +161,7 @@ export function RemoveLine({
           type="button"
           className="button ghost"
           ref={openButton}
-          disabled={locked}
+          disabled={locked || unavailable}
           onClick={() => setConfirming(true)}
         >
           <span aria-hidden="true">−</span> {r.open}

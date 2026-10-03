@@ -204,7 +204,7 @@ describe("the film's storyboard", () => {
     for (const lang of LANGS) {
       const text = said.caption[lang];
       for (const shown of [measured, room]) {
-        const number = formatSeconds(toRecordedSeconds(shown), lang).replace(/ s$|초$/, "");
+        const number = formatSeconds(toRecordedSeconds(shown), lang).replace(/\s+s$|초$/, "");
         assert.ok(text.includes(number), `${lang}: "${text}" lacks the meter's ${number}`);
       }
     }

@@ -27,9 +27,10 @@ See [submission details](docs/SUBMISSION.md) for the prepared materials and rema
 On 3 September 2026, after a ten-year lawsuit, Korea's Supreme Court confirmed that cinemas discriminate
 against blind and deaf moviegoers when films lack audio description and captions
 ([case 2022Da203507](https://www.scourt.go.kr/portal/news/NewsViewAction.work?gubun=6&seqnum=3044&type=0)).
-Making one Korean film accessible still takes about three months, about ten specialists and roughly
-₩14 million (about US$10,000) for description and captions together
-([Barrier-Free Film Committee](https://barrierfreefilms.or.kr/board_hrgp25/682), [2019 interview](https://web.archive.org/web/20260511062907/https://futurechosun.com/archives/43832)).
+In a [2019 interview](https://web.archive.org/web/20260511062907/https://futurechosun.com/archives/43832),
+making one Korean film accessible took about three months and about ten specialists. The
+[Barrier-Free Film Committee's FAQ](https://barrierfreefilms.or.kr/board_hrgp25/682) (undated) puts the
+cost at roughly ₩14 million (about US$10,000) for description and captions together.
 
 ## What Gapline does
 
@@ -45,7 +46,7 @@ Making one Korean film accessible still takes about three months, about ten spec
   the lines it sends back and can add a line where a silence still has free room, then mixes the
   track.
 - **Leaves every line open.** Want different words? You can still edit any line on the timeline;
-  Gapline re-voices just that one and checks the track again.
+  Gapline re-voices just that one and checks it against the picture and the rest of the track.
 
 ## Try it in 60 seconds
 
@@ -60,9 +61,10 @@ Making one Korean film accessible still takes about three months, about ten spec
    final check sent it back.
 3. Select a narration line on the timeline. You see what the model saw in the scene, every draft, the
    rule that rejected a draft with its guideline page, and the voiced length against the room it had.
-4. Choose **Try your own clip** and upload up to 90 seconds and 30 MB. A new track usually takes 2–6
-   minutes, longer for a long or busy clip. New tracks share a daily allowance on the public demo; when
-   it runs out, the sample keeps playing.
+4. Choose **Try your own clip** and upload up to 90 seconds and 30 MB. A new track takes about 1 to 3
+   minutes for most short clips and up to about 9 minutes for a clip with many pauses to describe
+   (56 live runs on the current code, 2026-10-03). New tracks share a daily allowance on the public
+   demo; when it runs out, the sample keeps playing.
 
 ## How the AI works
 
@@ -103,8 +105,9 @@ how long it takes to say, and when to stop trying.
     a described MP4 (audio tagged as audio description), a narration WAV,
     a WebVTT text track and a JSON script with every version and verdict.
 11. **Edit (optional).** You can rewrite or move any line, bring back one the loop dropped, or remove
-    one. A rewritten line is voiced at normal speed and the whole track is reviewed again. If it runs
-    long or breaks a rule, Gapline returns the reason and leaves your words as they are. A removal voices
+    one. A rewritten line is voiced at normal speed and reviewed against the picture and the rest of
+    the track. If it runs long or breaks a rule, Gapline returns the reason and leaves your words as
+    they are. A removal voices
     nothing: the other lines keep their audio byte for byte, and the final check runs again on what is
     left, so anything only that line covered is listed as missing. Every edit makes a new version and
     keeps the old one.
@@ -136,16 +139,16 @@ dropped the line rather than voice it.
 Each rule points at a clause of a published guideline, so every decision can be checked against its
 source. The rules live in [`src/lib/pipeline/guidelines.ts`](src/lib/pipeline/guidelines.ts).
 
-| Rule                             | A line fails when it                                                                                                                              | Source                                                                                                                                                                                               |
-| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reveals too early                | names a person, or reveals a plot point, before the film does (on-screen titles and signs are fine)                                               | KMCC p.8 (describe movement as it happens), p.7 (characters); Netflix §5.1 (foreshadowing), §1.2                                                                                                     |
-| Not on screen                    | states anything the clip does not show or let you hear, including outside knowledge of the film                                                   | KMCC p.8 (nothing beyond the picture), p.10 (review)                                                                                                                                                 |
-| Interprets instead of describing | names an emotion or judgment instead of the action or expression that shows it                                                                    | KMCC p.9 (behaviour, not feelings); Netflix §1.2                                                                                                                                                     |
-| Tense or person                  | is not in present tense and third person                                                                                                          | KMCC p.8 (present tense, neutral third person); Netflix §1.2                                                                                                                                         |
-| Viewer or camera framing         | says "we see" or "appears on screen", or uses camera jargon the story does not need                                                               | KMCC p.8–9 (avoid "is seen" phrasing and camera terms)                                                                                                                                               |
-| Inconsistent naming              | calls a person or object something different from earlier lines                                                                                   | KMCC p.9 (consistent names)                                                                                                                                                                          |
-| Redundant or low priority        | repeats what the dialogue or an obvious sound already says, or spends the room on something minor while something more important goes undescribed | KMCC p.7 (must describe characters, place, time, movement, unidentifiable sounds, on-screen text), p.8 (no description for sounds recognised at once or feelings the dialogue conveys); Netflix §1.2 |
-| Unclear or overloaded            | is incomplete, ambiguous, hard to follow by ear, or crammed with detail                                                                           | KMCC p.9 (complete, clear, concise)                                                                                                                                                                  |
+| Rule                             | A line fails when it                                                                                                                              | Source                                                                                                                                                                                                                                                    |
+| -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Reveals too early                | names a person, or reveals a plot point, before the film does (on-screen titles and signs are fine)                                               | KMCC p.8 (describe movement as it happens), p.7 (names and relationships only once the story reveals them); Netflix §5.1 (foreshadowing), §1.2 (characters unnamed until introduced)                                                                      |
+| Not on screen                    | states anything the clip does not show or let you hear, including outside knowledge of the film                                                   | KMCC p.8 (nothing beyond the picture), p.10 (review)                                                                                                                                                                                                      |
+| Interprets instead of describing | names an emotion or judgment instead of the action or expression that shows it                                                                    | KMCC p.9 (behavior, not feelings); Netflix §1.2 (factual, not opinionated)                                                                                                                                                                                |
+| Tense or person                  | is not in present tense and third person                                                                                                          | KMCC p.8 (present tense, neutral third person); Netflix §1.2 (present tense, third person)                                                                                                                                                                |
+| Viewer or camera framing         | says "we see" or "appears on screen", or uses camera jargon the story does not need                                                               | KMCC p.8–9 (avoid "is seen" phrasing and camera terms)                                                                                                                                                                                                    |
+| Inconsistent naming              | calls a person or object something different from earlier lines                                                                                   | KMCC p.9 (consistent names)                                                                                                                                                                                                                               |
+| Redundant or low priority        | repeats what the dialogue or an obvious sound already says, or spends the room on something minor while something more important goes undescribed | KMCC p.7 (must describe characters, place, time, movement, unidentifiable sounds, on-screen text), p.8 (no description for sounds recognized at once or feelings the dialogue conveys); Netflix §1.2 (no overload; leave out what dialogue already tells) |
+| Unclear or overloaded            | is incomplete, ambiguous, hard to follow by ear, or crammed with detail                                                                           | KMCC p.9 (complete, clear, concise)                                                                                                                                                                                                                       |
 
 KMCC is the Korea Media and Communications Commission guideline for accessible broadcasting
 ([장애인방송 프로그램 제공 가이드라인](https://www.kmcc.go.kr/download.do?fileSeq=62457), section 2,
@@ -208,7 +211,7 @@ them since.
 | _Tears of Steel_ lab scene, 45 s, held out | English   | Described      | 3                                | 4 min 1 s, $0.17  |
 | Korean interview, 45 s                     | Korean    | Described      | 1 (only 2.5 s of usable silence) | 3 min 11 s, $0.13 |
 | Korean interview, a later 40 s, held out   | Korean    | Stopped safely | none                             | $0.02             |
-| Synthetic colour-and-beep clip, 30 s       | Korean    | Stopped safely | none                             | $0.01             |
+| Synthetic color-and-beep clip, 30 s        | Korean    | Stopped safely | none                             | $0.01             |
 
 - **4 of 6 clips produced a described track.** On the other 2, the speech recognizer returned words
   whose start and end times were identical, and Gapline stopped instead of guessing where the silences
@@ -235,9 +238,10 @@ them since.
   none. Of the 3 moments it still lists, 2 have no free silence left. The credit at 2.0 s had 1.0 s
   of free room, yet no line was added there; we have not checked why.
 - **A 45–65 second clip took about 3–6 minutes and $0.13–0.24 in API calls** when nothing had been
-  analysed before. The sample track, with the fix step and the second rewrite, took 8 min 6 s and $0.32.
+  analyzed before. The sample track, with the fix step and the second rewrite, took 8 min 6 s and $0.32.
   Its hearing and watching came from an earlier run of the same clip, which adds 25 s and $0.04: $0.36
-  in all, or $0.33 per minute of film. Hosting and storage are not included.
+  in all, or $0.33 per minute of film. Hosting and storage are not included. On the current code,
+  56 live runs on 2026-10-03 took from 20 s to 8 min 52 s (step 4 above).
 
 The method, references and every number are in [docs/EVALUATION.md](docs/EVALUATION.md) and
 [`evals/`](evals/).
@@ -347,7 +351,7 @@ docs/               architecture, evaluation, deployment
   clips are not in this repository.
 - Font: [Pretendard](https://github.com/orioncactus/pretendard), SIL Open Font License 1.1. The
   status marks (✓ ✗ ⚠ ↺ ↻ −) come from _Gapline Symbols_, a renamed subset of it built by
-  `scripts/build-symbol-font.py` (`src/styles/fonts/`, licence in `OFL.txt` there).
+  `scripts/build-symbol-font.py` (`src/styles/fonts/`, license in `OFL.txt` there).
 - Review rules cite the KMCC accessible-broadcasting guideline and the Netflix Audio Description
   Style Guide v2.5.
 

@@ -158,7 +158,7 @@ describe("sample run figures", () => {
   it("quotes one run and names its narration language in both interface languages", () => {
     assert.deepEqual(sampleRunFigures("ko", summary, "en"), {
       language: "Korean",
-      time: "5 min 49 s",
+      time: "5\u00a0min 49\u00a0s",
       cost: "$0.241",
     });
     assert.deepEqual(sampleRunFigures("ko", summary, "ko"), {
@@ -178,7 +178,7 @@ describe("sample run figures", () => {
         assert.doesNotMatch(text, /\{\w+\}/, text);
         assert.match(
           text,
-          lang === "en" ? /Korean.*5 min 49 s.*\$0\.241/ : /한국어.*5분 49초.*\$0\.241/,
+          lang === "en" ? /Korean.*5\u00a0min 49\u00a0s.*\$0\.241/ : /한국어.*5분 49초.*\$0\.241/,
         );
       }
     }
@@ -236,12 +236,14 @@ describe("interface copy", () => {
     }
   });
 
-  it("gives one duration for a new track wherever a wait is mentioned", () => {
-    // Measured live runs took 2.3–6.4 min (fix round 3, 2026-10-03); the sample's 65 s took 6 min 27 s.
+  it("gives one measured duration for a new track wherever a wait is mentioned", () => {
+    // 66 live runs (QA rounds 2–3, 2026-10-03): short clips a median 64 s, 60–90 s clips with lines
+    // up to 8 min 22 s (BBB). "2–6 minutes" was contradicted by the showcase runs (6:27, 8:06).
     for (const catalog of [en, ko]) {
       for (const text of strings(catalog)) {
         assert.doesNotMatch(text, /few minutes|several minutes|몇 분/, text);
         assert.doesNotMatch(text, /10 minutes|up to 10\b|about 2 minutes|10분|2분쯤/, text);
+        assert.doesNotMatch(text, /2–6|2~6분|long or busy/, text);
       }
     }
     const english = [
@@ -260,11 +262,62 @@ describe("interface copy", () => {
       ko.live.errors.budget_busy,
       ko.workspace.liveNote,
     ];
-    for (const text of english) assert.match(text, /2–6 minutes/, text);
-    for (const text of korean) assert.match(text, /2~6분/, text);
+    // Where the wait has a sentence of its own, it says what makes a run long; elsewhere the range.
+    const detailed =
+      /about 1\u00a0to\u00a03\u00a0minutes for most short clips, and up to about 9\u00a0minutes for a clip with many pauses to describe/;
+    const koDetailed = /짧은 영상이면 대개 1~3분, 해설할 쉼이 많은 영상이면 9분 가까이/;
+    for (const text of english)
+      assert.match(text, /1\u00a0to\u00a09\u00a0minutes|about 1\u00a0to\u00a03\u00a0minutes/, text);
+    for (const text of korean) assert.match(text, /1~9분|1~3분/, text);
     for (const text of [en.landing.uploadIntro, en.live.elapsed, en.workspace.liveNote]) {
-      assert.match(text, /long or busy clip/, text);
+      assert.match(text, detailed, text);
     }
+    for (const text of [ko.landing.uploadIntro, ko.live.elapsed, ko.workspace.liveNote]) {
+      assert.match(text, koDetailed, text);
+    }
+  });
+
+  it("says who holds the allowance in plain words", () => {
+    // QA round 3: "Descriptions other visitors started hold the rest of today's allowance" was a
+    // word-for-word rendering of the Korean; "checks again what the track now misses" likewise.
+    for (const text of strings(en)) {
+      assert.doesNotMatch(text, /hold the rest|checks again what|behaviour/, text);
+    }
+    for (const text of strings(ko)) assert.doesNotMatch(text, /남은 몫을/, text);
+    assert.match(en.live.errors.budget_busy, /^Other visitors' runs are using the rest of today's/);
+    assert.equal(fill(en.landing.shortest, { s: "2.1 s" }), "shortest silence: 2.1 s");
+    assert.equal(fill(ko.landing.shortest, { s: "2.1초" }), "가장 짧은 침묵: 2.1초");
+  });
+
+  it("keeps mouse and keyboard instructions apart from the hints a touch screen shows", () => {
+    // A phone hides .pointer-hint (tokens.css); the hint around it must still read whole.
+    for (const t of [en, ko]) {
+      assert.doesNotMatch(t.landing.uploadHint, /Drop|끌어/, t.landing.uploadHint);
+      assert.doesNotMatch(t.line.pickHint, /keyboard|Enter|키보드/, t.line.pickHint);
+      assert.match(t.upload.dropHint, /Drop|끌어/);
+      assert.match(t.line.pickHintKeys, /Enter/);
+    }
+  });
+
+  it("keeps each English number on the line of its unit", () => {
+    // QA round 3 at 390 px: "up to 30 / MB" and "took 6 / min 27 s"; round-4 review at 390 px:
+    // "the 65- / second sample", and at 360 px "about 1 to / 3 minutes". A no-break hyphen is no
+    // fix: no Pretendard subset has U+2011, so it would render in a fallback font.
+    const unit = /(\d|\{\w+\}) (seconds?|minutes?|months?|MB|lines?|silences|stretches)\b/;
+    for (const text of strings(en)) {
+      assert.doesNotMatch(text, unit, text);
+      assert.doesNotMatch(text, /\d-(second|minute)/, text);
+      for (const [range] of text.matchAll(/\d\s+to\s+\d/g)) assert.doesNotMatch(range, / /, text);
+    }
+    assert.match(en.editor.lines.other, /^\{n\} lines$/);
+  });
+
+  it("dates the cost of making a film accessible by its sources, not as current", () => {
+    const [, cost] = en.landing.why;
+    assert.doesNotMatch(cost.text, /still/);
+    assert.match(cost.text, /as reported in 2019/);
+    assert.doesNotMatch(ko.landing.why[1].text, /지금도/);
+    assert.match(ko.landing.why[1].text, /2019년 보도 기준/);
   });
 
   it("names the landing's seven seconds by the window its player plays (53.8–60.8 s)", () => {

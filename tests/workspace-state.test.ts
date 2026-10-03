@@ -356,7 +356,10 @@ describe("workspace copy", () => {
   });
 
   it("quotes the measured typical time, not ten minutes, for a live run", () => {
-    assert.match(en.workspace.liveNote, /usually takes 2–6 minutes/);
+    assert.match(
+      en.workspace.liveNote,
+      /takes about 1\u00a0to\u00a03\u00a0minutes for most short clips/,
+    );
     assert.match(
       en.workspace.liveNote,
       /Your current result keeps playing until the new one is ready\.$/,
@@ -370,7 +373,7 @@ describe("workspace copy", () => {
     const lines = fill(en.editor.lines.other, { n: 5 });
     assert.equal(
       fill(en.workspace.runFinished, { lines }),
-      "Finished: the described film has 5 lines. Press Play with description to hear it.",
+      "Finished: the described film has 5\u00a0lines. Press Play with description to hear it.",
     );
   });
 });
