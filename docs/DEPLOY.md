@@ -113,6 +113,20 @@ to Artifact Registry, and Cloud Run starts the service with:
 - `GOOGLE_API_KEY` from Secret Manager;
 - public access, by turning off the invoker IAM check.
 
+After the deploy, the script requests the landing page and the sample's page once and prints each
+status and time (`warm-up GET /: HTTP 200 in 0.641236s`). The first request loads the page code and the
+first listing of the sample reads its runs, so the first visitor does not pay for either. It stops
+with an error when the landing page does not answer 200, or does not answer within 120 seconds. The
+sample's page answers 404 until you add the sample (step 7); set `SAMPLE_ID` when your sample has
+another ID.
+
+Uploads, runs and edits are accepted only when the browser's `Origin` matches the request's `Host`
+and `X-Forwarded-Proto` (`requestOrigin` in `src/lib/store/access.ts`); `X-Forwarded-Host` is ignored,
+because Cloud Run passes a client's value through unchanged. Serve the service on its own URL or a
+Cloud Run domain mapping. Before putting a proxy in front of it (Firebase Hosting, a load balancer),
+check which `Host` the service receives: if it is not the address in the browser, every upload, run and
+edit is refused with 403.
+
 ### Capacity and cost
 
 One page load asks for about 30 files at once, and an instance that is converting an upload with
@@ -155,6 +169,12 @@ calls for those 15 minutes and 2 after. Cloud Storage accepts about one write pe
 object; when a burst of runs ending at once loses index writes, those runs are logged as
 `RUN INDEX NOT UPDATED` and read directly by each listing until one records them, so pages are
 slower for that while and the lists stay right.
+
+Node runs file calls on a pool of 4 threads unless told otherwise, and a call on the mount holds its
+thread for the whole Cloud Storage round trip. With 4 such calls in flight, static files and pages
+waited behind them (live, 2026-10-03: a static file took 3 ms alone and 98–133 ms with 8 media checks
+in flight). The image sets `UV_THREADPOOL_SIZE=64` in the `Dockerfile`; Node reads it once at start,
+so it cannot be set from the app or changed without a new image.
 
 gcloud takes the options without leading dashes, separated by semicolons (`gcloud run deploy --help`,
 585.0.0). Cloud Run refused `metadata-cache-negative-ttl-secs` on 2026-10-03 ("Unsupported or

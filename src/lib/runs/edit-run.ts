@@ -345,7 +345,8 @@ export async function editRun(
             from: cue.start,
             at,
           };
-          // Nothing to accept: the words that stay were already in the track. The audit is recorded.
+          // Nothing to accept: the words that stay were already in the track. The audit of what
+          // the track now misses is recorded.
           await writeEditedRun({ ...run, cues, audio, humanEdit }, () => {});
           return;
         }
@@ -366,8 +367,7 @@ export async function editRun(
         };
         await writeEditedRun(
           { ...run, cues, audio, revoiced: { cueId: edited.id, line }, humanEdit },
-          (finalReview) => {
-            const verdict = finalReview.verdicts.find((v) => v.cueId === edited.id)!;
+          (verdict) => {
             if (!verdict.pass) {
               // One reason per broken rule, said once; the fix apart, for the page to label.
               const reasons = [...new Set(verdict.violations.map((v) => v.reason.trim()))];

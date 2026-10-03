@@ -5,6 +5,7 @@ import { UploadError } from "../errors";
 import {
   copyFileByStream,
   FfmpegError,
+  keyframeTimes,
   probeDurationSeconds,
   probeMedia,
   runFfmpeg,
@@ -51,28 +52,43 @@ const SCALE_FILTER =
  */
 const AUDIO_FADE_IN = "afade=t=in:d=0.02";
 
+/** Whether every thumbnail's span holds a keyframe, so a strip of keyframes alone shows each span. */
+export function keyframeInEverySpan(keyframes: number[], step: number, count: number): boolean {
+  for (let i = 0; i < count; i++)
+    if (!keyframes.some((t) => t >= i * step && t < (i + 1) * step)) return false;
+  return true;
+}
+
 /**
  * One row of ceil(clip / step) thumbnails at the clip's own shape; the timeline's picture lane
  * places tile i at i × step. The last frame is repeated past the end of the video, so a clip that
  * ends a fraction of a step after its last tile (or whose sound outlasts its picture) still fills
  * every tile instead of ending in a black one; ffmpeg stops as soon as the row is full.
+ *
+ * Thumbnails 72 px high need neither every frame nor the deblocking filter. When every tile's span
+ * holds a keyframe (phone and stream clips, keyframes every 1–2 s), only keyframes are decoded, and
+ * each tile is the last keyframe of its span (round=down; rounding to the nearest frame put 10 of
+ * 45 tiles up to 1 s before their span). A 90 s 1080p phone-style upload took 1.2 s (0.13 s to list
+ * its keyframes, 1.1 s to decode them) instead of 4.2 s, on 2 cores with the deployed ffmpeg 5.1
+ * (2026-10-04). Otherwise (x264's default of a keyframe every 250
+ * frames, for one) frames nothing refers to are skipped: about 3× faster than decoding every frame
+ * (city-45s: 4.3 → 1.3 s on 2 vCPU), within a frame or two of the same moments.
  */
 async function writeStrip(clipFile: string, outFile: string, clipSeconds: number): Promise<number> {
   const step = Math.max(1, Math.ceil(clipSeconds / MAX_THUMBNAILS));
   const count = Math.ceil(clipSeconds / step);
+  const keyframesOnly = keyframeInEverySpan(await keyframeTimes(clipFile), step, count);
   await runFfmpeg([
     "-y",
-    // Thumbnails 72 px high need neither every frame nor the deblocking filter: skipping both
-    // makes the strip about 3× faster to decode (city-45s: 4.3 → 1.3 s on 2 vCPU), within a frame
-    // or two of the same moments.
     "-skip_frame",
-    "noref",
+    keyframesOnly ? "nokey" : "noref",
     "-skip_loop_filter",
     "all",
     "-i",
     clipFile,
     "-vf",
-    `tpad=stop_mode=clone:stop_duration=${clipSeconds.toFixed(2)},fps=1/${step},` +
+    `tpad=stop_mode=clone:stop_duration=${clipSeconds.toFixed(2)},` +
+      `fps=1/${step}${keyframesOnly ? ":round=down" : ""},` +
       `scale=-2:${THUMB_HEIGHT},tile=${count}x1`,
     "-frames:v",
     "1",
@@ -284,14 +300,33 @@ const WORDS = new Intl.Segmenter(undefined, { granularity: "word" });
 const MIN_WORD_CUT_SHARE = 0.6;
 
 /**
+ * Direction overrides, embeddings, isolates and marks: a file name must not reverse or hide how its
+ * title reads ("\u202Egnp.exe\u202C clip" showed as "exe.png clip"; QA 2026-10-03).
+ */
+const BIDI_CONTROLS = /[\u061C\u200E\u200F\u202A-\u202E\u2066-\u2069]/gu;
+/**
+ * A name of only controls, format characters (zero-width space, word joiner, soft hyphen),
+ * separators, default-ignorable marks (variation selectors, the combining grapheme joiner, Hangul
+ * fillers, Khmer and Mongolian invisible signs) or the blank Braille pattern shows nothing, so the
+ * clip gets the fallback title ("\uFE0F\uFE0F.mp4" was stored as an invisible title; review,
+ * 2026-10-04). They are not removed from a visible name: a zero-width joiner or a variation selector
+ * holds an emoji sequence together.
+ */
+const NOTHING_VISIBLE = /^[\p{Cc}\p{Cf}\p{Z}\p{Default_Ignorable_Code_Point}\u2800]*$/u;
+
+/**
  * The clip's title: its file name without the extension. A longer name is cut after the last
  * whole word that fits and ends in "…", or inside a word when that keeps too little of it.
  * Characters are counted as the reader sees them, so an emoji or an accented letter is never split.
  */
 export function uploadTitle(fileName: string): string {
-  const name = fileName.replace(/\.[^.]+$/, "").trim();
+  const name = fileName
+    .replace(/\.[^.]+$/, "")
+    .replace(BIDI_CONTROLS, "")
+    .trim();
+  if (NOTHING_VISIBLE.test(name)) return "Untitled clip";
   const characters = (text: string) => [...GRAPHEMES.segment(text)].length;
-  if (characters(name) <= MAX_TITLE_CHARACTERS) return name || "Untitled clip";
+  if (characters(name) <= MAX_TITLE_CHARACTERS) return name;
   const room = MAX_TITLE_CHARACTERS - 1;
   let kept = "";
   for (const { segment } of WORDS.segment(name)) {

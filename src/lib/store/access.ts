@@ -1,6 +1,6 @@
 import { createHash, randomBytes } from "node:crypto";
 import { cookies } from "next/headers";
-import { assertSafeId, canSeeRun, readProject, type Project } from "./projects";
+import { assertSafeId, readProject, runOwnerHash, runVisibleTo, type Project } from "./projects";
 
 export const OWNER_COOKIE = "scene-owner";
 export function ownerHash(token: string): string {
@@ -52,10 +52,21 @@ export function requestViewerHash(request: Request): string | undefined {
   return undefined;
 }
 /**
- * The project, if this viewer may open it and see this run of it (canSeeRun). Another viewer's run
- * on the sample answers null, the same as a run that does not exist.
+ * The project, if this viewer may open it and see this run of it (runVisibleTo). Another viewer's
+ * run on the sample answers null, the same as a run that does not exist.
  */
 export async function accessibleRun(id: string, runId: string): Promise<Project | null> {
+  return (await runAccess(id, runId))?.project ?? null;
+}
+
+/**
+ * accessibleRun, also saying whether the run is open to everyone (`shared`): on the sample, a run no
+ * visitor made, such as a curated result. Any other run is reachable only with its maker's cookie.
+ */
+export async function runAccess(
+  id: string,
+  runId: string,
+): Promise<{ project: Project; shared: boolean } | null> {
   try {
     assertSafeId(runId);
   } catch {
@@ -63,29 +74,40 @@ export async function accessibleRun(id: string, runId: string): Promise<Project 
   }
   const project = await accessibleProject(id);
   if (!project) return null;
-  return (await canSeeRun(project, runId, await viewerHash())) ? project : null;
+  // Only a sample's runs can belong to someone other than the viewer; uploads skip the reads.
+  const owner = project.kind === "sample" ? await runOwnerHash(project.id, runId) : null;
+  if (!runVisibleTo(project, owner, await viewerHash())) return null;
+  return { project, shared: project.kind === "sample" && owner === null };
 }
 export function publicProject(project: Project): Omit<Project, "ownerHash"> {
   const { ownerHash: _owner, ...visible } = project;
   return visible;
 }
 /**
+ * The origin a browser on this site sends, from Host and X-Forwarded-Proto. Cloud Run's front end
+ * routes by Host and sets X-Forwarded-Proto itself (a forged one is replaced), but it passes a
+ * client's X-Forwarded-Host through unchanged, so that header names nothing (live QA, 2026-10-03).
+ * Next's own request URL can say localhost behind the proxy. Locally, Next sets the proto to http.
+ */
+export function requestOrigin(request: Request): string | null {
+  const host = request.headers.get("host");
+  if (!host) return null;
+  const proto = request.headers.get("x-forwarded-proto")?.split(",")[0].trim() || "http";
+  try {
+    return new URL(`${proto}://${host}`).origin;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Mutations (upload, run, edit) must come from this site's own pages. Browsers send Origin with
- * every POST, same-origin included, so a request without one is a script, not the app.
+ * every POST, same-origin included, so a request without one is a script, not the app. The whole
+ * origin must match, so neither http:// on this host nor a userinfo trick (https://x@host) passes.
  */
 export function sameOrigin(request: Request): boolean {
   if (request.headers.get("sec-fetch-site") === "cross-site") return false;
   const origin = request.headers.get("origin");
-  if (!origin) return false;
-  try {
-    // Next's request URL can use localhost behind Cloud Run's reverse proxy.
-    // Browser cross-site requests are rejected above; compare its public forwarded host.
-    const host =
-      request.headers.get("x-forwarded-host") ??
-      request.headers.get("host") ??
-      new URL(request.url).host;
-    return new URL(origin).host === host;
-  } catch {
-    return false;
-  }
+  const expected = requestOrigin(request);
+  return !!origin && !!expected && origin === expected;
 }

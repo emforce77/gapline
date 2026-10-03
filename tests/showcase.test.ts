@@ -9,6 +9,7 @@ import {
   projectDir,
   RUN_OWNER_FILE,
   runDir,
+  writeAnalysis,
   writeProject,
   type Project,
 } from "../src/lib/store/projects";
@@ -161,5 +162,26 @@ describe("the landing page's sample", () => {
       (await listProjects()).map((p) => p.id),
       [SAMPLE.id, OLDER_SAMPLE.id, UPLOAD.id],
     );
+  });
+
+  it("reads the analysis with the rest when asked, and passes over a pinned run that is gone", async () => {
+    const gone = "20261003t000900000-en-standard-999999";
+    await writeFile(
+      join(dir, "showcase.json"),
+      JSON.stringify({ projectId: SAMPLE.id, runs: { en: gone, ko: KO } }),
+    );
+    const analysis = {
+      speech: [{ start: 1, end: 2, speaker: "man", text: "Hello." }],
+      scene: { shots: [], characters: [], sounds: [] },
+    };
+    await writeAnalysis(SAMPLE.id, analysis);
+    // The gone run's script is read ahead with the rest; its failure must not reach anyone.
+    const both = await loadShowcases(["en", "ko"], { analysis: true });
+    assert.equal(both?.en.preview?.runId, NEWER_EN);
+    assert.equal(both?.ko.preview?.runId, KO);
+    assert.deepEqual(both?.en.analysis, analysis);
+    assert.equal(both?.ko.analysis, both?.en.analysis);
+    assert.equal("analysis" in (await loadShowcases(["en"]))!.en, false);
+    await unpin();
   });
 });

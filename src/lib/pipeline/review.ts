@@ -46,7 +46,9 @@ Do not fail a line for style preferences the rules do not cover.
 
 When you review the whole script, also list what is missing: important visual information no line covers
 (a new place or time, a main character's first appearance, essential on-screen text, a key action)
-${finalOutput ? "even if there is no room left to add it. This is the final surviving-output audit." : "that a gap could still hold, only where the gap has at least 1.2 s of free room outside existing lines."} Judge it
+${finalOutput ? "even if there is no room left to add it. This is the final surviving-output audit." : "that a gap could still hold, only where the gap has at least 1.2 s of free room outside existing lines."} List a
+moment only when the picture shows it happening at that time. The first-viewing notes are a quick first pass
+and can be wrong: they may point you to a moment, but never prove it on their own. Judge it
 by the density the script was written for — ${DENSITY_STYLE[context.density]} When you review only some
 lines, return missing as an empty list.`;
 }
@@ -73,6 +75,8 @@ export async function reviewLines(input: {
    * first pass over the whole script and the final check (src/lib/models.ts).
    */
   stage?: "review" | "rereview";
+  /** Said to the reviewer right after the lines, about how to judge them (an editor's own words). */
+  note?: string;
 }): Promise<{ verdicts: Verdict[]; missing: MissingItem[] }> {
   const unit = UNIT_NAME[input.context.language];
   const lines = input.lines
@@ -108,6 +112,7 @@ export async function reviewLines(input: {
             (input.finalOutput
               ? "\nFINAL OUTPUT AUDIT: these are the actual spoken lines after all deletions and shortening. List any essential missing action, person or on-screen text even when no free room remains. Use its scene time and the nearest gap id. Do not assume deleted draft lines are still present."
               : "") +
+            (input.note ? `\n${input.note}` : "") +
             retry,
         },
       ],

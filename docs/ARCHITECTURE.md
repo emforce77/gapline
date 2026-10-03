@@ -243,8 +243,13 @@ flowchart TD
    finishes, before the next one starts, inside the same silence.
 2. Only the edited line is voiced, at normal speed. If it runs past its room, the edit is refused with
    the exact seconds needed and available.
-3. The whole final script is reviewed again with measured end times. If the new line breaks a rule,
-   the edit is refused with the reviewer's reason and fix. Gapline never rewrites words typed by hand.
+3. The edited line is reviewed with its measured end time, the clip in view and every other line of
+   the track as context, at the effort of a re-review. The reviewer is told the words are the
+   editor's own, to be judged against the picture, not against what the line said before. If the
+   line breaks a rule, the edit is refused with the reviewer's reason and fix. Gapline never rewrites
+   words typed by hand. The whole-track final check is not run again: the result keeps the parent's
+   findings, with this line's verdict replaced (a whole-track check at high effort took 70 s to
+   refuse one line, QA 2026-10-03).
 4. An accepted edit becomes a new run that points to its parent. The other lines' WAV files are
    reused byte for byte, the mix and text track are rebuilt, and the before and after text is recorded.
    The original run is kept.

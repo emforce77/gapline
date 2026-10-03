@@ -37,6 +37,22 @@ describe("reviewer instructions", () => {
     assert.match(prompt, /final surviving-output audit/);
   });
 
+  // QA round 3, BBB run f0d3dd: the final check listed "the rabbit sets the apple on the grass" at
+  // 0:34 as missing. Only the first-viewing notes said so; the frames show him holding it throughout.
+  for (const finalOutput of [false, true]) {
+    it(`ask for missing moments the picture shows, not ones only the notes claim (final ${finalOutput})`, () => {
+      const prompt = reviewerSystem(context("en"), finalOutput).replace(/\s+/g, " ");
+      assert.match(prompt, /List a moment only when the picture shows it happening at that time/);
+      assert.match(
+        prompt,
+        /The first-viewing notes are a quick first pass and can be wrong: they may point you to a moment, but never prove it on their own/,
+      );
+      // The rule sits in the paragraph about what is missing, before the density it is judged by.
+      assert.ok(prompt.indexOf("also list what is missing") < prompt.indexOf("List a moment only"));
+      assert.ok(prompt.indexOf("List a moment only") < prompt.indexOf("Judge it by the density"));
+    });
+  }
+
   it("carry the requirement in the JSON schema the model answers with", () => {
     const schema = JSON.stringify(z.toJSONSchema(ReviewSchema));
     assert.match(schema, /any wording it suggests must itself obey every rule/);
@@ -97,7 +113,14 @@ describe("rule clauses", () => {
       rule("spoiler").source.en,
       /\(KMCC\) p\.8 \(describe movement as it happens\), p\.7/,
     );
-    assert.match(rule("spoiler").source.en, /Style Guide §5\.1 \(foreshadowing\), §1\.2$/);
+    assert.match(
+      rule("spoiler").source.en,
+      /Style Guide §5\.1 \(foreshadowing\), §1\.2 \(characters unnamed until introduced\)$/,
+    );
+    // Each half names what it covers, so the naming clause under a timing rejection reads as the
+    // rule's other half (QA round 3: "p.7 (characters)" under a skyline read as the wrong clause).
+    assert.match(rule("spoiler").source.en, /p\.7 \(names and relationships only once the story/);
+    assert.match(rule("spoiler").source.ko, /p\.7 「인물 이름·관계는 극에서 드러난 뒤」/);
     assert.match(
       rule("spoiler").source.ko,
       /^방미통위 가이드라인 p\.8 「움직임과 동시에 해설」, p\.7/,
@@ -124,6 +147,25 @@ describe("rule clauses", () => {
       /§1\.2 \(pronouns only when it is clear who is meant\)/,
     );
     assert.match(rule("clarity").source.en, /§2\.1 \(introducing on-screen text\)/);
+  });
+
+  // The landing and the inspector print a rule's whole citation; a bare "§1.2" says nothing about
+  // why it applies (QA round 3 found four).
+  it("say what every cited page or section is about", () => {
+    const clause = /(p\.\d+(?:–\d+)?|§\d+\.\d+)(.?.?)/g;
+    for (const r of GUIDELINE_RULES) {
+      for (const source of [r.source.en, r.source.ko]) {
+        const clauses = [...source.matchAll(clause)];
+        assert.ok(clauses.length > 0, source);
+        for (const [, cited, after] of clauses) {
+          assert.ok(after === " (" || after === " 「", `${r.id}: ${cited} is bare in "${source}"`);
+        }
+      }
+    }
+  });
+
+  it("spell the English citations in US English, like the rest of the page", () => {
+    for (const r of GUIDELINE_RULES) assert.doesNotMatch(r.source.en, /behaviour/, r.id);
   });
 
   it("explain the Korean guideline in English instead of a bare acronym", () => {

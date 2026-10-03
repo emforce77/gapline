@@ -473,19 +473,15 @@ it("reserves concurrent budgets atomically, settles once, and holds unknown spen
 });
 
 it("restricts uploads to their owning session and edits to actual neighboring audio bounds", () => {
+  // Behind Cloud Run: Host is the service's, the front end sets the proto; Next's URL says localhost.
+  const behindProxy = { host: "scene.example", "x-forwarded-proto": "https" };
   const proxied = new Request("http://localhost:8080/api/projects", {
-    headers: {
-      origin: "https://scene.example",
-      "x-forwarded-host": "scene.example",
-      "sec-fetch-site": "same-origin",
-    },
+    headers: { ...behindProxy, origin: "https://scene.example", "sec-fetch-site": "same-origin" },
   });
   assert.equal(sameOrigin(proxied), true);
   assert.equal(
     sameOrigin(
-      new Request(proxied, {
-        headers: { origin: "https://other.example", "x-forwarded-host": "scene.example" },
-      }),
+      new Request(proxied, { headers: { ...behindProxy, origin: "https://other.example" } }),
     ),
     false,
   );
@@ -493,8 +489,8 @@ it("restricts uploads to their owning session and edits to actual neighboring au
     sameOrigin(
       new Request(proxied, {
         headers: {
+          ...behindProxy,
           origin: "https://scene.example",
-          "x-forwarded-host": "scene.example",
           "sec-fetch-site": "cross-site",
         },
       }),

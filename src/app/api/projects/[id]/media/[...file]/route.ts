@@ -4,7 +4,7 @@ import { join, resolve, sep } from "node:path";
 import { Readable } from "node:stream";
 import { runDownloadName } from "@/lib/runs/download-name";
 import { projectDir } from "@/lib/store/projects";
-import { accessibleProject, accessibleRun } from "@/lib/store/access";
+import { accessibleProject, runAccess } from "@/lib/store/access";
 
 export const runtime = "nodejs";
 
@@ -31,11 +31,18 @@ function matchesEtag(header: string | null, etag: string): boolean {
 /**
  * Serves a project's media with HTTP Range support (video seeking needs it). A run's files are
  * served only to viewers who may see that run (another viewer's run on the sample is not found).
- * The browser keeps what it may: a run's files and an upload's files never change under their
- * URL (a run writes its result once, a retried edit gets a run of its own, an upload gets a new
- * id), so they are cached for a year. A sample's own clip, strip and poster are rewritten in place
- * when the sample is prepared again, so the browser checks them each time (ETag, 304). Every
- * answer is `private`: access depends on the viewer's cookie, and nothing shared caches it.
+ *
+ * How long the browser may keep a file depends on who may see it:
+ * - A run on the sample that no visitor made (a curated result) is open to everyone, and its files
+ *   never change under their URL (a run writes its result once), so they are kept for a year.
+ * - The sample's own clip, strip and poster are open to everyone but rewritten in place when the
+ *   sample is prepared again, so the browser checks them each time.
+ * - An upload's files and a visitor's own runs are reachable only with the owner cookie. The
+ *   browser's cache is not keyed on the cookie, and the cookie lasts 30 days or until it is cleared,
+ *   so a kept copy would outlive it. They are revalidated on every use instead: the ETag check runs
+ *   after the access check, so the browser reuses its copy (304) only while the cookie still opens
+ *   the file, and gets 404 once it no longer does.
+ * Every answer is `private`, so no shared cache keeps any of them.
  */
 export async function GET(
   request: Request,
@@ -43,8 +50,11 @@ export async function GET(
 ) {
   const { id, file } = await params;
   const runId = file[0] === "runs" ? file[1] : undefined;
-  const project = runId ? await accessibleRun(id, runId) : await accessibleProject(id);
-  if (!project) return new Response("Not found", { status: 404 });
+  const access = runId
+    ? await runAccess(id, runId)
+    : await accessibleProject(id).then((p) => p && { project: p, shared: p.kind === "sample" });
+  if (!access) return new Response("Not found", { status: 404 });
+  const { project, shared } = access;
   const allowed =
     (file.length === 1 && ["clip.mp4", "strip.jpg", "poster.jpg"].includes(file[0])) ||
     (file.length === 3 &&
@@ -72,13 +82,13 @@ export async function GET(
   // be fetched again in full on every visit even with a long max-age.
   const etag = `"${size.toString(16)}-${Math.floor(modified.getTime()).toString(16)}"`;
   const lastModified = modified.toUTCString();
-  const immutable = runId !== undefined || project.kind === "upload";
   const headers: Record<string, string> = {
     "Content-Type": type,
     "Accept-Ranges": "bytes",
-    "Cache-Control": immutable
-      ? `private, max-age=${IMMUTABLE_MAX_AGE_SECONDS}, immutable`
-      : "private, no-cache",
+    "Cache-Control":
+      shared && runId !== undefined
+        ? `private, max-age=${IMMUTABLE_MAX_AGE_SECONDS}, immutable`
+        : "private, no-cache",
     ETag: etag,
     "Last-Modified": lastModified,
   };

@@ -3,7 +3,33 @@ import type { Cue, DraftCue, Gap } from "./schemas";
 /** A line needs at least this much room. */
 export const MIN_ROOM_SECONDS = 1.0;
 
-/** Turns the writer's lines into placed cues: inside a gap, in order, each with its room computed. */
+/**
+ * Air kept between one line's end and the next line's start in the same gap. Two lines that met with
+ * 0.01 s between them were heard as one run-on sentence (Sintel, QA round 3); every other adjacent
+ * pair in that run had at least 0.3 s.
+ */
+export const LINE_SPACING_SECONDS = 0.3;
+
+/**
+ * Where a line's room ends: LINE_SPACING_SECONDS before the next line in its gap starts, or the gap's
+ * end for its last line. Never before the line's own start, so a line added less than that after
+ * another leaves it no room rather than a negative one, and never past the gap.
+ */
+export function roomEndBefore(
+  start: number,
+  nextStart: number | undefined,
+  gapEnd: number,
+): number {
+  if (nextStart === undefined) return gapEnd;
+  return Math.min(Math.max(nextStart - LINE_SPACING_SECONDS, start), gapEnd);
+}
+
+/**
+ * Turns the writer's lines into placed cues: inside a gap, in order, each with its room computed. A
+ * line's room ends LINE_SPACING_SECONDS before the next line in its gap starts, so the writer's word
+ * budget, the fit test and the reviewer all count the same room; a line with less than
+ * MIN_ROOM_SECONDS of it is dropped.
+ */
 export function placeCues(drafts: DraftCue[], gaps: Gap[]): { placed: Cue[]; dropped: Cue[] } {
   const placed: Cue[] = [];
   const dropped: Cue[] = [];
@@ -29,8 +55,7 @@ export function placeCues(drafts: DraftCue[], gaps: Gap[]): { placed: Cue[]; dro
     const lines = (byGap.get(gap.id) ?? []).sort((a, b) => a.at - b.at);
     lines.forEach((line, i) => {
       const start = line.at;
-      const next = lines[i + 1];
-      const windowEnd = next ? Math.min(Math.max(next.at, gap.start), gap.end) : gap.end;
+      const windowEnd = roomEndBefore(start, lines[i + 1]?.at, gap.end);
       const cue: Cue = {
         id: `L${++n}`,
         gapId: gap.id,
@@ -49,13 +74,10 @@ export function placeCues(drafts: DraftCue[], gaps: Gap[]): { placed: Cue[]; dro
   return { placed, dropped };
 }
 
-/** Air kept after a voiced line before a line added behind it may start. */
-export const LINE_SPACING_SECONDS = 0.3;
-
 /**
  * Where a line can still be added to a voiced track near second `at` without moving or cutting any
- * voiced line: inside the gap, from the end of the last line spoken before `at` (plus spacing) to the
- * next line's start or the gap end. The line starts at `at`, or earlier when `at` is within a second of
+ * voiced line: inside the gap, from the end of the last line spoken before `at` to the next line's
+ * start or the gap end, keeping LINE_SPACING_SECONDS from each line. The line starts at `at`, or earlier when `at` is within a second of
  * the room's end (a moment at the end of a silence, or just after it), never before the line in front.
  * Null when that leaves less than MIN_ROOM_SECONDS.
  */
@@ -70,7 +92,7 @@ export function freeRoom(
   const before = inGap.filter((l) => l.start <= at).at(-1);
   const after = inGap.find((l) => l.start > at);
   const earliest = Math.max(gap.start, before ? before.end + LINE_SPACING_SECONDS : gap.start);
-  const end = after ? after.start : gap.end;
+  const end = after ? after.start - LINE_SPACING_SECONDS : gap.end;
   const start = Math.max(earliest, Math.min(at, end - MIN_ROOM_SECONDS));
   return end - start >= MIN_ROOM_SECONDS ? { start, end } : null;
 }

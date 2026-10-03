@@ -45,7 +45,9 @@ export const GUIDELINE_RULES: GuidelineRule[] = [
     // Two halves, two clauses: p.7 holds names and relationships back until the story reveals them;
     // p.8 and Netflix §5.1 ask for description in step with the picture, not ahead of it. The timing
     // clauses lead: 3 of the 5 rejections under this rule in the team run 3519ee were lines ahead of
-    // the picture, and the landing's showcase is a skyline named before its cut.
+    // the picture, and the landing's showcase is a skyline named before its cut. Each clause says
+    // which half it covers, because the landing prints the whole citation under a timing rejection
+    // too ("p.7 (characters)" under a skyline read as the wrong clause, QA round 3).
     check:
       "Uses a character's name, identity or relationship before it has been spoken or shown in the clip " +
       "at that moment, or describes something before the picture shows it: a line must match the " +
@@ -54,11 +56,12 @@ export const GUIDELINE_RULES: GuidelineRule[] = [
     title: { en: "Reveals too early", ko: "스포일러 · 때 이른 해설" },
     source: {
       en:
-        `${KMCC_EN} p.8 (describe movement as it happens), p.7 (characters); ` +
-        `${NFLX_EN} §5.1 (foreshadowing), §1.2`,
+        `${KMCC_EN} p.8 (describe movement as it happens), ` +
+        "p.7 (names and relationships only once the story reveals them); " +
+        `${NFLX_EN} §5.1 (foreshadowing), §1.2 (characters unnamed until introduced)`,
       ko:
-        "방미통위 가이드라인 p.8 「움직임과 동시에 해설」, p.7 「등장인물」; " +
-        "Netflix 화면해설 가이드 §5.1 「영상과 동시에 해설」, §1.2",
+        "방미통위 가이드라인 p.8 「움직임과 동시에 해설」, p.7 「인물 이름·관계는 극에서 드러난 뒤」; " +
+        "Netflix 화면해설 가이드 §5.1 「영상과 동시에 해설」, §1.2 「소개 전 인물 이름 지양」",
     },
   },
   {
@@ -82,8 +85,8 @@ export const GUIDELINE_RULES: GuidelineRule[] = [
       "observable action or expression that lets the listener infer it.",
     title: { en: "Interprets instead of describing", ko: "감정·판단의 직접 서술" },
     source: {
-      en: `${KMCC_EN} p.9 (describe behaviour, not feelings); ${NFLX_EN} §1.2`,
-      ko: "방미통위 가이드라인 p.9 「감정은 행동·표정 묘사로」; Netflix 화면해설 가이드 §1.2",
+      en: `${KMCC_EN} p.9 (describe behavior, not feelings); ${NFLX_EN} §1.2 (factual, not opinionated)`,
+      ko: "방미통위 가이드라인 p.9 「감정은 행동·표정 묘사로」; Netflix 화면해설 가이드 §1.2 「사실 위주, 주관 배제」",
     },
   },
   {
@@ -91,8 +94,8 @@ export const GUIDELINE_RULES: GuidelineRule[] = [
     check: "Is not in present tense and third person.",
     title: { en: "Tense or person", ko: "현재형·3인칭 위반" },
     source: {
-      en: `${KMCC_EN} p.8 (present tense, neutral third person); ${NFLX_EN} §1.2`,
-      ko: "방미통위 가이드라인 p.8 「현재형, 중립적 3인칭」; Netflix 화면해설 가이드 §1.2",
+      en: `${KMCC_EN} p.8 (present tense, neutral third person); ${NFLX_EN} §1.2 (present tense, third person)`,
+      ko: "방미통위 가이드라인 p.8 「현재형, 중립적 3인칭」; Netflix 화면해설 가이드 §1.2 「현재형·3인칭」",
     },
   },
   {
@@ -141,11 +144,11 @@ export const GUIDELINE_RULES: GuidelineRule[] = [
       en:
         `${KMCC_EN} p.7 (must describe: characters, place, time, movement, unidentifiable ` +
         "sounds, on-screen text), p.8 (no description for sounds recognized at once or feelings " +
-        `the dialogue conveys); ${NFLX_EN} §1.2`,
+        `the dialogue conveys); ${NFLX_EN} §1.2 (no overload; leave out what dialogue already tells)`,
       ko:
         "방미통위 가이드라인 p.7 「반드시 해설할 요소: 등장인물·장소·시간·움직임·식별이 불가능한 " +
         "소리·자막」, p.8 「즉시 식별 가능한 소리, 대사로 알 수 있는 감정은 해설 불필요」; " +
-        "Netflix 화면해설 가이드 §1.2",
+        "Netflix 화면해설 가이드 §1.2 「대사로 알 수 있는 정보·과잉 정보 지양」",
     },
   },
   {

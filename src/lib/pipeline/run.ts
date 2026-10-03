@@ -12,6 +12,7 @@ import {
   latest,
   MIN_ROOM_SECONDS,
   placeCues,
+  roomEndBefore,
   roomForMoment,
   triedBefore,
   withFailedWordings,
@@ -237,7 +238,8 @@ export async function runDescription(
           .filter((c) => c.gapId === gap.id)
           .sort((a, b) => a.start - b.start);
         for (const [i, cue] of inGap.entries()) {
-          const windowEnd = inGap[i + 1]?.start ?? gap.end;
+          // The same room placeCues gives: up to LINE_SPACING_SECONDS before the next line.
+          const windowEnd = roomEndBefore(cue.start, inGap[i + 1]?.start, gap.end);
           if (windowEnd !== cue.windowEnd) {
             cue.windowEnd = windowEnd;
             await emit({ type: "cue_window", cueId: cue.id, windowEnd });

@@ -46,3 +46,22 @@ gcloud run deploy "$service" \
   --min-instances "${MIN_INSTANCES:-1}" --max-instances 8 \
   --no-invoker-iam-check \
   --port 8080
+
+# Warm the new revision before a visitor does. Its startup probe only checks that the port is open:
+# the first request loads the page code, and the first listing of the sample reads its runs (a new
+# run index after an upgrade, about 12 s on 2026-10-03). Plain GETs, no model calls. The sample is
+# absent until it is added (docs/DEPLOY.md, "7. Add the sample"), so only the landing page must answer.
+url="$(gcloud run services describe "$service" --project "$project" --region "$region" --format='value(status.url)')"
+sample="${SAMPLE_ID:-tos-opening}"
+# A hung revision must not stall the script (curl has no time limit of its own); the slowest first
+# request measured was the 12 s index rebuild above.
+warmup_timeout_seconds=120
+for path in / "/p/$sample"; do
+  read -r code seconds < <(curl -sS --max-time "$warmup_timeout_seconds" -o /dev/null \
+    -w '%{http_code} %{time_total}\n' "$url$path" || echo "000 0")
+  echo "warm-up GET $path: HTTP $code in ${seconds}s"
+  if [[ "$path" == / && "$code" != 200 ]]; then
+    echo "The landing page did not answer 200 after the deploy; check the service logs." >&2
+    exit 1
+  fi
+done

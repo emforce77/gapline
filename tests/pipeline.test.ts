@@ -101,7 +101,7 @@ describe("placeCues", () => {
     );
   });
 
-  it("gives each line the room up to the next line in its gap", () => {
+  it("gives each line the room up to a moment before the next line in its gap", () => {
     const { placed } = placeCues(
       [
         { gapId: "g1", at: 6, text: "second" },
@@ -112,7 +112,7 @@ describe("placeCues", () => {
     assert.deepEqual(
       placed.map((c) => [c.versions[0].text, c.start, c.windowEnd]),
       [
-        ["first", 1, 6],
+        ["first", 1, 6 - LINE_SPACING_SECONDS],
         ["second", 6, 10],
       ],
     );
