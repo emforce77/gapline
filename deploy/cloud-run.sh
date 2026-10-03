@@ -30,14 +30,15 @@ builder="projects/$project/serviceAccounts/scene-ad-build@$project.iam.gservicea
 #
 # The bucket is mounted with metadata caching off. Instances share it, and a cached lookup let one
 # instance answer with another's file as it was up to 60 s before (a finished run reported as still
-# running, events going backwards), or keep saying "missing" for 5 s after it was written (a saved
-# edit absent from the list). Every file lookup is then a Cloud Storage request.
+# running, events going backwards). Every file lookup is then a Cloud Storage request. Cloud Run
+# refuses metadata-cache-negative-ttl-secs (2026-10-03), so "missing" can still be cached for 5 s;
+# a saved edit's answer lists the new result itself, so the editor does not depend on it.
 gcloud run deploy "$service" \
   --project "$project" --region "$region" --source . \
   --service-account "$account" \
   --build-service-account "$builder" \
   --execution-environment gen2 \
-  --add-volume "name=data,type=cloud-storage,bucket=$bucket,mount-options=metadata-cache-ttl-secs=0;metadata-cache-negative-ttl-secs=0" \
+  --add-volume "name=data,type=cloud-storage,bucket=$bucket,mount-options=metadata-cache-ttl-secs=0" \
   --add-volume-mount "volume=data,mount-path=/data" \
   --set-env-vars "DATA_DIR=/data,DATA_BUCKET=$bucket,GCP_PROJECT_ID=$project,DAILY_BUDGET_USD=$budget,VISITOR_DAILY_BUDGET_USD=${VISITOR_DAILY_BUDGET_USD:-3}" \
   --set-secrets "GOOGLE_API_KEY=scene-ad-gemini-key:latest" \

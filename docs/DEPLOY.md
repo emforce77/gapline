@@ -139,23 +139,20 @@ Every instance reads and writes the same bucket. Cloud Storage FUSE normally cac
 up for 60 seconds, and that a file is missing for 5 seconds, so one instance could answer with
 another's file as it was up to a minute before: a finished run still "running" and its stages going
 backwards, or a saved edit missing from the list. The script mounts the bucket with
-`metadata-cache-ttl-secs=0;metadata-cache-negative-ttl-secs=0`, so every lookup asks Cloud Storage,
-which is consistent. Each lookup is then a request to Cloud Storage; listings read their files
-several at a time to keep that short.
+`metadata-cache-ttl-secs=0`, so every lookup of an existing file asks Cloud Storage, which is
+consistent. Each lookup is then a request to Cloud Storage; listings read their files several at a
+time to keep that short.
 
 gcloud takes the options without leading dashes, separated by semicolons (`gcloud run deploy --help`,
-585.0.0). Cloud Run's volume-mount page shows `metadata-cache-ttl-secs` in its example but does not
-mention `metadata-cache-negative-ttl-secs`, a Cloud Storage FUSE option whose 5-second default
-matches what QA measured on the live service. After the first deploy with it, confirm the new
-revision serves traffic and that both options are on the volume:
+585.0.0). Cloud Run refused `metadata-cache-negative-ttl-secs` on 2026-10-03 ("Unsupported or
+unrecognized flag for Cloud Storage volume"), so another instance can still report a just-written
+file as missing for up to 5 seconds. A saved edit does not depend on that: the edit's answer already
+lists the new result. To confirm the option on the volume:
 
 ```sh
 gcloud run services describe scene-ad --project "$PROJECT_ID" --region "$REGION" \
   --format='yaml(spec.template.spec.volumes)'
 ```
-
-If the revision does not start, deploy without `metadata-cache-negative-ttl-secs=0`: a saved edit
-does not depend on it, because the edit's answer already lists the new result.
 
 ### Who can spend the allowance
 
