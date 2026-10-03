@@ -1,7 +1,7 @@
-import { trimSilence, type TrimmedLine } from "../media/narration-track";
+import { speedUpLine, trimSilence, type TrimmedLine } from "../media/narration-track";
 import { ServiceError } from "../errors";
 import type { ClipContext } from "./context";
-import { latest, sameWords } from "./cues";
+import { latest, triedBefore, withFailedWordings } from "./cues";
 import type { RunEvent } from "./events";
 import { spokenUnits, unitBudget } from "./length";
 import { mapLimit } from "./map-limit";
@@ -11,7 +11,10 @@ import { reviseLines } from "./write";
 
 /** Voice → shorten rounds before a line that still overruns its window is dropped. */
 const MAX_SHORTEN_ROUNDS = 2;
-/** Chirp 3: HD stays natural up to about 15% faster than its default pace. */
+/**
+ * Fastest a take is played: the limit kept from when Chirp 3 HD set its own speaking rate. The FFmpeg
+ * atempo speed-up that replaced it (2026-10-03) has not been listened to at this rate.
+ */
 const MAX_SPEAKING_RATE = 1.15;
 /** Shortening aims below the window so the re-voiced line lands inside it. */
 const SHORTEN_TARGET = 0.9;
@@ -23,6 +26,11 @@ const TTS_CONCURRENCY = 4;
  * Voices approved lines and measures each against its window. A line that overruns is sped up
  * slightly, or shortened by the writer, reviewed again and re-voiced; one that still overruns is
  * dropped. Returns the audio of every line that fits, by cue id.
+ *
+ * Speeding up stretches the take in hand (FFmpeg atempo, pitch kept) instead of asking Text-to-Speech
+ * for a faster one: takes of one text vary by about 10%, so in the QA runs of 2026-10-03 a new take at
+ * the higher rate still overran in 12 of 32 tries, and each miss went through a shortening and two
+ * reviews (21–90 s). A stretched take is exactly as long as the rate makes it.
  */
 export async function voiceToFit(input: {
   active: () => Cue[];
@@ -39,11 +47,11 @@ export async function voiceToFit(input: {
   const { emit, language, writerModel, ledgerFile, context } = input;
   const lines = new Map<string, TrimmedLine>();
   // A retryable Text-to-Speech failure (busy, 5xx) is tried once more before the run gives up.
-  const voice = async (cue: Cue, rate: number) => {
+  const voice = async (cue: Cue) => {
     const request = {
       text: latest(cue).text,
       language,
-      speakingRate: rate,
+      speakingRate: 1,
       ledgerFile,
       label: "voice",
     };
@@ -60,10 +68,11 @@ export async function voiceToFit(input: {
     await mapLimit(pending, TTS_CONCURRENCY, async (cue) => {
       const room = cue.windowEnd - cue.start;
       let rate = 1;
-      let line = await voice(cue, rate);
+      let line = await voice(cue);
+      const firstSeconds = line.seconds;
       if (line.seconds > room && line.seconds / MAX_SPEAKING_RATE <= room) {
         rate = round(Math.min(MAX_SPEAKING_RATE, (line.seconds / room) * RATE_HEADROOM));
-        line = await voice(cue, rate);
+        line = await speedUpLine(line, rate);
       }
       const fits = line.seconds <= room;
       latest(cue).voice = { seconds: round(line.seconds), rate };
@@ -74,6 +83,7 @@ export async function voiceToFit(input: {
         rate,
         window: round(room),
         fits,
+        ...(rate !== 1 ? { firstSeconds: round(firstSeconds) } : {}),
       });
       if (fits) {
         cue.status = "fits";
@@ -87,6 +97,7 @@ export async function voiceToFit(input: {
       for (const cue of tooLong) {
         cue.status = "dropped";
         cue.droppedReason = "too_long";
+        dropVoicing(cue);
         await emit({ type: "cue_dropped", cueId: cue.id, reason: "too_long" });
       }
       break;
@@ -104,10 +115,12 @@ export async function voiceToFit(input: {
           cue,
           text: latest(cue).text,
           violations: [],
-          fix:
+          fix: withFailedWordings(
+            cue,
             `Spoken, this line takes ${spoken.toFixed(1)} s but has ${room.toFixed(1)} s of room ` +
-            `(${spokenUnits(latest(cue).text, language)} → at most ${maxUnits}). ` +
-            `Cut it, keeping the most important visual information.`,
+              `(${spokenUnits(latest(cue).text, language)} → at most ${maxUnits}). ` +
+              `Cut it, keeping the most important visual information.`,
+          ),
           maxUnits,
         };
       }),
@@ -118,11 +131,13 @@ export async function voiceToFit(input: {
     });
     for (const cue of tooLong) {
       const text = shortened.get(cue.id);
-      // A shortening the writer left out counts as none: the overlong line goes, the run carries on.
+      // A shortening the writer left out, or a wording the line already had (rejected or too long),
+      // counts as none: the overlong line goes, the run carries on.
       if (!text) console.warn(`shorten returned nothing for ${cue.id}; dropping it`);
-      if (!text || sameWords(text, latest(cue).text)) {
+      if (!text || triedBefore(cue, text)) {
         cue.status = "dropped";
         cue.droppedReason = "unchanged";
+        dropVoicing(cue);
         await emit({ type: "cue_dropped", cueId: cue.id, reason: "unchanged" });
         continue;
       }
@@ -134,6 +149,12 @@ export async function voiceToFit(input: {
     pending = tooLong.filter((c) => c.status === "approved");
   }
   return lines;
+}
+
+/** A dropped line is not heard: it keeps no measured length from an earlier voicing that fit. */
+function dropVoicing(cue: Cue): void {
+  delete cue.seconds;
+  delete cue.rate;
 }
 
 function round(value: number): number {

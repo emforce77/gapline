@@ -11,13 +11,21 @@ import {
   type ClipContext,
 } from "./context";
 import { ruleSummaryForPrompt } from "./guidelines";
+import { UNIT_NAME } from "./length";
 import { ReviewSchema, type MissingItem, type Verdict } from "./schemas";
 
 /** A review that names lines it was not given, or skips one, is asked for once more. */
 const REVIEW_ATTEMPTS = 2;
 
-/** Exported for tests, which pin the instructions the reviewer is given. */
-export function reviewerSystem(context: ClipContext, finalOutput = false): string {
+/**
+ * Exported for tests, which pin the instructions the reviewer is given. `lengthLimits`: the lines
+ * carry a length limit for their fix (re-reviews only; see reviewLines).
+ */
+export function reviewerSystem(
+  context: ClipContext,
+  finalOutput = false,
+  lengthLimits = false,
+): string {
   return `You review ${languageName(context.language)} audio description lines for blind and low-vision viewers
 against published guidelines. You did not write them. You see the clip itself; judge every line against
 the picture and the soundtrack at that moment.
@@ -28,7 +36,7 @@ ${ruleSummaryForPrompt()}
 For each line return pass=true with no violations, or pass=false with every violation: the rule id, the
 exact words that break it, and a one-sentence reason. "fix" says how to repair the line in one sentence.
 Write reason and fix in ${languageName(context.language)}. The fix must itself obey every rule above: any
-wording it suggests must pass this same review. For example, a fix for on-screen text reads the text
+wording it suggests must pass this same review${lengthLimits ? ", and must fit the line's length limit (the writer copies the wording,\nand a longer one cannot be voiced in the room)" : ""}. For example, a fix for on-screen text reads the text
 itself; it never says the text appears or is shown on screen, because that is viewer or camera framing.
 Be strict about spoiler and unseen. For every
 person a line mentions, find them in the People list: naming someone before the time given, naming someone
@@ -48,16 +56,31 @@ export async function reviewLines(input: {
   model: string;
   ledgerFile: string;
   label: string;
-  lines: { id: string; start: number; end: number; text: string }[];
+  /**
+   * maxUnits: the most words (syllables in Korean) a rewrite of the line can have in its room, shown
+   * as a limit for the fix. Given on re-reviews only: on the first review of a 65 s script it raised
+   * the reviewer's thinking from 28–33k to 35–36k tokens (about 15 s; docs/EVALUATION.md, 2026-10-03).
+   */
+  lines: { id: string; start: number; end: number; text: string; maxUnits?: number }[];
   /** Already approved lines, for naming consistency. */
   approved: { id: string; start: number; text: string }[];
   /** True when the lines are the whole script, so coverage can be judged. */
   wholeScript: boolean;
   /** Final output audit: report essential omissions even if no room remains. */
   finalOutput?: boolean;
+  /**
+   * "rereview" for a second look at a few rewritten or shortened lines, which thinks less than the
+   * first pass over the whole script and the final check (src/lib/models.ts).
+   */
+  stage?: "review" | "rereview";
 }): Promise<{ verdicts: Verdict[]; missing: MissingItem[] }> {
+  const unit = UNIT_NAME[input.context.language];
   const lines = input.lines
-    .map((l) => `- ${l.id} [${l.start.toFixed(3)}–${l.end.toFixed(3)} s]: ${l.text}`)
+    .map(
+      (l) =>
+        `- ${l.id} [${l.start.toFixed(3)}–${l.end.toFixed(3)} s]: ${l.text}` +
+        (l.maxUnits ? `\n  length limit for a fix: at most ${l.maxUnits} ${unit}` : ""),
+    )
     .join("\n");
   const approved = input.approved
     .map((l) => `- ${l.id} at ${l.start.toFixed(3)} s: ${l.text}`)
@@ -67,7 +90,11 @@ export async function reviewLines(input: {
     const { data } = await callStructured({
       label: input.label,
       model: input.model,
-      system: reviewerSystem(input.context, input.finalOutput),
+      system: reviewerSystem(
+        input.context,
+        input.finalOutput,
+        input.lines.some((l) => l.maxUnits),
+      ),
       user: [
         { type: "video_url", video_url: { url: input.context.videoDataUrl } },
         {
@@ -88,7 +115,7 @@ export async function reviewLines(input: {
       schema: ReviewSchema,
       temperature: 0,
       ledgerFile: input.ledgerFile,
-      reasoningEffort: reasoningEffort("review"),
+      reasoningEffort: reasoningEffort(input.stage ?? "review"),
     });
     const problem = reviewProblem(data, input);
     if (problem && attempt < REVIEW_ATTEMPTS) {

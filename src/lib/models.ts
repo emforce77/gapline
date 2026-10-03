@@ -19,14 +19,19 @@ const STAGE_EFFORT: Record<string, Effort | undefined> = {
   // Measured on tos-opening (65 s). The writer at the default level spent 13–18k thinking tokens
   // (85–117 s) per draft; "medium" with the clip in view gave the cleanest drafts (no rejections in
   // Korean). "low" drafts faster but misplaced lines in time. A revision is a small edit: "low".
-  // The reviewer thinks hardest: it is the quality gate (at "low" it passed a "화면이" framing).
+  // The reviewer thinks hardest: it is the quality gate (at "low" it passed a "화면이" framing). Its
+  // first pass over the whole script and the final check stay at "high": on 2026-09-22 "medium" there
+  // lost the "40 years later" time jump without listing it (docs/EVALUATION.md). Re-reviewing a few
+  // rewritten or shortened lines is "rereview": at "high" a one-line re-check thought for a median
+  // 3.4k tokens (about 45 s); see docs/EVALUATION.md, 2026-10-03, for the measured runs.
   write: "medium",
   revise: "low",
   review: "high",
+  rereview: "medium",
 };
 
 export function reasoningEffort(
-  stage: "watch" | "write" | "revise" | "review",
+  stage: "watch" | "write" | "revise" | "review" | "rereview",
 ): Effort | undefined {
   const override = process.env[`SCENE_EFFORT_${stage.toUpperCase()}`];
   if (override) return override as Effort;

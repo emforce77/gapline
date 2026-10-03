@@ -1,6 +1,7 @@
 import type { RunErrorCode } from "../api-contract";
 import type {
   Cue,
+  CueVersion,
   Density,
   Gap,
   Language,
@@ -21,17 +22,22 @@ export interface RelistenReport {
   wordsFound: number;
   /** Narration room those words closed, in seconds. */
   blockedSeconds: number;
+  /** The soundtrack is silent or missing: nothing was sent to the recognizer (from 2026-10-03). */
+  soundless?: true;
 }
 
 export interface RunSummary {
+  /** Absent when nothing was checked: a run with no silence to write for (from 2026-10-03). */
   qualityStatus?: "review_needed" | "model_checked";
   finalReview?: { verdicts: Verdict[]; missing: MissingItem[] };
   /**
    * What the final check found (failing lines, missing moments) and how many of them the fix stage
    * turned into voiced lines; `finalReview` is that check brought up to date with the fixes. Absent
-   * when the check found nothing that could be fixed, and in runs before 2026-09-23.
+   * when the check found nothing that could be fixed, and in runs before 2026-09-23. `added` counts
+   * only new lines that still have the words written for their moment. `kept`: failing lines that
+   * stay as voiced because no rewrite of them passed and fit (absent before 2026-10-03).
    */
-  finalFix?: { failing: number; missing: number; rewritten: number; added: number };
+  finalFix?: { failing: number; missing: number; rewritten: number; added: number; kept?: number };
   costStatus?: "known" | "unresolved";
   analysisReused?: { speech: boolean; scene: boolean };
   parentRunId?: string;
@@ -94,7 +100,11 @@ export type RunEvent =
   | { type: "cue_reviewed"; cueId: string; round: number; verdict: Verdict }
   | { type: "coverage"; round: number; missing: MissingItem[] }
   | { type: "cue_window"; cueId: string; windowEnd: number }
-  | { type: "cue_revised"; cueId: string; by: "revise" | "shorten"; text: string; model: string }
+  /**
+   * A new version of a line. Also sent when the fix stage puts a line back as it was voiced (its
+   * rewrite did not pass or fit): then `by` is that version's own, followed by its review and voicing.
+   */
+  | { type: "cue_revised"; cueId: string; by: CueVersion["by"]; text: string; model: string }
   | {
       type: "cue_voiced";
       cueId: string;
@@ -102,6 +112,8 @@ export type RunEvent =
       rate: number;
       window: number;
       fits: boolean;
+      /** The take's length at normal speed, when it was sped up (rate above 1; from 2026-10-03). */
+      firstSeconds?: number;
     }
   | { type: "cue_dropped"; cueId: string; reason: NonNullable<Cue["droppedReason"]> }
   | { type: "writer_delta"; text: string }

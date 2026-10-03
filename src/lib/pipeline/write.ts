@@ -21,7 +21,14 @@ import {
 } from "./schemas";
 import { UNIT_NAME } from "./length";
 
-function writerSystem(context: ClipContext): string {
+/**
+ * Exported for tests, which pin the instructions the writer is given.
+ * Credits other than the title come last (KMCC p.8: place and time changes at the start; Netflix
+ * §2.5: credits as time permits, condensed). With "opening credits" in item 1, a Korean run spent a
+ * line on a film-fund credit and dropped the city and the first person (run 790315), and a Sintel
+ * run read "Blender Foundation presents" in 2 of its 4 lines (run 3ec22f).
+ */
+export function writerSystem(context: ClipContext): string {
   return `You are a professional audio describer writing ${languageName(context.language)} audio description
 for blind and low-vision viewers. Narration may only be spoken inside the gaps listed below: the time
 between lines of dialogue and away from story-critical sounds. You see the clip itself and timed notes from
@@ -30,10 +37,26 @@ a first viewing; trust the picture over the notes, and place each line where the
 ${styleRules(context)}
 ${lengthRule(context.language)}
 
-Placement: "at" is the second the line starts, inside its gap and as close as possible to the moment it
-describes. A line's room runs from its "at" to the next line's "at" in the same gap, or to the gap end.
-Leave at least 1.2 s of room for every line. Describe place and time changes first, then people and action.
-Read essential on-screen text (titles, time jumps, signs) in the nearest gap.
+Placement: "at" is the second the line starts, inside its gap. A line describes what is on screen while
+it is spoken, from its first word: never start it before what it describes appears. Find that moment in
+the picture and in the shot times of the notes; when it comes partway through a gap, start the line there.
+A line's room runs from its "at" to the next line's "at" in the same gap, or to the gap end. Leave at
+least 1.2 s of room for every line.
+
+What comes first when gaps are few or short:
+1. On-screen words that tell the story and that the soundtrack does not speak: the film's title, title
+   cards, time and place cards, signs, captions, subtitles and intertitles. Read them in the nearest
+   gap, before any motion, cursor or interface detail. If a caption does not fit, read its key words
+   rather than describing something else.
+2. A change of place or time, at the start of the scene.
+3. Who is there. Introduce each person the first time a line mentions them, as the style rules say, in
+   the first gap that can hold the introduction; never refer to someone the narration has not yet
+   introduced with a pronoun or a bare label. A gap too short for an introduction gets a line that
+   needs none, or no line.
+4. Then action, gestures and posture. Describe only what the picture shows happening: never what becomes
+   of an object when that moment is not shown.
+5. Other credits (who presents, cast, crew, funders) last: only in room the items above do not need,
+   condensed into one short line.
 
 A reviewer will reject lines that break these rules:
 ${ruleSummaryForPrompt()}`;
@@ -134,10 +157,17 @@ export async function reviseLines(input: {
         text:
           `${clipFacts(input.context)}\n\nThe rest of the script (keep names consistent with it):\n` +
           `${context || "(none)"}\n\nRewrite these lines. Keep each line's meaning where the rules allow, ` +
-          `fix every finding, and stay within its length.\n${requested || "(none)"}` +
+          `fix every finding, and stay within its length. A line keeps its start: when a finding says ` +
+          `it describes something before it appears, describe what is on screen from that start ` +
+          `instead. When a suggested fix is longer than the length allows, keep what it asks for in ` +
+          `fewer words; never trade a person's introduction for a pronoun. A shorter line is still a ` +
+          `complete sentence that names its subject; only on-screen text may be read as a fragment. A ` +
+          `shorter reading of on-screen text keeps its lead-in and ends at a sentence boundary.\n` +
+          `${requested || "(none)"}` +
           (input.missing?.length
-            ? `\n\nAlso add one new line for each missing item, in the named gap near the given second, ` +
-              `where it has at least 1.2 s of room before the next line:\n` +
+            ? `\n\nAlso add one new line for each missing item, in the named gap at or soon after the ` +
+              `given second and never before what it describes appears, where it has at least 1.2 s ` +
+              `of room before the next line:\n` +
               input.missing.map((m) => `- ${m.gapId} at ${m.at.toFixed(1)} s: ${m.what}`).join("\n")
             : ""),
       },

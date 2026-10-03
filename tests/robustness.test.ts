@@ -167,6 +167,7 @@ describe("budget", () => {
       assert.deepEqual(status, {
         canStart: false,
         reason: "budget_daily",
+        visitor: null,
         resetAt: budgetDay(new Date()).resetAt,
       });
     }));
@@ -275,11 +276,11 @@ describe("watch timestamps", () => {
 describe("room for description", () => {
   it("flags clips whose silences cannot hold more than a line or two", () => {
     const korean = assessRoom([{ id: "g1", start: 10, end: 12.46 }], 45);
-    assert.deepEqual(korean, { gapSeconds: 2.46, thresholdSeconds: 3, little: true });
+    assert.deepEqual(korean, { gapSeconds: 2.46, thresholdSeconds: 6.75, little: true });
     assert.equal(assessRoom([{ id: "g1", start: 0, end: 29.82 }], 65).little, false);
     assert.deepEqual(assessRoom([{ id: "g1", start: 0, end: 4 }], 90), {
       gapSeconds: 4,
-      thresholdSeconds: 4.5,
+      thresholdSeconds: 13.5,
       little: true,
     });
     assert.equal(renderGaps([]), "(none)");
@@ -413,8 +414,10 @@ describe("API routes", () => {
       assert.equal(refused.status, 403);
       assert.deepEqual(await refused.json(), { error: "forbidden" });
       const status = await import("../src/app/api/live-status/route");
-      const body = await (await status.GET()).json();
-      assert.deepEqual(Object.keys(body).sort(), ["canStart", "reason", "resetAt"]);
+      const body = await (
+        await status.GET(new Request("http://scene.example/api/live-status"))
+      ).json();
+      assert.deepEqual(Object.keys(body).sort(), ["canStart", "reason", "resetAt", "visitor"]);
       assert.equal(body.canStart, true);
     }));
 });

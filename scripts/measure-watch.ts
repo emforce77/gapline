@@ -1,6 +1,7 @@
 /** Runs the watching stage once on a sample clip and prints the map, tokens and cost. */
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
+import { measureAudible } from "../src/lib/pipeline/audible";
 import { watchClip } from "../src/lib/pipeline/watch";
 import { readCallRecords } from "../src/lib/llm/ledger";
 import { MODELS } from "../src/lib/models";
@@ -18,6 +19,7 @@ async function main(): Promise<void> {
   const map = await watchClip({
     videoDataUrl: `data:video/mp4;base64,${video.toString("base64")}`,
     clipSeconds: await probeDurationSeconds(clipFile),
+    audible: await measureAudible(clipFile),
     model,
     ledgerFile,
   });

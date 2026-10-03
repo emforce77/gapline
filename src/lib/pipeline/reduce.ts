@@ -17,9 +17,10 @@ export const STAGES: StageId[] = [
 export interface StageView {
   /**
    * "stopped": where the run failed or was interrupted (see endRunning). "lost": where the run was
-   * when the page could no longer reach the server, so whether it finished is not known.
+   * when the page could no longer reach the server, so whether it finished is not known. "skipped":
+   * a stage the run decided it did not need (see skippedFix).
    */
-  state: "waiting" | "running" | "done" | "reused" | "stopped" | "lost";
+  state: "waiting" | "running" | "done" | "reused" | "stopped" | "lost" | "skipped";
   startedAt?: number;
   seconds?: number;
 }
@@ -109,7 +110,7 @@ export function reduceRun(view: RunView, event: TimedRunEvent): RunView {
         event.state === "started"
           ? { state: "running" as const, startedAt: event.t }
           : { ...next.stages[event.stage], state: "done" as const, seconds: event.seconds };
-      return { ...next, stages: { ...next.stages, [event.stage]: stage } };
+      return { ...next, stages: skippedFix({ ...next.stages, [event.stage]: stage }) };
     }
     case "speech":
     case "scene": {
@@ -130,6 +131,7 @@ export function reduceRun(view: RunView, event: TimedRunEvent): RunView {
           gapsChecked: event.gapsChecked,
           wordsFound: event.wordsFound,
           blockedSeconds: event.blockedSeconds,
+          ...(event.soundless ? { soundless: true as const } : {}),
         },
       };
     case "gaps":
@@ -162,12 +164,16 @@ export function reduceRun(view: RunView, event: TimedRunEvent): RunView {
         versions: [...c.versions, { text: event.text, by: event.by, model: event.model }],
       }));
     case "cue_voiced":
-      return updateCue(next, event.cueId, (c) => ({
-        ...withLatest(c, (v) => ({ ...v, voice: { seconds: event.seconds, rate: event.rate } })),
-        ...(event.fits
-          ? { status: "fits" as const, seconds: event.seconds, rate: event.rate }
-          : {}),
-      }));
+      return updateCue(next, event.cueId, (c) => {
+        const voiced = withLatest(c, (v) => ({
+          ...v,
+          voice: { seconds: event.seconds, rate: event.rate },
+        }));
+        if (!event.fits) return voiced;
+        // A line the final check's fix put back to its voiced words was dropped a moment earlier.
+        delete voiced.droppedReason;
+        return { ...voiced, status: "fits" as const, seconds: event.seconds, rate: event.rate };
+      });
     case "cue_dropped":
       return updateCue(next, event.cueId, (c) => ({
         ...c,
@@ -194,6 +200,19 @@ export function reduceRun(view: RunView, event: TimedRunEvent): RunView {
         retryable: event.retryable ?? null,
       };
   }
+}
+
+/**
+ * The run applies the final check ("fix") only when the check failed a line or found a moment it can
+ * still place, and emits nothing for it otherwise. So the mix starting after a finished final check,
+ * with "fix" never started, means the check found nothing to fix: the row says so instead of waiting
+ * under a ticked "Final check" and then vanishing. Runs from before the final check never finish
+ * "verify", so this never marks theirs.
+ */
+function skippedFix(stages: RunView["stages"]): RunView["stages"] {
+  if (stages.mix.state !== "running" && stages.mix.state !== "done") return stages;
+  if (stages.verify.state !== "done" || stages.fix.state !== "waiting") return stages;
+  return { ...stages, fix: { state: "skipped" } };
 }
 
 /**

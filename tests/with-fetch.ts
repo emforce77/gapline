@@ -1,12 +1,22 @@
 import { googleAccessToken } from "../src/lib/google/auth";
 
-/** Replaces fetch for one test; every request must be one the test expects. */
+/**
+ * Replaces fetch for one test; every request must be one the test expects. The Google token is
+ * fetched once up front; GCLOUD_CONFIGURATION is unset meanwhile, so a dropped token (googleFetch
+ * after an HTTP 401) fails instead of asking the gcloud CLI for a real one.
+ */
 export async function withFetch<T>(
   handler: (url: string, init?: RequestInit) => Promise<Response>,
   work: () => Promise<T>,
 ): Promise<T> {
   const original = globalThis.fetch;
-  const keys = ["GCP_PROJECT_ID", "GOOGLE_API_KEY", "GEMINI_API_KEY", "K_SERVICE"] as const;
+  const keys = [
+    "GCP_PROJECT_ID",
+    "GOOGLE_API_KEY",
+    "GEMINI_API_KEY",
+    "K_SERVICE",
+    "GCLOUD_CONFIGURATION",
+  ] as const;
   const saved = keys.map((k) => process.env[k]);
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     const address = String(url);
@@ -17,6 +27,7 @@ export async function withFetch<T>(
   process.env.GCP_PROJECT_ID = "fixture";
   process.env.GEMINI_API_KEY = "fixture";
   delete process.env.GOOGLE_API_KEY;
+  delete process.env.GCLOUD_CONFIGURATION;
   process.env.K_SERVICE = "fixture";
   await googleAccessToken();
   delete process.env.K_SERVICE;

@@ -35,7 +35,8 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
   let longVoice = false;
   globalThis.fetch = async (url, options) => {
     const address = String(url);
-    if (address.includes("metadata.google")) return Response.json({ access_token: "fixture" });
+    if (address.includes("metadata.google"))
+      return Response.json({ access_token: "fixture", expires_in: 3599 });
     if (address.includes("us-speech.googleapis.com")) {
       counts.hear++;
       return Response.json({ results: [], metadata: { totalBilledDuration: "5s" } });
@@ -44,7 +45,10 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
       counts.voice++;
       return Response.json({
         audioContent: (longVoice
-          ? encodeWav(new Int16Array(24000 * 8).fill(2000), 24000)
+          ? encodeWav(
+              Int16Array.from({ length: 24000 * 8 }, (_, i) => Math.round(2000 * Math.sin(i / 10))),
+              24000,
+            )
           : wav
         ).toString("base64"),
       });
@@ -118,7 +122,8 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
       "-f",
       "lavfi",
       "-i",
-      "anullsrc=r=48000:cl=stereo",
+      // Audible, so the soundtrack is sent to Speech-to-Text (a silent one is not).
+      "sine=frequency=440:sample_rate=48000",
       "-t",
       "5",
       "-c:v",
@@ -144,8 +149,9 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
     await assert.rejects(
       runDescription({ ...common, runId: "failed-run", runDir: runDir(project.id, "failed-run") }),
     );
-    // Hearing is the whole clip, then its one silence (0–5 s) again on its own.
-    assert.deepEqual(counts, { hear: 2, watch: 1, voice: 0 });
+    // Hearing is the whole clip once: its one silence (0–5 s) is that same audio, so the re-listen
+    // does not send it again (relistenGaps).
+    assert.deepEqual(counts, { hear: 1, watch: 1, voice: 0 });
     const cached = await readAnalysisParts(project, key);
     assert.ok(cached.speech && cached.scene);
     writerFails = false;
@@ -157,7 +163,7 @@ it("reuses failed-run analysis, blocks unchanged reapproval, and edits only one 
       runDir: runDir(project.id, "base-run"),
       emit: (e) => events.push(e),
     });
-    assert.equal(counts.hear, 2);
+    assert.equal(counts.hear, 1);
     assert.equal(counts.watch, 1);
     assert.equal(result.cues.find((c) => c.id === "L1")!.droppedReason, "unchanged");
     assert.equal(events.filter((e) => e.type === "cue_reviewed" && e.cueId === "L1").length, 1);

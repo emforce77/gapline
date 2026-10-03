@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
-import { readFile, writeFile } from "node:fs/promises";
+import { access, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import {
   SceneMapSchema,
@@ -10,8 +10,16 @@ import {
 } from "../pipeline/schemas";
 import { projectDir, type Project } from "./projects";
 
-/** 3: speech includes the per-gap re-listen (relisten.ts); older saved analyses are heard again. */
+/** 3: speech includes the per-gap re-listen (relisten.ts). Part of both parts' keys. */
 export const ANALYSIS_VERSION = "3";
+/**
+ * Versions the speech part alone, so a change to hearing leaves saved scene maps reused (partKey).
+ * 4: recognizer annotations such as "[ BACKGROUND]" are not speech, long unplaced spans are heard
+ * again in halves, speech is trimmed to audible audio, and segments carry the recognized language
+ * (hear.ts, audible.ts). Older saved speech of uploads is heard again; a sample's is kept
+ * (readAnalysisParts).
+ */
+const SPEECH_VERSION = "4";
 export interface AnalysisParts {
   speech?: SpeechSegment[];
   scene?: SceneMap;
@@ -25,6 +33,11 @@ export async function analysisKey(project: Project, model: string): Promise<stri
   for await (const part of createReadStream(join(projectDir(project.id), "clip.mp4")))
     hash.update(part);
   return hash.digest("hex");
+}
+
+/** The key a part is saved under: the analysis key, and for speech its own version too. */
+function partKey(kind: keyof AnalysisParts, key: string): string {
+  return kind === "speech" ? `${key}:speech-${SPEECH_VERSION}` : key;
 }
 
 /**
@@ -59,6 +72,11 @@ export function validateAnalysis(part: AnalysisParts, duration: number): Analysi
   return { speech, scene };
 }
 
+/**
+ * The saved analysis parts that match `key`. A sample's parts are curated, shared by every visitor
+ * and already paid for: they are reused whatever their key, so a new ANALYSIS_VERSION or
+ * SPEECH_VERSION never makes a visitor's run hear or watch a sample again.
+ */
 export async function readAnalysisParts(project: Project, key: string): Promise<AnalysisParts> {
   const parts: AnalysisParts = {};
   for (const kind of ["speech", "scene"] as const) {
@@ -66,7 +84,7 @@ export async function readAnalysisParts(project: Project, key: string): Promise<
       const cached = JSON.parse(
         await readFile(join(projectDir(project.id), `analysis-${kind}.json`), "utf8"),
       );
-      if (cached.key === key)
+      if (cached.key === partKey(kind, key) || project.kind === "sample")
         Object.assign(parts, {
           [kind]: validateAnalysis({ [kind]: cached.data }, project.clipSeconds)[kind],
         });
@@ -83,16 +101,27 @@ export async function readAnalysisParts(project: Project, key: string): Promise<
   return Object.fromEntries(Object.entries(parts).filter(([, v]) => v !== undefined));
 }
 
+/** Saves each given part under `key`. A sample's stored part is never replaced (readAnalysisParts). */
 export async function saveAnalysisPart(
   project: Project,
   key: string,
   part: AnalysisParts,
 ): Promise<void> {
   const valid = validateAnalysis(part, project.clipSeconds);
-  for (const kind of ["speech", "scene"] as const)
-    if (valid[kind] !== undefined)
-      await writeFile(
-        join(projectDir(project.id), `analysis-${kind}.json`),
-        JSON.stringify({ key, data: valid[kind] }),
-      );
+  for (const kind of ["speech", "scene"] as const) {
+    if (valid[kind] === undefined) continue;
+    const file = join(projectDir(project.id), `analysis-${kind}.json`);
+    if (project.kind === "sample" && (await stored(file))) continue;
+    await writeFile(file, JSON.stringify({ key: partKey(kind, key), data: valid[kind] }));
+  }
+}
+
+async function stored(file: string): Promise<boolean> {
+  try {
+    await access(file);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
 }

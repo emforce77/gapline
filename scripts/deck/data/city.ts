@@ -85,9 +85,10 @@ const WORDS_PER_SECOND = UNITS_PER_SECOND.en;
 
 /**
  * The speed-up rule of the voice stage (src/lib/pipeline/fit-voice.ts): a take longer than its room
- * is voiced once more at rate = round2(min(1.15, take / room × 1.03)), and only that second take is
- * stored. So the first take of a sped-up version is recovered from its rate, as the range of takes
- * that round to it. The build stops if the rule in fit-voice.ts changes.
+ * is played at rate = round2(min(1.15, take / room × 1.03)). Runs before 2026-10-03, which the deck
+ * reads, voiced it once more at that rate and stored only that second take; since then the take is
+ * sped up in place. So the first take of a sped-up version is recovered from its rate, as the range
+ * of takes that round to it. The build stops if the rule in fit-voice.ts changes.
  */
 const RATE_ROUNDING = 0.005;
 const fitSource = readFileSync(FIT_SOURCE, "utf8");

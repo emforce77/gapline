@@ -7,7 +7,14 @@ import {
   MIN_GAP_SECONDS,
   SPEECH_GUARD_SECONDS,
 } from "../src/lib/pipeline/gaps";
-import { freeRoom, LINE_SPACING_SECONDS, placeCues } from "../src/lib/pipeline/cues";
+import {
+  freeRoom,
+  LINE_SPACING_SECONDS,
+  placeCues,
+  roomForMoment,
+  triedBefore,
+  withFailedWordings,
+} from "../src/lib/pipeline/cues";
 import { spokenUnits, unitBudget } from "../src/lib/pipeline/length";
 import { foldRun } from "../src/lib/pipeline/reduce";
 import type { TimedRunEvent } from "../src/lib/pipeline/events";
@@ -179,6 +186,81 @@ describe("freeRoom", () => {
   });
 });
 
+describe("roomForMoment", () => {
+  it("clamps a moment just outside its silence into it, as the sample's credit was", () => {
+    // Sintel, 2026-10-03: a moment at 13.5 s filed under the empty silence 14.65–15.85.
+    const g3 = { id: "g3", start: 14.65, end: 15.85 };
+    assert.deepEqual(roomForMoment({ gapId: "g3", at: 13.5 }, [g3], []), {
+      start: 14.65,
+      end: 15.85,
+    });
+  });
+
+  it("gives no room to a moment far from the silence it names, or to an unknown silence", () => {
+    // The same run filed a moment at 29.8 s under the silence 39.17–41.51: 9 s off.
+    const g4 = { id: "g4", start: 39.17, end: 41.51 };
+    assert.equal(roomForMoment({ gapId: "g4", at: 29.8 }, [g4], []), null);
+    assert.equal(roomForMoment({ gapId: "g9", at: 40 }, [g4], []), null);
+  });
+});
+
+describe("rewrites that go back", () => {
+  const cue = (): Cue => ({
+    id: "L1",
+    gapId: "g1",
+    start: 0,
+    windowEnd: 1.25,
+    status: "pending",
+    versions: [
+      {
+        text: "He raises a microphone.",
+        by: "write",
+        model: "m",
+        review: {
+          cueId: "L1",
+          pass: false,
+          violations: [{ rule: "unseen", quote: "He", reason: "Who is he?" }],
+          fix: "Name him by look.",
+        },
+      },
+      {
+        text: "The eyepiece man raises a microphone.",
+        by: "revise",
+        model: "m",
+        review: { cueId: "L1", pass: true, violations: [], fix: "" },
+        voice: { seconds: 2.12, rate: 1.15 },
+      },
+    ],
+  });
+
+  it("count a wording the line already had, in any version, as no rewrite", () => {
+    assert.ok(triedBefore(cue(), "He  raises a microphone."));
+    assert.ok(triedBefore(cue(), "The eyepiece man raises a microphone."));
+    assert.ok(!triedBefore(cue(), "A man raises a microphone."));
+  });
+
+  it("tell the writer which wordings failed and why, but not the current one", () => {
+    const fix = withFailedWordings(cue(), "Cut it.");
+    assert.equal(
+      fix,
+      'Cut it.\n  already tried and failed, do not offer again: "He raises a microphone." ' +
+        "(unseen: Who is he?)",
+    );
+    const fresh = cue();
+    fresh.versions.splice(0, 1);
+    assert.equal(withFailedWordings(fresh, "Cut it."), "Cut it.");
+  });
+
+  it("list a wording that was voiced too long for its room", () => {
+    const longer = cue();
+    longer.versions.push({ text: "A man.", by: "shorten", model: "m" });
+    assert.match(
+      withFailedWordings(longer, "Cut it."),
+      /"The eyepiece man raises a microphone\." \(spoken in 2\.1 s, room 1\.3 s\)/,
+    );
+  });
+});
+
 describe("length budget", () => {
   it("counts Korean syllables without spaces or punctuation, and English words", () => {
     assert.equal(spokenUnits("로켓이 솟아오른다.", "ko"), 8);
@@ -202,6 +284,31 @@ describe("narration audio", () => {
     const pcm = new Int16Array([...silence(0.5), ...tone(1), ...silence(0.5)]);
     const trimmed = trimSilence(encodeWav(pcm, rate));
     assert.ok(Math.abs(trimmed.seconds - 1.08) < 0.02, `got ${trimmed.seconds}`);
+  });
+
+  it("trims the inaudible drift a Chirp 3 HD take opens with, and keeps it out of the line", () => {
+    // 0.6 s of a 10 Hz wave at −41 dBFS peak, as real takes open, then 1 s of voice.
+    const drift = Int16Array.from({ length: 0.6 * rate }, (_, i) =>
+      Math.round(300 * Math.sin((2 * Math.PI * 10 * i) / rate)),
+    );
+    const trimmed = trimSilence(encodeWav(new Int16Array([...drift, ...tone(1)]), rate));
+    // Before 2026-10-03 the per-sample threshold took the drift for speech: about 1.6 s.
+    assert.ok(Math.abs(trimmed.seconds - 1.04) < 0.02, `got ${trimmed.seconds}`);
+    const head = trimmed.pcm.slice(0, Math.round(0.03 * rate));
+    assert.ok(Math.max(...head.map(Math.abs)) < 100, "no drift kept before the voice");
+  });
+
+  it("keeps a short sound just after the speech, like a final stop's release", () => {
+    const release = Int16Array.from({ length: 0.01 * rate }, (_, i) =>
+      Math.round(3000 * Math.sin(i / 3)),
+    );
+    const pcm = new Int16Array([...tone(1), ...silence(0.08), ...release, ...silence(0.5)]);
+    const trimmed = trimSilence(encodeWav(pcm, rate));
+    assert.ok(Math.abs(trimmed.seconds - 1.13) < 0.02, `got ${trimmed.seconds}`);
+  });
+
+  it("refuses a take with no audible speech", () => {
+    assert.throws(() => trimSilence(encodeWav(silence(1), rate)), /no audible speech/);
   });
 
   it("lays lines on a clip-length track at their start times", () => {
@@ -265,6 +372,27 @@ describe("foldRun", () => {
     assert.equal(line.versions.length, 2);
     assert.equal(line.versions[0].review?.pass, false);
     assert.equal(line.versions[1].voice?.seconds, 1.4);
+  });
+
+  it("clears the drop reason of a line the fix puts back to its voiced words", () => {
+    const cue: Cue = {
+      id: "L1",
+      gapId: "g1",
+      start: 1,
+      windowEnd: 4,
+      versions: [{ text: "A rocket rises.", by: "write", model: "m" }],
+      status: "fits",
+    };
+    const view = foldRun(
+      [
+        { type: "cue_written", cue, t: 1 },
+        { type: "cue_dropped", cueId: "L1", reason: "too_long", t: 2 },
+        { type: "cue_voiced", cueId: "L1", seconds: 1.4, rate: 1, window: 3, fits: true, t: 3 },
+      ],
+      10,
+    );
+    assert.equal(view.cues[0].status, "fits");
+    assert.equal(view.cues[0].droppedReason, undefined);
   });
 });
 

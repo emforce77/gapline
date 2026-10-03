@@ -171,3 +171,119 @@ it("hears the clip, then each silence again as its own slice with the same reque
     ],
   );
 });
+
+/** A 64×36 black clip of `seconds` with the given lavfi audio source. */
+async function clipWith(dir: string, name: string, audio: string, seconds: number) {
+  const file = join(dir, `${name}.mp4`);
+  await runFfmpeg([
+    "-y",
+    "-f",
+    "lavfi",
+    "-i",
+    `color=c=black:s=64x36:r=5:d=${seconds}`,
+    "-f",
+    "lavfi",
+    "-i",
+    audio,
+    "-c:v",
+    "libx264",
+    "-pix_fmt",
+    "yuv420p",
+    "-c:a",
+    "aac",
+    "-t",
+    String(seconds),
+    file,
+  ]);
+  return file;
+}
+
+function hearOnly(clipFile: string, clipSeconds: number, ledgerFile: string) {
+  const events: RunEvent[] = [];
+  const stages: string[] = [];
+  const stage: StageRunner = async (name, work) => {
+    stages.push(name);
+    return work();
+  };
+  const run = analyzeClip({
+    clipFile,
+    clipSeconds,
+    filmLanguageCode: "auto",
+    watchModel: "fixture",
+    ledgerFile,
+    videoDataUrl: Promise.resolve("data:video/mp4;base64,"),
+    cached: { scene: { shots: [], characters: [], sounds: [] } },
+    stage,
+    emit: async (event) => {
+      events.push(event);
+    },
+  });
+  return { run, events, stages };
+}
+
+it("sends a clip with a silent soundtrack to no recognizer and says so", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "scene-soundless-"));
+  const clipFile = await clipWith(dir, "silent", "anullsrc=r=48000:cl=stereo", 12);
+  const { run, events, stages } = hearOnly(clipFile, 12, join(dir, "ledger.jsonl"));
+  const { speech } = await withFetch(
+    async (url) => assert.fail(`no request expected, got ${url}`),
+    () => run,
+  );
+  assert.deepEqual(speech, []);
+  assert.deepEqual(stages, ["hear", "relisten"]);
+  assert.deepEqual(
+    events.find((e) => e.type === "relisten"),
+    { type: "relisten", gapsChecked: 0, wordsFound: 0, blockedSeconds: 0, soundless: true },
+  );
+});
+
+it("places a lone untimed token by hearing its chunk again in halves", async () => {
+  // Chirp 3 on a 30 s music clip (QA 2026-10-03): "[ BACKGROUND]" or a lone untimed ".7".
+  const dir = await mkdtemp(join(tmpdir(), "scene-untimed-chunk-"));
+  const seconds = 30;
+  const clipFile = await clipWith(
+    dir,
+    "music",
+    `sine=frequency=330:sample_rate=48000:duration=${seconds}`,
+    seconds,
+  );
+  let sent = 0;
+  const lengths: number[] = [];
+  const handler = async (_url: string, init?: RequestInit) => {
+    const body = JSON.parse(String(init!.body));
+    const length = await flacSeconds(dir, body.content, sent++);
+    lengths.push(length);
+    const answer = (words: { word: string; startOffset?: string; endOffset?: string }[]) =>
+      Response.json({
+        results: [{ alternatives: [{ words }], languageCode: "en" }],
+        metadata: { totalBilledDuration: `${Math.ceil(length)}s` },
+      });
+    if (Math.abs(length - seconds) < 0.05)
+      return answer([{ word: "[" }, { word: "BACKGROUND]" }, { word: ".7" }]);
+    return answer([]);
+  };
+  const ledgerFile = join(dir, "ledger.jsonl");
+  const { run, events } = hearOnly(clipFile, seconds, ledgerFile);
+  const { speech } = await withFetch(handler, () => run);
+  assert.deepEqual(speech, [], "the halves heard nothing: no room is closed");
+  // The whole clip, then its two halves. The clip's one silence is the audio of that first
+  // request, so the re-listen sends nothing.
+  assert.deepEqual(
+    lengths.map((l) => Math.round(l * 10) / 10),
+    [30, 15.5, 15.5],
+  );
+  assert.deepEqual(
+    events.find((e) => e.type === "relisten"),
+    {
+      type: "relisten",
+      gapsChecked: 1,
+      wordsFound: 0,
+      blockedSeconds: 0,
+    },
+  );
+  const calls = await readCallRecords(ledgerFile);
+  assert.deepEqual(
+    calls.map((c) => [c.label, c.billedSeconds, c.untimedWords]),
+    [["hear", 30 + 16 + 16, 1]],
+  );
+});

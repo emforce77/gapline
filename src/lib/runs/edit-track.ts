@@ -7,7 +7,7 @@
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { readCallRecords, summarizeCosts } from "../llm/ledger";
-import { encodeWatchingVideo } from "../media/proxies";
+import { watchingVideoFor } from "../media/proxies";
 import { buildNarrationTrack, encodeWav, type TrimmedLine } from "../media/narration-track";
 import { describedVtt, mixDescribedFilm } from "../media/mix";
 import { parseWav } from "../media/wav";
@@ -103,7 +103,7 @@ export async function writeEditedRun(
   const { base, first, dir, cues, project } = run;
   const shipped = shipLines(cues, base.gaps);
   const clipFile = join(projectDir(run.projectId), "clip.mp4");
-  const video = await encodeWatchingVideo(clipFile);
+  const video = await watchingVideoFor(clipFile);
   const finalReview = await reviewLines({
     context: {
       language: first.language,
@@ -157,11 +157,16 @@ export async function writeEditedRun(
       sampleRate,
     ),
   );
-  const spans = shipped.map((c) => ({ start: c.start, end: c.start + c.seconds! }));
+  const spans = shipped.map((c) => ({
+    start: c.start,
+    end: c.start + c.seconds!,
+    text: c.versions.at(-1)!.text,
+  }));
   await mixDescribedFilm({
     clipFile,
     rawNarrationWav: rawNarration,
     spans,
+    language: first.language,
     describedMp4: join(dir, FILES.described),
     narrationWav: join(dir, FILES.narration),
   });

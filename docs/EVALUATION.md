@@ -211,3 +211,88 @@ spends from its own allowance, $10 a day and $20 in total, and runs one clip at 
 
 Results: [run-level JSON](../evals/results-2026-09-22.json), [CSV](../evals/results-2026-09-22.csv),
 [protocol](../evals/README.md).
+
+## 2026-10-03: faster re-reviews and no fitting line lost
+
+QA found runs of 4–9 minutes, most of it reviewer calls at high thinking, and lines that had been
+voiced and fit dropped by the fix stage. The changes
+([architecture](ARCHITECTURE.md#the-loop-that-makes-each-line), steps 4–7):
+
+- Re-reviews of a few rewritten, added or shortened lines think at medium. The first review of the
+  whole script and the final check stay at high, the setting the September test kept.
+- A failed fix never costs a voiced line: it goes back to its voiced words and audio, with the
+  check's verdict listed (`finalFix.kept`).
+- A rewrite or shortening with the words of any earlier version counts as unchanged, and rewrite
+  requests list the wordings that already failed and why.
+- A take up to 15% too long is sped up with FFmpeg `atempo` instead of being voiced again.
+- Trimming removes the drift below 80 Hz before finding the speech.
+- A clip with no silence skips writing and the final check.
+- The 360p watching copy is kept beside the clip, named after the clip's size and modification
+  time so a clip prepared again in place is encoded again; run events and paid-call records are
+  written in batches.
+
+**Runs.** Same machine and code, except the files changed above. _Tears of Steel_ opening (65 s,
+English, analysis reused) at standard and brief, and the team scene (45 s, English, standard), twice
+before and twice after the change, three runs at a time. A fresh copy of the team scene with nothing
+reused ran once after. Run directories are in the QA scratchpad, not in the repository.
+
+| Clip, density            | Before: time, cost         | After: time, cost          | Lines shipped of written, before → after |
+| ------------------------ | -------------------------- | -------------------------- | ---------------------------------------- |
+| Opening, standard        | 333 s $0.372; 216 s $0.246 | 385 s $0.433; 290 s $0.325 | 7/7, 7/8 → 8/8, 8/8                      |
+| Opening, brief           | 140 s $0.150; 218 s $0.236 | 274 s $0.307; 265 s $0.327 | 3/3, 3/3 → 4/4, 4/4                      |
+| Team scene, reused       | 225 s $0.231               | 197 s $0.213; 166 s $0.183 | 3/4 → 3/3, 3/3                           |
+| Team scene, from scratch | 258 s $0.269               | 212 s $0.215               | 3/3 → 3/3                                |
+
+What the change did, by stage (medians over all runs above):
+
+- **Re-reviews:** 15 calls, 21.4 s and 4.6k thinking tokens each, before; 11 calls, 9.9 s and 1.7k
+  each, after. Mean cost $0.026 → $0.015 per call.
+- **Fix stage:** 54–88 s in the 4 runs that had one, before; 9.5–41 s in 5 runs, after.
+- **Shortening:** 4 shortenings before, none after. Every take that overran was sped up and fit (5
+  lines, 1.05–1.15×).
+- **Watching copy:** writing started 3.7–6.3 s after the silences were found in 4 of the 5 runs
+  that reused the analysis, before; at once in every run after, from the kept copy.
+- **Trimming:** re-trimming the 26 stored takes of the "before" runs removes a median 0.31 s more
+  (up to 0.73 s) than the old trim kept.
+- **Lines lost:** 2 of 28 written lines were dropped before (one after three rejections, one added
+  and rejected); 0 of 33 after. No fix failed in these runs, so the restore never ran here; a mocked
+  test covers it (`tests/run-loop.media.ts`).
+
+**Overall speed: not measured.** The version measured above was slower overall on the opening.
+The two calls at high, the first review and the final check, thought longer. On the opening, the
+medians were 29.9k and 29.6k thinking tokens after, against 10.5k and 21.4k before (4 finished runs
+each). Over both clips they were 28.7k and 26.3k after, against 13.2k and 19.8k before. That version
+also showed each line's length limit to every review, to stop fixes the writer copies from running
+long. A replay of one first review of the opening (an 8-line draft from the after-runs), three times
+each way, thought 34.7–36.3k tokens (129–130 s) with limits and 28.3–32.9k (103–124 s) without. With
+the earlier instructions it thought 26.6k (88 s, once). So the limits added about 13% (means 35.4k
+and 31.2k), not the doubling. The rest is not explained by these data: the same draft also
+thought far more than the before-runs' own first reviews of the opening (6.4–22.0k). Limits are now
+given on re-reviews only. The first review and the final check get the same instructions as before
+the change. This version was not measured end to end: the prepaid credits ran out during the
+replay, and the owner asked for no new paid runs. With limits, 0 of 14 rewrites were over their
+length budget, against 3 of 13 before.
+
+**Lines against the picture** (frames every 0.5 s). Both versions read the same facts in the
+opening: "40 years later" at 45.5 s, the holograms, "Simulation ready", the man with the eyepiece.
+Both describe him about 2 s before he is shown: "A man with a cybernetic eyepiece examines a brain"
+at 57.0 s, while only the brain is shown until about 59 s. After the change, one opening run also
+read the Netherlands Film Fund credit at 19.3 s; a line for it was rejected before. In the team scene,
+the line at 36.4–40.5 s was "He puts an arm around Tom and pulls him close" before. After, it was the
+same in one run and "He points back toward the window" in another, after two rejections. The man
+does point back at 36–40 s and puts his arm around the grey-haired man at 41 s. The line at 5.0 s says "microphone"
+for a hand-held device in both versions.
+
+**Not adopted: caching the video for Gemini.** The clip goes inline with every call. Prompt tokens,
+video included, were 11–19% of the Gemini cost of these runs, and Gemini's implicit cache matched in
+12 of 109 calls. An explicit cache would save at most part of that share, and nothing for clips below
+its minimum size, at the cost of a cache to create and expire per run. Keeping the watching copy
+removed the encode, which was the larger wait.
+
+**Not measured.** Batching the event and call logs targets Cloud Storage's limit of about one write
+per second per object; it was tested locally only. Replaying the event times of the 13 finished
+runs above through the batching gives 8–20 writes of the event log per run (median 14), 1–4 of them
+less than a second after the previous one (median 3). Writing every event on its own gave 26–57
+(median 38), 19–47 of them that close (median 26). Only a stage's start and the run's start and end
+are written before the run goes on; a refused write keeps its lines for the next one. The runs above, the replay and one run stopped by
+the daily allowance cost $4.61 together.

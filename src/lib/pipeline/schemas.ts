@@ -12,6 +12,8 @@ export const SpeechSegmentSchema = z
     text: z.string().describe("Verbatim words in the original language"),
     /** "relisten": found when the gap it sits in was recognized again on its own (relisten.ts). */
     heard: z.literal("relisten").optional(),
+    /** BCP-47 tag of the language the recognizer heard (hear.ts); absent in older analyses. */
+    lang: z.string().optional(),
   })
   .refine((s) => s.end > s.start, "end must follow start");
 
@@ -51,26 +53,35 @@ export const ShotSchema = z
       .describe("Who or what is visible and what they do, concretely, in present tense"),
     onScreenText: z
       .string()
-      .describe("Exact visible text such as titles or signs; empty string when none"),
+      .describe(
+        "The film's own words on screen, verbatim: titles, credits, captions or subtitles, time and " +
+          "place cards, signs; empty string when none",
+      ),
   })
   .refine((s) => s.end > s.start, "end must follow start");
 
 export const CharacterSchema = z.object({
   id: z.string().describe("Stable id: c1, c2, ..."),
   look: z.string().describe("Visual descriptor a narrator can use before the name is known"),
-  name: z.string().describe("Name as spoken in dialogue; empty string if never spoken"),
+  name: z
+    .string()
+    .describe(
+      "Name as spoken in dialogue or shown on screen as this person's name; empty string if neither",
+    ),
   nameFirstSpokenAt: z
     .number()
     .nonnegative()
     .nullable()
-    .describe("Seconds when the name is first said aloud; null if never"),
+    .describe("Seconds when the name is first said aloud or shown; null if never"),
 });
 
 export const SceneMapSchema = z
   .object({
     shots: z.array(ShotSchema),
     characters: z.array(CharacterSchema),
-    sounds: z.array(SoundEventSchema),
+    sounds: z
+      .array(SoundEventSchema)
+      .describe("Only sounds heard on the soundtrack; empty when it is silent"),
   })
   .refine(
     (s) => new Set(s.characters.map((c) => c.id)).size === s.characters.length,
@@ -97,7 +108,9 @@ export const DraftCueSchema = z.object({
   at: z
     .number()
     .nonnegative()
-    .describe("Second the line starts; inside its gap, near the moment it describes"),
+    .describe(
+      "Second the line starts; inside its gap, never before what it describes appears on screen",
+    ),
   text: z.string().trim().min(1),
 });
 export const DraftScriptSchema = z.object({ cues: z.array(DraftCueSchema) });
@@ -117,8 +130,9 @@ export const VerdictSchema = z
       .string()
       .describe(
         "How to fix it in one sentence, in the language of the line; any wording it suggests must " +
-          "itself obey every rule (for on-screen text, read the text; never say it appears on " +
-          "screen); empty when pass",
+          "itself obey every rule (for on-screen text, read the text word for word, after a short " +
+          "lead-in naming where it is written when one is needed, such as 'A sign reads:'; never say " +
+          "it appears on screen); empty when pass",
       ),
   })
   .refine(
@@ -137,8 +151,9 @@ export const ReviewSchema = z
       .array(MissingItemSchema)
       .describe(
         "Important visual information no line covers — a new place or time, a main character's first " +
-          "appearance, essential on-screen text, a key action — that a gap with free room could still hold. " +
-          "Empty when nothing important is missing.",
+          "appearance, essential on-screen text (each title, time or place card, caption or sign in the " +
+          "notes that no line reads; not other credits), a key action — that a gap with free room " +
+          "could still hold. Empty when nothing important is missing.",
       ),
   })
   .refine(

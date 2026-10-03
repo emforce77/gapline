@@ -1,6 +1,6 @@
 import { retryableStatus, ServiceError } from "../errors";
 import { appendCallRecord } from "../llm/ledger";
-import { googleHeaders } from "../google/auth";
+import { googleFetch } from "../google/auth";
 import { parseWav } from "../media/wav";
 import { reserveCall } from "../runs/budget";
 
@@ -35,9 +35,8 @@ export async function synthesizeLine(input: {
   const settleCall = reserveCall([...input.text].length * TTS_USD_PER_CHARACTER);
   let cost: number | null = null;
   try {
-    const response = await fetch("https://texttospeech.googleapis.com/v1/text:synthesize", {
+    const response = await googleFetch("https://texttospeech.googleapis.com/v1/text:synthesize", {
       method: "POST",
-      headers: await googleHeaders(),
       body: JSON.stringify({
         input: { text: input.text },
         voice: { languageCode: voice.languageCode, name: input.voiceName ?? voice.name },
@@ -48,11 +47,14 @@ export async function synthesizeLine(input: {
         },
       }),
     });
+    // An HTTP error is not billed, so the call costs nothing (and frees its bound in the run budget).
+    if (!response.ok) cost = 0;
     if (!response.ok)
       throw new ServiceError(
         "voice_failed",
         `Text-to-Speech HTTP ${response.status}: ${await response.text()}`,
         retryableStatus(response.status),
+        response.status,
       );
     const body = (await response.json()) as { audioContent: string };
     const wav = Buffer.from(body.audioContent, "base64");
@@ -84,6 +86,7 @@ export async function synthesizeLine(input: {
       completionTokens: 0,
       costUsd: cost ?? 0,
       costKnown: cost !== null,
+      ...(cost === 0 ? { costSource: "not_billed" as const } : {}),
       latencyMs: Date.now() - started,
       firstTokenMs: null,
       finishReason: "",

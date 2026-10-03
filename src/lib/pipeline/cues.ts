@@ -75,9 +75,66 @@ export function freeRoom(
   return end - start >= MIN_ROOM_SECONDS ? { start, end } : null;
 }
 
+/**
+ * How far a moment the final check found may lie outside the silence it names and still get a line
+ * there. Of 31 such moments in the QA runs of 2026-10-03, 21 sat within 2.93 s of their silence and
+ * the next was 6.13 s away; a line 9 s from what it describes would describe the wrong picture.
+ */
+export const MAX_MOMENT_DISTANCE_SECONDS = 3;
+
+/**
+ * The free room a line about a missing moment can use (freeRoom), with the moment clamped into the
+ * silence it names; null when that silence is unknown, the moment lies further than
+ * MAX_MOMENT_DISTANCE_SECONDS outside it, or there is no room.
+ */
+export function roomForMoment(
+  item: { gapId: string; at: number },
+  gaps: Gap[],
+  voiced: { start: number; end: number }[],
+): { start: number; end: number } | null {
+  const gap = gaps.find((g) => g.id === item.gapId);
+  if (!gap) return null;
+  const at = Math.min(Math.max(item.at, gap.start), gap.end);
+  if (Math.abs(at - item.at) > MAX_MOMENT_DISTANCE_SECONDS) return null;
+  return freeRoom(at, gap, voiced);
+}
+
 /** The version a line currently stands on. */
 export function latest(cue: Cue) {
   return cue.versions[cue.versions.length - 1];
+}
+
+/**
+ * True when `text` has the words of one of the line's earlier versions. Every earlier version was
+ * rejected, too long, or is the one that stands now, so going back to one gains nothing: it counts
+ * as no rewrite (reason "unchanged").
+ */
+export function triedBefore(cue: Cue, text: string): boolean {
+  return cue.versions.some((v) => sameWords(v.text, text));
+}
+
+/**
+ * A rewrite request's fix, followed by the line's earlier wordings that failed and why: the writer
+ * sees only the current text otherwise, and offered rejected or too-long wordings again (QA,
+ * 2026-10-03: 9 lines went back to an earlier wording, some 2–4 times).
+ */
+export function withFailedWordings(cue: Cue, fix: string): string {
+  const room = cue.windowEnd - cue.start;
+  const current = latest(cue).text;
+  const failed: string[] = [];
+  for (const v of cue.versions) {
+    const why =
+      v.review?.pass === false
+        ? v.review.violations.map((x) => `${x.rule}: ${x.reason}`).join("; ")
+        : v.voice && v.voice.seconds > room
+          ? `spoken in ${v.voice.seconds.toFixed(1)} s, room ${room.toFixed(1)} s`
+          : null;
+    if (!why || sameWords(v.text, current) || failed.some((f) => f.startsWith(`"${v.text}"`)))
+      continue;
+    failed.push(`"${v.text}" (${why})`);
+  }
+  if (failed.length === 0) return fix;
+  return `${fix}\n  already tried and failed, do not offer again: ${failed.join("; ")}`;
 }
 
 export function sameWords(a: string, b: string): boolean {

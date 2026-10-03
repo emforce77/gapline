@@ -46,8 +46,8 @@ export function findGaps(map: DialogueMap, clipSeconds: number): Gap[] {
 
 /** Below this much total room a clip can hold at most a line or two, whatever the writer does. */
 export const LITTLE_ROOM_MIN_SECONDS = 3;
-/** ...or below this share of the clip, for longer clips. */
-export const LITTLE_ROOM_SHARE = 0.05;
+/** ...or below this share of the clip (QA clips with 5.5-14.7% room are flagged, 26%+ are not). */
+export const LITTLE_ROOM_SHARE = 0.15;
 
 /**
  * Total speakable room and whether it is too little for meaningful description. Pure, so the

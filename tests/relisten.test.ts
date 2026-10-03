@@ -9,20 +9,25 @@ import type { TimedRunEvent } from "../src/lib/pipeline/events";
 import { findGaps, MIN_GAP_SECONDS } from "../src/lib/pipeline/gaps";
 import {
   CHUNK_SECONDS,
+  groupSegments,
+  padSlice,
+  placeLongSpans,
+  PLACE_MAX_LEVELS,
+  SLICE_PADDING_SECONDS,
+  SLICES_IN_FLIGHT,
   speechCostUsd,
   timeChunkWords,
+  UNPLACED_MAX_SECONDS,
+  wordsInSlice,
   type RecognizeResponse,
-  type RecognizedChunk,
   type SpanRecognizer,
+  type Word,
 } from "../src/lib/pipeline/hear";
 import { foldRun } from "../src/lib/pipeline/reduce";
 import {
   planRelisten,
   relistenGaps,
-  RELISTEN_CONCURRENCY,
   RELISTEN_LEDGER_LABEL,
-  RELISTEN_PADDING_SECONDS,
-  speechInSlice,
   type RelistenSlice,
 } from "../src/lib/pipeline/relisten";
 import type { DraftCue, Gap, SpeechSegment } from "../src/lib/pipeline/schemas";
@@ -69,10 +74,7 @@ function fixtureRecognizer(bodies: { from: number; response: RecognizeResponse }
 
 const slice = (start: number, end: number, clip = 20): RelistenSlice => ({
   gapId: "g1",
-  start,
-  end,
-  from: Math.max(0, start - RELISTEN_PADDING_SECONDS),
-  to: Math.min(clip, end + RELISTEN_PADDING_SECONDS),
+  ...padSlice(start, end, clip),
 });
 
 describe("planRelisten", () => {
@@ -89,9 +91,9 @@ describe("planRelisten", () => {
       ["g1", "g2", "g4"],
     );
     near(slices[0].from, 0, "clip start bounds the left padding");
-    near(slices[0].to, 2.07 + RELISTEN_PADDING_SECONDS);
-    near(slices[1].from, 4.21 - RELISTEN_PADDING_SECONDS);
-    near(slices[1].to, 6.59 + RELISTEN_PADDING_SECONDS);
+    near(slices[0].to, 2.07 + SLICE_PADDING_SECONDS);
+    near(slices[1].from, 4.21 - SLICE_PADDING_SECONDS);
+    near(slices[1].to, 6.59 + SLICE_PADDING_SECONDS);
     near(slices[2].to, 65, "clip end bounds the right padding");
     for (const [s, g] of [
       [slices[1], gaps[1]],
@@ -112,76 +114,334 @@ describe("planRelisten", () => {
   });
 });
 
-describe("speechInSlice", () => {
+describe("wordsInSlice", () => {
   const s = slice(4, 8);
-  const chunk = (words: [string, number, number][]): RecognizedChunk => ({
-    ...timeChunkWords(response(words, 5), s.from, s.to),
-    billedSeconds: 5,
-  });
+  const heard = (words: [string, number, number][]) =>
+    wordsInSlice(s, timeChunkWords(response(words, 5), s.from, s.to).words);
 
   it("maps slice-relative offsets to clip time and keeps every word that touches the gap", () => {
-    const { segments, words } = speechInSlice(
-      s,
-      chunk([
-        ["tail", 0.1, 0.45], // 3.6–3.95: only in the left padding
-        ["edge", 0.3, 0.7], // 3.8–4.2: crosses the gap start, kept whole
-        ["middle", 2, 2.5], // 5.5–6.0
-        ["late", 4.4, 4.6], // 7.9–8.1: crosses the gap end
-        ["after", 4.55, 4.9], // 8.05–8.4: only in the right padding
-      ]),
-    );
-    assert.equal(words, 3);
+    const words = heard([
+      ["tail", 0.1, 0.45], // 3.6–3.95: only in the left padding
+      ["edge", 0.3, 0.7], // 3.8–4.2: crosses the gap start, kept whole
+      ["middle", 2, 2.5], // 5.5–6.0
+      ["late", 4.4, 4.6], // 7.9–8.1: crosses the gap end
+      ["after", 4.55, 4.9], // 8.05–8.4: only in the right padding
+    ]);
     assert.deepEqual(
-      segments.map((x) => [x.text, x.heard]),
-      [
-        ["edge", "relisten"],
-        ["middle", "relisten"],
-        ["late", "relisten"],
-      ],
+      words.map((w) => w.word),
+      ["edge", "middle", "late"],
     );
-    near(segments[0].start, 3.8);
-    near(segments[0].end, 4.2);
-    near(segments[1].start, 5.5);
-    near(segments[2].end, 8.1);
+    near(words[0].start, 3.8);
+    near(words[0].end, 4.2);
+    near(words[1].start, 5.5);
+    near(words[2].end, 8.1);
+    assert.deepEqual(
+      groupSegments(words).map((x) => x.text),
+      ["edge", "middle", "late"],
+    );
   });
 
   it("cuts a word at the slice edges, never beyond the audio that was sent", () => {
-    const { segments } = speechInSlice(s, chunk([["long", 4, 9]])); // 7.5–12.5 reported
-    near(segments[0].start, 7.5);
-    near(segments[0].end, s.to);
+    const [word] = heard([["long", 4, 9]]); // 7.5–12.5 reported, longer than any word
+    near(word.start, 7.5);
+    near(word.end, s.end, "a span too long to be one word is cut to the part");
+    const [short] = heard([["late", 4.2, 5.2]]); // 7.7–8.7, past the audio sent
+    near(short.start, 7.7);
+    near(short.end, s.to);
   });
 
-  it("blocks the whole part of the silence when any word comes back without timing", () => {
-    const { segments, words } = speechInSlice(s, {
-      ...timeChunkWords(
+  it("blocks untimed words up to their timed neighbours, inside the part", () => {
+    const body: RecognizeResponse = {
+      results: [
         {
-          results: [
+          alternatives: [
             {
-              alternatives: [
-                {
-                  words: [{ word: "hm" }, { word: "yes", startOffset: "0.1s", endOffset: "0.3s" }],
-                },
+              words: [
+                { word: "hm" },
+                { word: "yes", startOffset: "1.5s", endOffset: "1.8s" },
+                { word: "so" },
               ],
             },
           ],
         },
-        s.from,
-        s.to,
-      ),
-      billedSeconds: 5,
-    });
-    assert.equal(words, 2);
-    assert.deepEqual(segments, [
-      { start: 4, end: 8, speaker: "", text: "hm yes", heard: "relisten" },
-    ]);
-    assert.doesNotThrow(() => validateAnalysis({ speech: segments }, 20));
+      ],
+    };
+    const words = wordsInSlice(s, timeChunkWords(body, s.from, s.to).words);
+    assert.deepEqual(
+      words.map((w) => [w.start, w.end, w.word, w.untimed ?? false]),
+      [
+        [4, 5, "hm", true], // from the slice start, cut to the part
+        [5, 5.3, "yes", false],
+        [5.3, 8, "so", true], // to the slice end, cut to the part
+      ],
+    );
   });
 
-  it("finds nothing when the recognizer hears nothing", () => {
-    assert.deepEqual(speechInSlice(s, { words: [], untimed: 0, billedSeconds: 5 }), {
-      segments: [],
-      words: 0,
-    });
+  it("finds nothing when the recognizer hears nothing, or only its annotations", () => {
+    assert.deepEqual(wordsInSlice(s, []), []);
+    const annotated = timeChunkWords(
+      {
+        results: [
+          {
+            alternatives: [
+              {
+                words: [
+                  { word: "[" },
+                  { word: "BACKGROUND]" },
+                  { word: "[", startOffset: "1s", endOffset: "2s" },
+                  { word: "]", startOffset: "2s", endOffset: "2.1s" },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+      s.from,
+      s.to,
+    );
+    assert.deepEqual(annotated.annotations, ["[ BACKGROUND]", "[ ]"]);
+    assert.equal(annotated.untimed, 0);
+    assert.deepEqual(wordsInSlice(s, annotated.words), []);
+  });
+});
+
+describe("placeLongSpans", () => {
+  /** A recognizer that answers `answer(from, to)` in slice-relative offsets, and logs every call. */
+  function recognizer(answer: (from: number, to: number) => RecognizeResponse["results"]) {
+    const calls: [number, number][] = [];
+    const recognize: SpanRecognizer = async (from, length) => {
+      calls.push([from, from + length]);
+      // No case here needs more than 30 requests: fail instead of hanging on a loop.
+      if (calls.length > 64) throw new Error(`still asking after 64 requests: ${calls.slice(-4)}`);
+      const billed = Math.ceil(length);
+      return {
+        ...timeChunkWords({ results: answer(from, from + length) }, from, from + length),
+        billedSeconds: billed,
+      };
+    };
+    return { recognize, calls };
+  }
+  const untimedAt = (at: number, token: string) => (from: number, to: number) =>
+    from <= at && at < to ? [{ alternatives: [{ words: [{ word: token }] }] }] : [];
+
+  it("bounds a lone untimed token to a few seconds instead of its whole chunk", async () => {
+    // Chirp 3 on a 30 s music clip: a single ".7" with no timing (QA 2026-10-03, format-mov-30s).
+    const [first] = timeChunkWords({ results: untimedAt(0, ".7")(0, 30.02) }, 0, 30.02).words;
+    assert.deepEqual([first.start, first.end], [0, 30.02]);
+    // Worst case: the recognizer hallucinates the token again wherever 17 s is in the audio.
+    const { recognize, calls } = recognizer(untimedAt(17, ".7"));
+    const placed = await placeLongSpans([first], recognize, 30.02);
+    const blocked = placed.words.reduce((sum, w) => sum + w.end - w.start, 0);
+    assert.ok(blocked <= UNPLACED_MAX_SECONDS + EPS, `blocked ${blocked} s`);
+    assert.ok(placed.words.every((w) => w.start <= 17 + EPS && w.end >= 17 - 1 - EPS));
+    // 30 → 15 → 7.5 → 3.75 s: two halves a level, and only halves that hear it again go on.
+    assert.equal(calls.length, 6);
+    assert.equal(placed.requests, 6);
+    assert.equal(
+      placed.billedSeconds,
+      calls.reduce((sum, [from, to]) => sum + Math.ceil(to - from), 0),
+    );
+    for (const [from, to] of calls) assert.ok(from >= 0 && to <= 30.02);
+  });
+
+  it("frees the whole span when its halves hear nothing", async () => {
+    const { recognize, calls } = recognizer(() => []);
+    const words: Word[] = [{ start: 19.67, end: 37.17, word: "A day A day", untimed: true }];
+    const placed = await placeLongSpans(words, recognize, 52.21);
+    assert.deepEqual(placed.words, []);
+    assert.equal(calls.length, 2);
+    near(calls[0][0], 19.67 - SLICE_PADDING_SECONDS);
+    near(calls[1][1], 37.17 + SLICE_PADDING_SECONDS);
+  });
+
+  it("places the words of a 'word' stretched over many seconds where the halves hear them", async () => {
+    // Sintel trailer, first pass (2026-10-03): "What" 12.12–36.92 s; the line is spoken at 12–15 s.
+    const { recognize } = recognizer((from, to) =>
+      from <= 13 && 13 < to
+        ? [
+            {
+              alternatives: [
+                {
+                  words: [
+                    { word: "What", startOffset: `${13 - from}s`, endOffset: `${13.3 - from}s` },
+                    {
+                      word: "brings",
+                      startOffset: `${13.3 - from}s`,
+                      endOffset: `${13.7 - from}s`,
+                    },
+                  ],
+                },
+              ],
+            },
+          ]
+        : [],
+    );
+    const placed = await placeLongSpans(
+      [
+        { start: 2, end: 3, word: "kept" },
+        { start: 12.12, end: 36.92, word: "What" },
+      ],
+      recognize,
+      52.21,
+    );
+    assert.deepEqual(
+      placed.words.map((w) => [w.word, Math.round(w.start * 100) / 100]),
+      [
+        ["kept", 2],
+        ["What", 13],
+        ["brings", 13.3],
+      ],
+    );
+  });
+
+  it("joins overlapping long spans and keeps a word across the cut once", async () => {
+    // Sintel first pass: "What" 12.12–36.92 s and "A" 19.92–36.96 s; both cover "I'm searching".
+    const at = (word: string, start: number, end: number) => (from: number, to: number) =>
+      from <= start && end <= to
+        ? [{ word, startOffset: `${start - from}s`, endOffset: `${end - from}s` }]
+        : [];
+    const middle = (12.12 + 36.96) / 2;
+    const heard = [at("searching", 19, 19.3), at("cut", middle - 0.2, middle + 0.2)];
+    const { recognize, calls } = recognizer((from, to) => [
+      { alternatives: [{ words: heard.flatMap((h) => h(from, to)) }] },
+    ]);
+    const placed = await placeLongSpans(
+      [
+        { start: 12.12, end: 36.92, word: "What" },
+        { start: 19.92, end: 36.96, word: "A" },
+      ],
+      recognize,
+      52.21,
+    );
+    assert.equal(calls.length, 2, "one span, two halves");
+    assert.deepEqual(
+      placed.words.map((w) => w.word),
+      ["searching", "cut"],
+    );
+  });
+
+  it("lets a word placed inside a re-heard span give way to the halves, but only where they hear", async () => {
+    // Sintel first pass: "searching" 18.64–18.80 s sits inside "What" 12.12–36.92 s.
+    const { recognize } = recognizer((from, to) =>
+      from <= 18.6 && 18.9 <= to
+        ? [
+            {
+              alternatives: [
+                {
+                  words: [
+                    {
+                      word: "searching",
+                      startOffset: `${18.62 - from}s`,
+                      endOffset: `${18.9 - from}s`,
+                    },
+                  ],
+                },
+              ],
+            },
+          ]
+        : [],
+    );
+    const placed = await placeLongSpans(
+      [
+        { start: 12.12, end: 36.92, word: "What" },
+        { start: 18.64, end: 18.8, word: "searching" },
+        { start: 30, end: 30.4, word: "unheard" },
+      ],
+      recognize,
+      52.21,
+    );
+    assert.deepEqual(
+      placed.words.map((w) => [w.word, w.start]),
+      [
+        ["searching", 18.62],
+        ["unheard", 30],
+      ],
+    );
+  });
+
+  it("keeps short untimed spans blocked without asking again", async () => {
+    const words: Word[] = [{ start: 0, end: 1.24, word: "어쩔 수 없고요.", untimed: true }];
+    const placed = await placeLongSpans(words, async () => assert.fail("nothing to place"), 40);
+    assert.deepEqual(placed, { words, billedSeconds: 0, requests: 0 });
+  });
+
+  /** Blocked seconds, and every span short enough or one the last level left. */
+  const blockedSeconds = (words: Word[]) => words.reduce((sum, w) => sum + w.end - w.start, 0);
+
+  it("ends when every request answers with a token it cannot time", async () => {
+    // Chirp 3 on music answers any audio with one untimed ".7" (QA 2026-10-03, format-mov-30s).
+    const { recognize, calls } = recognizer(() => [
+      { alternatives: [{ words: [{ word: ".7" }] }] },
+    ]);
+    const placed = await placeLongSpans(
+      [{ start: 0, end: 30.02, word: ".7", untimed: true }],
+      recognize,
+      30.02,
+    );
+    // 30 → 15 → 7.5 → 3.75 s, every half answering again: 2 + 4 + 8 requests, all of it blocked.
+    assert.equal(calls.length, 14);
+    near(blockedSeconds(placed.words), 30.02);
+    assert.ok(placed.words.every((w) => w.end - w.start <= UNPLACED_MAX_SECONDS + EPS));
+  });
+
+  it("ends when the token sits at the cut, where both halves' padding hears it", async () => {
+    // Halves of 0–30.02 s meet at 15.01 s; each is sent with 0.5 s of the other.
+    const { recognize, calls } = recognizer(untimedAt(15.2, ".7"));
+    const placed = await placeLongSpans(
+      [{ start: 0, end: 30.02, word: ".7", untimed: true }],
+      recognize,
+      30.02,
+    );
+    assert.equal(calls.length, 2 + 4 + 4);
+    assert.ok(blockedSeconds(placed.words) <= 2 * UNPLACED_MAX_SECONDS + EPS);
+    assert.ok(placed.words.every((w) => w.start <= 15.2 + EPS && w.end >= 15.2 - 4 - EPS));
+  });
+
+  it("ends when a stretched 'word' starts exactly at each cut", async () => {
+    // Sintel "What" shape: every slice answers one timed word from its part's start to its end.
+    const { recognize, calls } = recognizer((from, to) => [
+      {
+        alternatives: [
+          {
+            words: [
+              {
+                word: "What",
+                startOffset: `${Math.min(SLICE_PADDING_SECONDS, to - from)}s`,
+                endOffset: `${to - from}s`,
+              },
+            ],
+          },
+        ],
+      },
+    ]);
+    const placed = await placeLongSpans(
+      [{ start: 12.1, end: 36.9, word: "What" }],
+      recognize,
+      52.21,
+    );
+    assert.equal(calls.length, 14);
+    assert.ok(placed.words.every((w) => w.end - w.start <= UNPLACED_MAX_SECONDS + EPS));
+  });
+
+  it(`stops after ${PLACE_MAX_LEVELS} levels and keeps what is still unplaced blocked`, async () => {
+    // A 90 s upload whose two chunks both came back untimed: one span joined across the chunks.
+    const { recognize, calls } = recognizer(() => [
+      { alternatives: [{ words: [{ word: "♫" }, { word: "la" }] }] },
+    ]);
+    const placed = await placeLongSpans(
+      [
+        { start: 0, end: 52.5, word: "la", untimed: true },
+        { start: 52.5, end: 90, word: "la", untimed: true },
+      ],
+      recognize,
+      90,
+    );
+    assert.equal(calls.length, 2 + 4 + 8 + 16);
+    // The last level's halves are 90 / 16 = 5.625 s: each still unplaced, each kept as it is.
+    assert.equal(placed.words.length, 16);
+    for (const w of placed.words) near(w.end - w.start, 90 / 16);
+    near(blockedSeconds(placed.words), 90);
+    for (const [from, to] of calls) assert.ok(to - from <= CHUNK_SECONDS);
   });
 });
 
@@ -265,14 +525,14 @@ describe("relistenGaps", () => {
     const ledgerFile = join(await mkdtemp(join(tmpdir(), "scene-relisten-")), "ledger.jsonl");
     const { report } = await relistenGaps({ speech, clipSeconds: 40, ledgerFile, recognize });
     assert.equal(report.gapsChecked, 9);
-    assert.equal(peak, RELISTEN_CONCURRENCY);
+    assert.equal(peak, SLICES_IN_FLIGHT);
   });
 
   it("fails the hearing when a slice fails, recording an unknown charge", async () => {
     const ledgerFile = join(await mkdtemp(join(tmpdir(), "scene-relisten-")), "ledger.jsonl");
     await assert.rejects(
       relistenGaps({
-        speech: [],
+        speech: [{ start: 4, end: 5, speaker: "", text: "a word" }],
         clipSeconds: 10,
         ledgerFile,
         recognize: async () => {
@@ -284,6 +544,24 @@ describe("relistenGaps", () => {
     const [record] = await readCallRecords(ledgerFile);
     assert.equal(record.ok, false);
     assert.equal(record.costKnown, false);
+  });
+
+  it("does not send again the one request that heard a short clip with no speech", async () => {
+    const ledgerFile = join(await mkdtemp(join(tmpdir(), "scene-relisten-")), "none.jsonl");
+    const result = await relistenGaps({
+      speech: [],
+      clipSeconds: 30.02,
+      ledgerFile,
+      recognize: async () => assert.fail("the first pass heard this exact audio"),
+    });
+    assert.deepEqual(result, {
+      speech: [],
+      report: { gapsChecked: 1, wordsFound: 0, blockedSeconds: 0 },
+    });
+    // A clip longer than one request was heard in overlapping chunks: its silence is heard again.
+    const { recognize, calls } = fixtureRecognizer([]);
+    await relistenGaps({ speech: [], clipSeconds: 60.01, ledgerFile, recognize });
+    assert.equal(calls.length, 2);
   });
 
   it("makes no call when no silence is long enough to hold a line", async () => {

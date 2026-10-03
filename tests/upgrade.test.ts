@@ -399,7 +399,7 @@ it("persists partial analysis before downstream failure and invalidates changed 
     const project: Project = {
       id: "cache-test",
       title: "fixture",
-      kind: "sample",
+      kind: "upload",
       clipSeconds: 5,
       filmLanguageCode: "en-US",
       attribution: "",

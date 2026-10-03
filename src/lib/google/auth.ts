@@ -11,6 +11,7 @@ const TOKEN_MARGIN_MS = 5 * 60 * 1000;
 const LOCAL_TOKEN_TTL_MS = 5 * 60 * 1000;
 const METADATA_TOKEN_URL =
   "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
+const HTTP_UNAUTHORIZED = 401;
 
 let cached: { token: string; expires: number } | null = null;
 
@@ -52,10 +53,43 @@ export async function googleAccessToken(): Promise<string> {
   return cached.token;
 }
 
-export async function googleHeaders(): Promise<Record<string, string>> {
+/** Forgets the cached token, so the next request asks for a new one. */
+export function dropGoogleToken(): void {
+  cached = null;
+}
+
+async function googleHeaders(): Promise<Record<string, string>> {
   return {
     Authorization: `Bearer ${await googleAccessToken()}`,
     "Content-Type": "application/json",
     "x-goog-user-project": gcpProjectId(),
   };
+}
+
+/**
+ * A Google Cloud REST request with googleHeaders. An HTTP 401 means the service refused a token the
+ * cache still held as live (revoked, or expired early): the cache is dropped and the request sent
+ * once more with a new token, and that second answer is returned whatever it is. When the request
+ * cannot be sent at all, `unreachable` (if given) turns the failure into the caller's own error; a
+ * token that cannot be had fails as it is.
+ */
+export async function googleFetch(
+  url: string,
+  init: Omit<RequestInit, "headers" | "body"> & { body: string },
+  unreachable?: (error: unknown) => Error,
+): Promise<Response> {
+  const send = async () => {
+    const headers = await googleHeaders();
+    try {
+      return await fetch(url, { ...init, headers });
+    } catch (error) {
+      throw unreachable ? unreachable(error) : error;
+    }
+  };
+  const first = await send();
+  if (first.status !== HTTP_UNAUTHORIZED) return first;
+  await first.body?.cancel();
+  console.warn(`google: HTTP 401 from ${new URL(url).host}; asking for a new token, sending again`);
+  dropGoogleToken();
+  return send();
 }

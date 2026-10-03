@@ -5,7 +5,7 @@ import { describedVtt, mixDescribedFilm } from "../media/mix";
 import { buildNarrationTrack, encodeWav, type TrimmedLine } from "../media/narration-track";
 import { latest } from "./cues";
 import type { RunFiles, RunSummary } from "./events";
-import type { Cue, Gap, SpeechSegment, Verdict } from "./schemas";
+import type { Cue, Gap, Language, SpeechSegment, Verdict } from "./schemas";
 
 /** Sample rate of an empty narration track (no line shipped); Chirp 3 HD voices at 24 kHz. */
 const EMPTY_TRACK_SAMPLE_RATE = 24000;
@@ -24,6 +24,7 @@ export async function mixRun(input: {
   clipSeconds: number;
   shipped: Cue[];
   lines: Map<string, TrimmedLine>;
+  language: Language;
 }): Promise<void> {
   const { runDir, shipped, lines } = input;
   for (const cue of shipped) {
@@ -42,11 +43,16 @@ export async function mixRun(input: {
       sampleRate,
     ),
   );
-  const spans = shipped.map((c) => ({ start: c.start, end: c.start + (c.seconds ?? 0) }));
+  const spans = shipped.map((c) => ({
+    start: c.start,
+    end: c.start + (c.seconds ?? 0),
+    text: latest(c).text,
+  }));
   await mixDescribedFilm({
     clipFile: input.clipFile,
     rawNarrationWav: rawNarration,
     spans,
+    language: input.language,
     describedMp4: join(runDir, RUN_FILES.described),
     narrationWav: join(runDir, RUN_FILES.narration),
   });
@@ -76,7 +82,8 @@ export function summarizeRun(input: {
   calls: CallRecord[];
   cues: Cue[];
   shipped: Cue[];
-  finalReview: NonNullable<RunSummary["finalReview"]>;
+  /** Absent when the run had no silence to write for, so nothing was checked (no badge). */
+  finalReview?: NonNullable<RunSummary["finalReview"]>;
   finalFix?: RunSummary["finalFix"];
   analysisReused: NonNullable<RunSummary["analysisReused"]>;
   clipSeconds: number;
@@ -101,11 +108,15 @@ export function summarizeRun(input: {
   }
   const spans = shipped.map((c) => ({ start: c.start, end: c.start + (c.seconds ?? 0) }));
   return {
-    qualityStatus:
-      finalReview.missing.length || finalReview.verdicts.some((v) => !v.pass)
-        ? "review_needed"
-        : "model_checked",
-    finalReview,
+    ...(finalReview
+      ? {
+          qualityStatus:
+            finalReview.missing.length || finalReview.verdicts.some((v) => !v.pass)
+              ? ("review_needed" as const)
+              : ("model_checked" as const),
+          finalReview,
+        }
+      : {}),
     ...(input.finalFix ? { finalFix: input.finalFix } : {}),
     costStatus: summarizeCosts(calls).costStatus,
     analysisReused: input.analysisReused,
