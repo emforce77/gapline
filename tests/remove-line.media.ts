@@ -70,7 +70,8 @@ it("removes one line: other WAVs reused byte-for-byte, track and audit rebuilt, 
   const audits: string[] = [];
   globalThis.fetch = async (url, options) => {
     const address = String(url);
-    if (address.includes("metadata.google")) return Response.json({ access_token: "fixture" });
+    if (address.includes("metadata.google"))
+      return Response.json({ access_token: "fixture", expires_in: 3599 });
     if (address.includes("texttospeech.googleapis.com")) {
       counts.tts++;
       return Response.json({ audioContent: tone(0.7, 7).toString("base64") });
@@ -258,7 +259,12 @@ it("removes one line: other WAVs reused byte-for-byte, track and audit rebuilt, 
     assert.ok(peak(0.3, 0.7) > 1000, "L1 still speaks");
     assert.equal(peak(1.8, 2.6), 0, "L2's span is silent");
     assert.ok(await exists(join(dir, "described.mp4")));
-    assert.deepEqual(noteFromScript(script), { line: 2, kind: "removed" });
+    // The note carries when the edit was saved (the edit record's `at`).
+    assert.deepEqual(noteFromScript(script), {
+      line: 2,
+      kind: "removed",
+      at: script.humanEdits[0].at,
+    });
 
     // Idempotent: the same request returns the same result without another model call.
     assert.deepEqual(await editRun(project.id, "base-run", removal, OWNER), removed);
@@ -302,7 +308,11 @@ it("removes one line: other WAVs reused byte-for-byte, track and audit rebuilt, 
         await readFile(join(runDir(project.id, restored.runId), `voice/${id}.wav`)),
         wavs[id],
       );
-    assert.deepEqual(noteFromScript(back), { line: 2, kind: "restored" });
+    assert.deepEqual(noteFromScript(back), {
+      line: 2,
+      kind: "restored",
+      at: back.humanEdits[0].at,
+    });
   } finally {
     globalThis.fetch = originalFetch;
     for (const key of Object.keys(process.env)) if (!(key in env)) delete process.env[key];

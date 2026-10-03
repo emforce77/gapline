@@ -1,4 +1,9 @@
 import { spawn } from "node:child_process";
+import { createReadStream, createWriteStream } from "node:fs";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { pipeline } from "node:stream/promises";
 
 /** Resolved once: a static build locally (FFMPEG_PATH), the apt package in the container. */
 export function ffmpegPath(): string {
@@ -34,6 +39,28 @@ export function runFfmpeg(args: string[]): Promise<FfmpegResult> {
   });
 }
 
+/**
+ * Runs work in a fresh local folder and removes it afterwards. ffmpeg writes its outputs there, not
+ * on the data volume: the MP4 and WAV muxers seek back to patch their headers, and the GCS FUSE
+ * mount accepts only appends (it logs OutOfOrderError and stages the whole file again).
+ */
+export async function withScratchDir<T>(work: (dir: string) => Promise<T>): Promise<T> {
+  const dir = await mkdtemp(join(tmpdir(), "scene-ff-"));
+  try {
+    return await work(dir);
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+/**
+ * Copies a finished file in one front-to-back write. Not fs.copyFile (GCS FUSE has no
+ * copy_file_range) and not rename (the scratch folder is on another device).
+ */
+export async function copyFileByStream(from: string, to: string): Promise<void> {
+  await pipeline(createReadStream(from), createWriteStream(to));
+}
+
 /** Container duration in seconds, read from ffmpeg's own header dump (there is no ffprobe). */
 export async function probeDurationSeconds(file: string): Promise<number> {
   const { stderr } = await runFfmpeg(["-i", file, "-f", "null", "-t", "0", "-"]);
@@ -50,19 +77,67 @@ export interface MediaProbe {
   width: number | null;
   height: number | null;
   hasAudio: boolean;
+  /** The first video stream as ffmpeg names it (null for the parts it does not print). */
+  video: {
+    codec: string | null;
+    /** e.g. "High", "Constrained Baseline". */
+    profile: string | null;
+    pixelFormat: string | null;
+    /** Field order says "top first" or "bottom first". */
+    interlaced: boolean;
+    fps: number | null;
+    /** A display matrix turns the picture (phone video stored on its side). */
+    rotated: boolean;
+  };
+}
+
+/** Splits a stream description at the commas between its fields, not those inside parentheses. */
+function streamFields(description: string): string[] {
+  const fields: string[] = [];
+  let depth = 0;
+  let current = "";
+  for (const char of description) {
+    if (char === "(" || char === "[") depth++;
+    if (char === ")" || char === "]") depth--;
+    if (char === "," && depth === 0) {
+      fields.push(current.trim());
+      current = "";
+    } else current += char;
+  }
+  fields.push(current.trim());
+  return fields;
 }
 
 /** Streams and duration of an input file, from ffmpeg's own header dump (throws if unreadable). */
 export async function probeMedia(file: string): Promise<MediaProbe> {
   const { stderr } = await runFfmpeg(["-i", file, "-f", "null", "-t", "0", "-"]);
+  return readMediaProbe(stderr);
+}
+
+/** Reads streams and duration from what `ffmpeg -i` prints. */
+export function readMediaProbe(stderr: string): MediaProbe {
   // Only the input section describes the file; the output section lists ffmpeg's own streams.
-  const input = stderr.split(/^Output #0/m)[0];
-  const duration = input.match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
-  const streams = input.split("\n").filter((line) => /^\s*Stream #\d+:\d+/.test(line));
-  const videoLine = streams.find(
-    (line) => /: Video: /.test(line) && !line.includes("(attached pic)"),
+  const lines = stderr.split(/^Output #0/m)[0].split("\n");
+  const duration = lines.join("\n").match(/Duration: (\d+):(\d+):(\d+(?:\.\d+)?)/);
+  const isStream = (line: string) => /^\s*Stream #\d+:\d+/.test(line);
+  const videoAt = lines.findIndex(
+    (line) => isStream(line) && /: Video: /.test(line) && !line.includes("(attached pic)"),
   );
+  const videoLine = videoAt === -1 ? undefined : lines[videoAt];
+  // Side data (the display matrix) is printed under the stream, before the next one.
+  const nextStream = lines.findIndex((line, i) => i > videoAt && isStream(line));
+  const videoBlock =
+    videoAt === -1 ? [] : lines.slice(videoAt + 1, nextStream === -1 ? undefined : nextStream);
   const size = videoLine?.match(/, (\d{1,5})x(\d{1,5})\b/);
+  const fields = videoLine ? streamFields(videoLine.slice(videoLine.indexOf(": Video: ") + 9)) : [];
+  const codec = fields[0]?.match(/^(\w+)/)?.[1] ?? null;
+  // The first parenthesis after the codec is its profile, unless it is the codec tag ("avc1 / 0x…").
+  const profile = fields[0]?.match(/^\w+ \(([^)/]+)\)/)?.[1] ?? null;
+  const pixel = fields[1]?.match(/^(\w+)(?:\((.*)\))?/);
+  const fps = fields.map((f) => f.match(/^(\d+(?:\.\d+)?) fps$/)).find(Boolean);
+  const rotation = videoBlock
+    .map((line) => line.match(/displaymatrix: rotation of (-?\d+(?:\.\d+)?) degrees/))
+    .find(Boolean);
   return {
     durationSeconds: duration
       ? Number(duration[1]) * 3600 + Number(duration[2]) * 60 + Number(duration[3])
@@ -70,7 +145,15 @@ export async function probeMedia(file: string): Promise<MediaProbe> {
     hasVideo: videoLine !== undefined,
     width: size ? Number(size[1]) : null,
     height: size ? Number(size[2]) : null,
-    hasAudio: streams.some((line) => /: Audio: /.test(line)),
+    hasAudio: lines.some((line) => isStream(line) && /: Audio: /.test(line)),
+    video: {
+      codec,
+      profile,
+      pixelFormat: pixel?.[1] ?? null,
+      interlaced: pixel?.[2]?.includes("first") ?? false,
+      fps: fps ? Number(fps[1]) : null,
+      rotated: rotation ? Number(rotation[1]) % 360 !== 0 : false,
+    },
   };
 }
 

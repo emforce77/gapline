@@ -3,7 +3,7 @@ import { it } from "node:test";
 import { access, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { MAX_UPLOAD_SECONDS } from "../src/lib/api-contract";
+import { MAX_UPLOAD_SECONDS, MIN_UPLOAD_SECONDS } from "../src/lib/api-contract";
 import { UploadError } from "../src/lib/errors";
 import { readCallRecords } from "../src/lib/llm/ledger";
 import { probeMedia, runFfmpeg } from "../src/lib/media/ffmpeg";
@@ -23,7 +23,7 @@ async function missing(path: string): Promise<boolean> {
   );
 }
 
-it("ingests silent, odd-sized and portrait clips; rejects long, audio-only and broken files without leftovers", async () => {
+it("ingests silent, odd-sized and portrait clips; rejects short, long, audio-only and broken files without leftovers", async () => {
   process.env.DATA_DIR = await mkdtemp(join(tmpdir(), "scene-ingest-"));
   const src = await mkdtemp(join(tmpdir(), "scene-sources-"));
   const make = (name: string, args: string[]) => runFfmpeg(["-y", ...args, join(src, name)]);
@@ -52,14 +52,15 @@ it("ingests silent, odd-sized and portrait clips; rejects long, audio-only and b
     "-c:a",
     "aac",
   ]);
+  // Uploads are at least MIN_UPLOAD_SECONDS (3 s) long; a 2 s clip measured 2.03 s once converted.
   await make("portrait.mkv", [
     "-f",
     "lavfi",
     "-i",
-    "color=c=gray:s=1179x2556:r=5:d=2,format=yuv444p",
+    "color=c=gray:s=1179x2556:r=5:d=4,format=yuv444p",
     ...SILENT_AUDIO,
     "-t",
-    "2",
+    "4",
     "-c:v",
     "ffv1",
     "-c:a",
@@ -73,6 +74,21 @@ it("ingests silent, odd-sized and portrait clips; rejects long, audio-only and b
     ...SILENT_AUDIO,
     "-t",
     "95",
+    "-c:v",
+    "libx264",
+    "-pix_fmt",
+    "yuv420p",
+    "-c:a",
+    "aac",
+  ]);
+  await make("short.mp4", [
+    "-f",
+    "lavfi",
+    "-i",
+    "color=c=gray:s=160x90:r=10:d=2",
+    ...SILENT_AUDIO,
+    "-t",
+    "2",
     "-c:v",
     "libx264",
     "-pix_fmt",
@@ -141,6 +157,7 @@ it("ingests silent, odd-sized and portrait clips; rejects long, audio-only and b
   }
 
   const rejected: [string, UploadError["code"], number | undefined][] = [
+    ["short.mp4", "too_short", undefined],
     ["long.mp4", "too_long", 95],
     ["headerless.mkv", "too_long", undefined],
     ["voice.m4a", "no_video_stream", undefined],
@@ -158,6 +175,7 @@ it("ingests silent, odd-sized and portrait clips; rejects long, audio-only and b
     assert.ok(await missing(projectDir(id)), `${file} leaves no project folder`);
   }
   assert.equal(MAX_UPLOAD_SECONDS, 90);
+  assert.equal(MIN_UPLOAD_SECONDS, 3);
 });
 
 it("hears clips whose recognizer returns untimed words, including across a chunk boundary", async () => {
@@ -240,7 +258,7 @@ it("hears clips whose recognizer returns untimed words, including across a chunk
   assert.deepEqual(crossing, [{ start: 52.5, end: 55, speaker: "", text: "untimed timed" }]);
 });
 
-it("reports a clip with little room, and a failed run by code only", async () => {
+it("reports a clip with little room, skips writing when there is none, and a failed run by code only", async () => {
   process.env.DATA_DIR = await mkdtemp(join(tmpdir(), "scene-room-"));
   process.env.DAILY_BUDGET_USD = "5";
   const dir = join(process.env.DATA_DIR, "projects", "room-test");
@@ -252,7 +270,11 @@ it("reports a clip with little room, and a failed run by code only", async () =>
     "lavfi",
     "-i",
     "color=c=blue:s=160x90:r=10:d=5",
-    ...SILENT_AUDIO,
+    // An audible soundtrack, so it is sent to Speech-to-Text (a silent one is not).
+    "-f",
+    "lavfi",
+    "-i",
+    "sine=frequency=440:sample_rate=48000",
     "-t",
     "5",
     "-c:v",
@@ -264,21 +286,26 @@ it("reports a clip with little room, and a failed run by code only", async () =>
     clipFile,
   ]);
   let writerStatus = 200;
+  let talking = true;
+  const labels: string[] = [];
   const llm = (data: unknown) =>
     new Response(
       `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: JSON.stringify(data) }] }, finishReason: "STOP" }], usageMetadata: { promptTokenCount: 100, candidatesTokenCount: 100, thoughtsTokenCount: 0, totalTokenCount: 200 } })}\n\n`,
     );
   const handler = async (url: string, init?: RequestInit) => {
-    // Someone speaks from 0.1 s to 4.9 s: no silence long enough for a line.
+    // Someone speaks from 0.1 s to 4.9 s: no silence long enough for a line. Without the talk,
+    // the whole clip is one silence.
     if (url.includes("us-speech.googleapis.com"))
       return Response.json({
-        results: [
-          {
-            alternatives: [
-              { words: [{ word: "talking", startOffset: "0.1s", endOffset: "4.9s" }] },
-            ],
-          },
-        ],
+        results: talking
+          ? [
+              {
+                alternatives: [
+                  { words: [{ word: "talking", startOffset: "0.1s", endOffset: "4.9s" }] },
+                ],
+              },
+            ]
+          : [],
         metadata: { totalBilledDuration: "5s" },
       });
     assert.equal(
@@ -287,6 +314,7 @@ it("reports a clip with little room, and a failed run by code only", async () =>
     );
     const properties = JSON.parse(String(init!.body)).generationConfig.responseFormat.text.schema
       .properties;
+    labels.push(properties.shots ? "watch" : properties.cues ? "write" : "other");
     if (properties.shots)
       return llm({
         shots: [{ start: 0, end: 5, setting: "studio", action: "a man talks", onScreenText: "" }],
@@ -330,7 +358,23 @@ it("reports a clip with little room, and a failed run by code only", async () =>
     t: 0,
   });
   assert.equal(summary.littleRoom, true);
+  // No silence: nothing is written or checked, so the result has no final-check badge.
+  assert.deepEqual(labels, ["watch"]);
+  assert.equal(summary.cuesWritten, 0);
+  assert.equal(summary.qualityStatus, undefined);
+  assert.equal(summary.finalReview, undefined);
+  const started = events.flatMap((e) =>
+    e.type === "stage" && e.state === "started" ? [e.stage] : [],
+  );
+  assert.deepEqual(
+    started.filter((s) => ["write", "review", "voice", "verify", "fix"].includes(s)),
+    [],
+  );
+  assert.ok(started.includes("mix"));
+  for (const file of ["described.mp4", "narration.wav", "descriptions.vtt", "script.json"])
+    await readFile(join(dir, "runs", "room-run", file));
 
+  talking = false;
   writerStatus = 402;
   const failed: TimedRunEvent[] = [];
   await withFetch(handler, () =>
