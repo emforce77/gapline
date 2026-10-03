@@ -25,6 +25,72 @@ export async function readJson<T>(key: string, initial: () => T): Promise<T> {
   }
 }
 
+/** The calls updateObjectJson makes on a bucket; @google-cloud/storage's Bucket has them. */
+export interface JsonBucket {
+  file(
+    name: string,
+    options?: { generation?: string | number },
+  ): {
+    getMetadata(): Promise<[{ generation?: string | number }, ...unknown[]]>;
+    download(): Promise<[Buffer, ...unknown[]]>;
+    save(
+      data: string,
+      options: {
+        resumable: false;
+        contentType: string;
+        preconditionOpts: { ifGenerationMatch: string | number };
+      },
+    ): Promise<unknown>;
+  };
+}
+
+const COMMIT_ATTEMPTS = 8;
+const errorCode = (e: unknown) => Number((e as { code?: number }).code);
+
+/**
+ * updateJson against a bucket: read the object at one generation, change it, and save it only if
+ * that generation is still current. A 404 from the metadata lookup means there is no object yet. A
+ * 404 from the download pinned to that generation means another writer replaced it in between (the
+ * bucket keeps no old generations), which is a lost race like a 412, so both are tried again with
+ * a fresh read. Treating that 404 as "no object" ran `change` on an empty state: settling a run
+ * then failed with "Reservation not found" after the run had finished (live QA, 2026-10-03).
+ */
+export async function updateObjectJson<T, R>(
+  bucket: JsonBucket,
+  key: string,
+  initial: () => T,
+  change: (state: T) => R,
+): Promise<R> {
+  for (let attempt = 0; attempt < COMMIT_ATTEMPTS; attempt++) {
+    try {
+      let generation: string | number = 0;
+      let state = initial();
+      let found: { generation?: string | number } | undefined;
+      try {
+        [found] = await bucket.file(key).getMetadata();
+      } catch (e) {
+        if (errorCode(e) !== 404) throw e;
+      }
+      if (found) {
+        generation = found.generation!;
+        const [body] = await bucket.file(key, { generation }).download();
+        state = JSON.parse(body.toString());
+      }
+      const result = change(state);
+      await bucket.file(key).save(JSON.stringify(state), {
+        resumable: false,
+        contentType: "application/json",
+        preconditionOpts: { ifGenerationMatch: generation },
+      });
+      return result;
+    } catch (e) {
+      if (![404, 412].includes(errorCode(e)) || attempt === COMMIT_ATTEMPTS - 1) throw e;
+      await delay(20 * (attempt + 1));
+    }
+  }
+  throw new Error("Concurrent update could not be committed");
+}
+
 /** Conditional object writes on Cloud Run; a filesystem lock + atomic rename locally. */
 export async function updateJson<T, R>(
   key: string,
@@ -34,34 +100,7 @@ export async function updateJson<T, R>(
   const bucketName = process.env.DATA_BUCKET;
   if (process.env.K_SERVICE && !bucketName)
     throw new Error("DATA_BUCKET is required for atomic Cloud Run writes");
-  if (bucketName) {
-    const bucket = new Storage().bucket(bucketName);
-    for (let attempt = 0; attempt < 8; attempt++) {
-      try {
-        let generation: string | number = 0;
-        let state = initial();
-        try {
-          const [metadata] = await bucket.file(key).getMetadata();
-          generation = metadata.generation!;
-          const [body] = await bucket.file(key, { generation }).download();
-          state = JSON.parse(body.toString());
-        } catch (e) {
-          if (Number((e as { code?: number }).code) !== 404) throw e;
-        }
-        const result = change(state);
-        await bucket.file(key).save(JSON.stringify(state), {
-          resumable: false,
-          contentType: "application/json",
-          preconditionOpts: { ifGenerationMatch: generation },
-        });
-        return result;
-      } catch (e) {
-        if (![404, 412].includes(Number((e as { code?: number }).code)) || attempt === 7) throw e;
-        await delay(20 * (attempt + 1));
-      }
-    }
-    throw new Error("Concurrent update could not be committed");
-  }
+  if (bucketName) return updateObjectJson(new Storage().bucket(bucketName), key, initial, change);
   const file = join(dataDir(), key);
   await mkdir(dirname(file), { recursive: true });
   const lock = `${file}.lock`;

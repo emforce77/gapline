@@ -1,7 +1,8 @@
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { appendFile, mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { z } from "zod";
+import { RUN_TIME_LIMIT_SECONDS } from "../api-contract";
 import { readCallRecords, summarizeCosts } from "../llm/ledger";
 import { trimSilence } from "../media/narration-track";
 import { parseWav } from "../media/wav";
@@ -10,7 +11,14 @@ import { sameWords } from "../pipeline/cues";
 import type { Cue, Gap, Language } from "../pipeline/schemas";
 import { synthesizeLine } from "../pipeline/voice";
 import { updateJson } from "../store/atomic";
-import { canSeeRun, readProject, RUN_EDITOR_FILE, runDir, type RunEditor } from "../store/projects";
+import {
+  assertSafeId,
+  canSeeRun,
+  readProject,
+  RUN_EDITOR_FILE,
+  runDir,
+  type RunEditor,
+} from "../store/projects";
 import {
   newRunBudget,
   reserveRun,
@@ -20,6 +28,7 @@ import {
   type BudgetScope,
 } from "./budget";
 import { writeEditedRun, type EditBase, type HumanEdit } from "./edit-track";
+import { describeFailure } from "./failure";
 
 const CUE_ID = z.string().regex(/^L\d+$/);
 const REQUEST_ID = z.string().regex(/^[a-zA-Z0-9-]{8,64}$/);
@@ -45,15 +54,33 @@ export class EditError extends Error {
     public code: string,
     message: string,
     public status = 422,
+    /** Fields the edits route adds to its JSON answer (spokenSeconds; reasons and fix). */
+    public detail: Record<string, unknown> = {},
   ) {
     super(message);
   }
 }
+/**
+ * One requestId's record. "done" answers every retry with its run. A "failed" attempt is made again
+ * by a retry, in a run directory of its own, so no result file is ever rewritten and no attempt's
+ * ledger is charged twice. "running" answers 409 until the time limit says its instance is gone.
+ */
 interface RequestState {
   fingerprint: string;
   state: "new" | "running" | "done" | "failed";
   runId?: string;
+  /** For "failed": the stable code of what stopped it, for the server's records only. */
   error?: string;
+  /** Attempts so far; absent in records written before 2026-10-03 (one attempt). */
+  attempts?: number;
+  /** When the current attempt started; absent in records written before 2026-10-03. */
+  startedAt?: string;
+}
+
+/** The run an attempt writes: the first keeps the original naming, later ones add their number. */
+function attemptRunId(requestKey: string, attempt: number): string {
+  const runId = `edit-${requestKey.slice(0, 40)}`;
+  return attempt === 1 ? runId : `${runId}-${attempt}`;
 }
 
 /** A line an editor can change: in the track, dropped by the pipeline, or removed by an editor. */
@@ -158,6 +185,8 @@ async function reviseLine(
     throw new EditError(
       "too_long",
       `The edited voice takes ${line.seconds.toFixed(2)} seconds; only ${(bounds.max - input.start).toFixed(2)} are available. Shorten it or move it earlier.`,
+      422,
+      { spokenSeconds: line.seconds },
     );
   edited.seconds = line.seconds;
   edited.rate = 1;
@@ -194,6 +223,11 @@ export async function editRun(
   const project = await readProject(projectId);
   // Another viewer's version of the sample is not there for this one, exactly like a missing run.
   const notFound = () => new EditError("not_found", "Original run not found.", 404);
+  try {
+    assertSafeId(baseRunId);
+  } catch {
+    throw notFound();
+  }
   if (!(await canSeeRun(project, baseRunId, owner))) throw notFound();
   const baseDir = runDir(projectId, baseRunId);
   let base: EditBase;
@@ -232,7 +266,8 @@ export async function editRun(
     .update(`${owner}:${baseRunId}:${input.requestId}`)
     .digest("hex");
   const key = `projects/${projectId}/edits/${requestKey}.json`;
-  const claim = await updateJson<RequestState, RequestState>(
+  const now = Date.now();
+  const claim = await updateJson<RequestState, { previous: RequestState; runId?: string }>(
     key,
     () => ({ fingerprint, state: "new" }),
     (state) => {
@@ -243,32 +278,52 @@ export async function editRun(
           409,
         );
       const previous = { ...state };
-      if (state.state === "new") state.state = "running";
-      return previous;
+      const stalled =
+        state.state === "running" &&
+        (!state.startedAt || now - Date.parse(state.startedAt) > RUN_TIME_LIMIT_SECONDS * 1000);
+      if (state.state !== "new" && state.state !== "failed" && !stalled) return { previous };
+      state.attempts = state.state === "new" ? 1 : (state.attempts ?? 1) + 1;
+      state.state = "running";
+      state.runId = attemptRunId(requestKey, state.attempts);
+      state.startedAt = new Date(now).toISOString();
+      delete state.error;
+      return { previous, runId: state.runId };
     },
   );
-  if (claim.state === "done") return { runId: claim.runId! };
-  if (claim.state !== "new")
+  if (claim.previous.state === "done") return { runId: claim.previous.runId! };
+  if (!claim.runId)
     throw new EditError(
-      claim.state,
-      claim.error ?? "This edit is already processing. Keep the original result open.",
+      "running",
+      "This edit is already processing. Keep the original result open.",
       409,
     );
-  const runId = `edit-${requestKey.slice(0, 40)}`;
+  const runId = claim.runId;
   const dir = runDir(projectId, runId);
   const ledgerFile = join(dir, "ledger.jsonl");
+  const record = (change: (state: RequestState) => void) =>
+    updateJson<RequestState, void>(key, () => ({ fingerprint, state: "running", runId }), change);
   let reservation: Awaited<ReturnType<typeof reserveRun>> | undefined;
   let budget: ReturnType<typeof newRunBudget> | undefined;
+  let started: number | undefined;
   try {
-    reservation = await reserveRun(scope);
+    reservation = await reserveRun(scope, owner);
     budget = newRunBudget(reservation);
     await withRunBudget(
       reservation,
       async () => {
-        const started = Date.now();
+        started = Date.now();
         await mkdir(join(dir, "voice"), { recursive: true });
         // Before any result file: on the sample, the edit belongs to its editor from the start.
-        const editor: RunEditor = { ownerHash: owner };
+        // The rest lets its editor find it again after a reload while it is being made.
+        const editor: RunEditor = {
+          ownerHash: owner,
+          startedAt: new Date(started).toISOString(),
+          baseRunId,
+          cueId: input.cueId,
+          action: "action" in input ? "remove" : "rewrite",
+          language: first.language,
+          density: first.density,
+        };
         await writeFile(join(dir, RUN_EDITOR_FILE), JSON.stringify(editor));
         const cues = structuredClone(base.cues);
         const at = new Date().toISOString();
@@ -305,42 +360,58 @@ export async function editRun(
           { ...run, cues, audio, revoiced: { cueId: edited.id, line }, humanEdit },
           (finalReview) => {
             const verdict = finalReview.verdicts.find((v) => v.cueId === edited.id)!;
-            if (!verdict.pass)
-              throw new EditError(
-                "review",
-                verdict.violations.map((v) => v.reason).join(" ") + " " + verdict.fix,
-              );
+            if (!verdict.pass) {
+              // One reason per broken rule, said once; the fix apart, for the page to label.
+              const reasons = [...new Set(verdict.violations.map((v) => v.reason.trim()))];
+              throw new EditError("review", reasons.join(" "), 422, { reasons, fix: verdict.fix });
+            }
             edited.versions.at(-1)!.review = verdict;
           },
         );
       },
       budget,
     );
-    await updateJson<RequestState, void>(
-      key,
-      () => claim,
-      (state) => {
-        state.state = "done";
-        state.runId = runId;
-      },
-    );
+    await record((state) => {
+      state.state = "done";
+      state.runId = runId;
+    });
     return { runId };
   } catch (error) {
-    await updateJson<RequestState, void>(
-      key,
-      () => claim,
-      (state) => {
-        state.state = "failed";
-        state.error = error instanceof Error ? error.message : String(error);
-      },
-    );
+    // A code, never the error's text: provider answers must not reach the browser on a retry.
+    const failure = error instanceof EditError ? null : describeFailure(error);
+    const code = error instanceof EditError ? error.code : failure!.code;
+    if (started !== undefined) {
+      // The edit's run then answers "failed", so a page that lost the request can tell. `code` is
+      // a run failure's code; an edit refused for its words (review, too_long…) has only `error`.
+      const event: TimedRunEvent = {
+        type: "run_failed",
+        error: code,
+        ...failure,
+        t: (Date.now() - started) / 1000,
+      };
+      await appendFile(join(dir, "events.jsonl"), `${JSON.stringify(event)}\n`).catch(
+        (markerError: unknown) =>
+          console.error(`edit failure marker not written: run=${runId}`, markerError),
+      );
+    }
+    await record((state) => {
+      state.state = "failed";
+      state.error = code;
+    });
     throw error;
   } finally {
     if (reservation) {
       const cost = await readCallRecords(ledgerFile).then(summarizeCosts, () => null);
+      // A saved edit stays saved: a failed settlement is logged, never turned into its answer. The
+      // unsettled entry counts in full toward the cap until the time limit (admission).
       await settleRun(
         reservation,
         cost?.costStatus === "known" ? cost.costUsd : runChargeBound(budget!),
+      ).catch((settleError: unknown) =>
+        console.error(
+          `SETTLEMENT FAILED: edit run=${runId} reservation=${reservation!.id}`,
+          settleError,
+        ),
       );
     }
   }

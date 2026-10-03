@@ -74,6 +74,7 @@ export async function executeRun(
 ): Promise<{ runId: string }> {
   const { project, runId, dir, key } = run;
   const budget = newRunBudget(reservation);
+  let summary: Awaited<ReturnType<typeof runDescription>>["summary"];
   try {
     if (run.owner) {
       await mkdir(dir, { recursive: true });
@@ -85,7 +86,7 @@ export async function executeRun(
       };
       await writeFile(join(dir, RUN_OWNER_FILE), JSON.stringify(owner));
     }
-    const { summary } = await withRunBudget(
+    ({ summary } = await withRunBudget(
       reservation,
       () =>
         runDescription({
@@ -108,12 +109,7 @@ export async function executeRun(
           emit,
         }),
       budget,
-    );
-    await settleRun(
-      reservation,
-      summary.costStatus === "unresolved" ? runChargeBound(budget) : summary.costUsd,
-    );
-    return { runId };
+    ));
   } catch (error) {
     // A run that stopped early (often before its ledger exists) is charged what its calls can
     // have cost, not the whole reservation: nine early failures must not spend a day's allowance.
@@ -127,6 +123,15 @@ export async function executeRun(
     await settleRun(reservation, spent);
     throw error;
   }
+  // The run has written its result and sent run_done. A settlement that fails now is logged, never
+  // turned into a failure of the run; the unsettled entry counts in full until the time limit.
+  await settleRun(
+    reservation,
+    summary.costStatus === "unresolved" ? runChargeBound(budget) : summary.costUsd,
+  ).catch((error: unknown) =>
+    console.error(`SETTLEMENT FAILED: run=${runId} reservation=${reservation.id}`, error),
+  );
+  return { runId };
 }
 
 /** Starts a run for a project: preparation, budget reservation, the run itself, settlement. */

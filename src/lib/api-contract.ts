@@ -12,6 +12,8 @@ import type { Density, Language } from "./pipeline/schemas";
 export const MAX_UPLOAD_BYTES = 30 * 1024 * 1024;
 /** Uploads are analysed as a short clip; longer films belong to the batch path, not the live demo. */
 export const MAX_UPLOAD_SECONDS = 90;
+/** Shorter clips cannot hold a pause to describe (the little-room minimum, gaps.ts, is also 3 s). */
+export const MIN_UPLOAD_SECONDS = 3;
 
 /**
  * A live run ends within this time: the runs route's maxDuration and Cloud Run's --timeout (both
@@ -26,6 +28,7 @@ export type UploadErrorCode =
   | "not_video" // 415: the part's MIME type is not video/*
   | "too_large" // 413: over MAX_UPLOAD_BYTES (maxBytes in the body)
   | "too_long" // 422: over MAX_UPLOAD_SECONDS (maxSeconds, and seconds when known)
+  | "too_short" // 422: under MIN_UPLOAD_SECONDS after conversion (a still picture is one frame)
   | "no_video_stream" // 422: a readable file without a picture (audio only)
   | "unreadable" // 422: ffmpeg cannot open or convert it
   | "internal"; // 500: storage or server failure; see the server log
@@ -35,9 +38,18 @@ export type BudgetErrorCode =
   | "budget_busy" // another live run holds the rest of today's allowance; retry when it ends
   | "budget_daily"; // today's allowance is spent; resetAt says when it renews (00:00 UTC)
 
+/**
+ * Why this visitor (browser session) cannot start one more live run or edit right now, while the
+ * shared allowance itself could (429, like BudgetErrorCode).
+ */
+export type VisitorBudgetErrorCode =
+  | "visitor_busy" // their own other run or edit is still going (any clip); retry when it ends
+  | "visitor_daily"; // they used their daily share (VISITOR_DAILY_BUDGET_USD); resetAt as above
+
 /** The `code` of a run_failed event, and of run/edit request failures. */
 export type RunErrorCode =
   | BudgetErrorCode
+  | VisitorBudgetErrorCode
   | "run_allowance" // this run reached its own API allowance
   | "provider_busy" // the model provider is rate limited or overloaded (retryAfterSeconds)
   | "provider_failed" // the model provider refused the request (credit, model, price)
@@ -48,7 +60,13 @@ export type RunErrorCode =
   | "internal";
 
 /** Request-level failures of the run, run-events and edit routes. */
-export type RequestErrorCode = "forbidden" | "not_found" | "invalid_request";
+export type RequestErrorCode =
+  | "forbidden"
+  | "not_found"
+  | "invalid_request"
+  // 409 from POST /api/projects/[id]/runs: this viewer's run of this clip is still going; the body
+  // names it (runId, language, density) so the page can follow it instead of paying for a second.
+  | "run_active";
 
 /** JSON body of every error response from the API. */
 export interface ApiErrorBody<Code extends string = string> {
@@ -58,14 +76,23 @@ export interface ApiErrorBody<Code extends string = string> {
   /** Measured clip length, for too_long when the file declares it. */
   seconds?: number;
   retryAfterSeconds?: number;
-  /** ISO time, for budget_daily. */
+  /** ISO time, for budget_daily and visitor_daily. */
   resetAt?: string;
+  /** For run_active: the run that is still going, and its settings. */
+  runId?: string;
+  language?: Language;
+  density?: Density;
 }
 
-/** GET /api/live-status: whether a live run could start now (checked again at start). */
+/**
+ * GET /api/live-status: whether a live run could start now (checked again at start). `canStart` is
+ * false when either the shared allowance (`reason`) or this visitor's own limit (`visitor`) refuses.
+ */
 export interface LiveStatus {
   canStart: boolean;
   reason: BudgetErrorCode | null;
+  /** This browser session's own limit: its other run or edit is going, or its daily share is used. */
+  visitor: VisitorBudgetErrorCode | null;
   /** Next 00:00 UTC, when the daily allowance renews. */
   resetAt: string;
 }
@@ -78,6 +105,32 @@ export interface ActiveRun {
   startedAt: string;
   /** Last time the run wrote an event; long silences are normal during model calls. */
   lastEventAt: string;
+}
+
+/**
+ * An edit the viewer made that has not finished; GET /api/projects/[id]/runs → `edits`. Its result
+ * will be the run `runId`: GET .../runs/[runId] answers `running` (no events) until the edit ends,
+ * then `done` (and the run is listed) or `failed` (one run_failed event with its code).
+ */
+export interface ActiveEdit {
+  runId: string;
+  /** The result the edit was made from. */
+  baseRunId: string;
+  cueId: string;
+  action: "rewrite" | "remove";
+  language: Language;
+  density: Density;
+  startedAt: string;
+}
+
+/**
+ * 201 from POST /api/projects/[id]/runs/[runId]/edits: the new result, and the viewer's finished
+ * runs read after it was saved (listRuns' RunListing shape), so the page can select it without
+ * another request.
+ */
+export interface EditSaved<Listing = unknown> {
+  runId: string;
+  runs: Listing[];
 }
 
 /** GET /api/projects/[id]/runs/[runId] → `status`. "interrupted": no final event and past the time limit. */

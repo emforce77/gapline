@@ -143,14 +143,20 @@ describe("the landing page's sample", () => {
 
   it("falls back to the newest sample and its newest runs without a pin", async () => {
     await unpin();
+    // Uploads are never read for it, so a broken one cannot fail the landing page.
+    await assert.rejects(listProjects(), SyntaxError);
+    const unpinned = await loadShowcases(["en"]);
+    assert.equal(unpinned?.en.project.id, SAMPLE.id);
     await rm(projectDir("u-half-written"), { recursive: true });
     // A listing skips a folder without metadata and any name that is not a project id.
     await mkdir(projectDir("u-no-metadata"), { recursive: true });
+    await mkdir(projectDir("no-metadata-sample"), { recursive: true });
     await writeFile(join(dir, "projects", "README.txt"), "");
     const both = await loadShowcases(["en", "ko"]);
     assert.equal(both?.en.project.id, SAMPLE.id);
     assert.equal(both?.en.preview?.runId, NEWER_EN);
     assert.equal(both?.ko.preview?.runId, KO);
+    await rm(projectDir("no-metadata-sample"), { recursive: true });
     assert.deepEqual(
       (await listProjects()).map((p) => p.id),
       [SAMPLE.id, OLDER_SAMPLE.id, UPLOAD.id],

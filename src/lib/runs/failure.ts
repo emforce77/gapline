@@ -17,7 +17,7 @@ export function describeFailure(error: unknown): FailureInfo {
   if (error instanceof BudgetExhaustedError)
     return {
       code: error.code,
-      retryable: error.code === "budget_busy",
+      retryable: error.code === "budget_busy" || error.code === "visitor_busy",
       ...(error.resetAt ? { resetAt: error.resetAt } : {}),
     };
   if (error instanceof ProviderError)

@@ -41,6 +41,17 @@ export async function viewerHash(): Promise<string | undefined> {
   return token ? ownerHash(token) : undefined;
 }
 /**
+ * viewerHash read from the request's own Cookie header, for a handler that needs nothing else
+ * from next/headers (and so also answers when called outside a Next request, as in tests).
+ */
+export function requestViewerHash(request: Request): string | undefined {
+  for (const pair of (request.headers.get("cookie") ?? "").split(";")) {
+    const [name, value] = pair.trim().split("=");
+    if (name === OWNER_COOKIE && value && /^[a-f0-9]{64}$/.test(value)) return ownerHash(value);
+  }
+  return undefined;
+}
+/**
  * The project, if this viewer may open it and see this run of it (canSeeRun). Another viewer's run
  * on the sample answers null, the same as a run that does not exist.
  */

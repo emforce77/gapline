@@ -5,12 +5,12 @@ import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
 import { encodeWav } from "../src/lib/media/narration-track";
 import type { Cue } from "../src/lib/pipeline/schemas";
-import { downloadName, runDownloadName } from "../src/lib/runs/download-name";
+import { downloadName, runDownloadName, titleSlug } from "../src/lib/runs/download-name";
 import { editRun, EditError } from "../src/lib/runs/edit-run";
 import { canAccess, ownerHash } from "../src/lib/store/access";
 import {
   canSeeRun,
-  listActiveRuns,
+  listActiveWork,
   listRuns,
   readRunSnapshot,
   RUN_EDITOR_FILE,
@@ -102,6 +102,8 @@ describe("versions made on the shared sample", () => {
     dir = await mkdtemp(join(tmpdir(), "scene-sample-privacy-"));
     process.env.DATA_DIR = dir;
     await writeProject(SAMPLE);
+    // The clip an edit stats to find its kept watching copy; never decoded here (no ffmpeg).
+    await writeFile(join(dir, "projects", SAMPLE.id, "clip.mp4"), "");
     await writeProject(UPLOAD);
     await finishedRun(SAMPLE.id, "20260928t064307205-en-standard-221ceb");
     await finishedRun(SAMPLE.id, "20261003t101010101-en-standard-aaaaaa", {
@@ -225,34 +227,48 @@ describe("versions made on the shared sample", () => {
       (id) => id.startsWith("edit-") && id !== `edit-${"a".repeat(40)}`,
     )!;
     const marker = JSON.parse(await readFile(join(runsDir, editId, RUN_EDITOR_FILE), "utf8"));
-    assert.deepEqual(marker, { ownerHash: B });
-    // It never shows up as a generate run its editor could resume.
-    assert.deepEqual(await listActiveRuns(SAMPLE.id, B), []);
+    assert.deepEqual(
+      { ...marker, startedAt: typeof marker.startedAt },
+      {
+        ownerHash: B,
+        startedAt: "string",
+        baseRunId: base,
+        cueId: "L1",
+        action: "remove",
+        language: "en",
+        density: "standard",
+      },
+    );
+    // It never shows up as a generate run its editor could resume, and once it has failed, its
+    // run says so instead of still being made.
+    assert.deepEqual(await listActiveWork(SAMPLE.id, B), { active: [], edits: [] });
+    const failed = await readRunSnapshot(SAMPLE.id, editId);
+    assert.equal(failed.status, "failed");
+    assert.deepEqual(
+      failed.events.map((e) => e.type === "run_failed" && e.code),
+      ["internal"],
+    );
     await finishedRun(SAMPLE.id, editId, { file: RUN_EDITOR_FILE, owner: B });
     assert.ok(ids(await listRuns(SAMPLE, B)).includes(editId));
     assert.ok(!ids(await listRuns(SAMPLE, A)).includes(editId));
     assert.ok(!ids(await listRuns(SAMPLE, undefined)).includes(editId));
   });
 
-  it("names downloads by project, language, density and version", async () => {
+  it("names downloads by clip title, language, density and version", async () => {
     const started = { language: "ko", density: "standard" } as const;
+    const tos = { id: "tos-opening", title: "Tears of Steel — opening" };
     assert.equal(
-      downloadName(
-        "tos-opening",
-        "20260923t065852164-ko-standard-350b05",
-        started,
-        "described.mp4",
-      ),
-      "gapline-tos-opening-ko-standard-20260923-065852-described.mp4",
+      downloadName(tos, "20260923t065852164-ko-standard-350b05", started, "described.mp4"),
+      "gapline-tears-of-steel-opening-ko-standard-20260923-065852-described.mp4",
     );
     assert.equal(
       downloadName(
-        "tos-opening",
+        tos,
         "edit-6c4ddb3c5a06c7901a834befe1bb25ba04a7ebde",
         { language: "en", density: "brief" },
         "narration.wav",
       ),
-      "gapline-tos-opening-en-brief-edit-6c4ddb-narration.wav",
+      "gapline-tears-of-steel-opening-en-brief-edit-6c4ddb-narration.wav",
     );
     // An English and a Korean run, and an original and its edit, never share a name.
     const names = new Set(
@@ -263,7 +279,7 @@ describe("versions made on the shared sample", () => {
         ["edit-b81cc95c158ee4acf857a44a2f7cf609e1df851c", "ko"],
       ].map(([runId, language]) =>
         downloadName(
-          "tos-opening",
+          tos,
           runId,
           { language: language as "en" | "ko", density: "standard" },
           "described.mp4",
@@ -273,13 +289,33 @@ describe("versions made on the shared sample", () => {
     assert.equal(names.size, 4);
     // A run's per-line voice file (voice/L<n>.wav) can be downloaded too.
     assert.equal(
-      downloadName("tos-opening", "20260923t065852164-ko-standard-350b05", started, "L1.wav"),
-      "gapline-tos-opening-ko-standard-20260923-065852-L1.wav",
+      downloadName(tos, "20260923t065852164-ko-standard-350b05", started, "L1.wav"),
+      "gapline-tears-of-steel-opening-ko-standard-20260923-065852-L1.wav",
     );
-    assert.throws(() => downloadName("tos-opening", "x", started, 'a".mp4'), /Unsafe/);
+    assert.throws(() => downloadName(tos, "x", started, 'a".mp4'), /Unsafe/);
     assert.equal(
-      await runDownloadName(SAMPLE.id, `edit-${"a".repeat(40)}`, "descriptions.vtt"),
+      await runDownloadName(SAMPLE, `edit-${"a".repeat(40)}`, "descriptions.vtt"),
       "gapline-sample-clip-en-standard-edit-aaaaaa-descriptions.vtt",
+    );
+  });
+
+  it("keeps a title's ASCII, and falls back to the project id when it has none", () => {
+    const started = { language: "en", density: "standard" } as const;
+    const run = "20261003t101010101-en-standard-aaaaaa";
+    const named = (title: string) =>
+      downloadName({ id: "u-0123456789", title }, run, started, "x.vtt");
+    assert.equal(named("Café scène 2"), "gapline-cafe-scene-2-en-standard-20261003-101010-x.vtt");
+    assert.equal(named("한국어 인터뷰"), "gapline-u-0123456789-en-standard-20261003-101010-x.vtt");
+    // Digits alone would not tell clips apart; a mixed title keeps its ASCII words.
+    assert.equal(named("영상 2"), "gapline-u-0123456789-en-standard-20261003-101010-x.vtt");
+    assert.equal(titleSlug("회의_2026"), "");
+    assert.equal(titleSlug("TOS 오프닝 2"), "tos-2");
+    // Quotes and line breaks, which would break the header, become hyphens.
+    assert.equal(named('a"b\r\nc'), "gapline-a-b-c-en-standard-20261003-101010-x.vtt");
+    assert.equal(titleSlug("x".repeat(80)), "x".repeat(40));
+    assert.equal(
+      titleSlug("Long title with a cut right after a word -"),
+      "long-title-with-a-cut-right-after-a-word",
     );
   });
 });

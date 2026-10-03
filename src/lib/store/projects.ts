@@ -1,7 +1,14 @@
 import { mkdir, readdir, readFile, writeFile, copyFile, access, stat } from "node:fs/promises";
+import { constants } from "node:os";
 import { join, resolve } from "node:path";
+import { setTimeout as delay } from "node:timers/promises";
 import { z } from "zod";
-import { RUN_TIME_LIMIT_SECONDS, type ActiveRun, type RunStatus } from "../api-contract";
+import {
+  RUN_TIME_LIMIT_SECONDS,
+  type ActiveEdit,
+  type ActiveRun,
+  type RunStatus,
+} from "../api-contract";
 import type { RunSummary, TimedRunEvent } from "../pipeline/events";
 import { mapLimit } from "../pipeline/map-limit";
 import type { SceneMap, SpeechSegment } from "../pipeline/schemas";
@@ -106,6 +113,15 @@ export async function writeProject(project: Project): Promise<void> {
   await writeFile(join(projectDir(project.id), "project.json"), JSON.stringify(project, null, 2));
 }
 
+/** Uploads get ids with this prefix (POST /api/projects); samples and scripts' projects never do. */
+export const UPLOAD_ID_PREFIX = "u-";
+
+/** The ids of the projects that are not uploads, read from the directory names alone. */
+export async function sampleProjectIds(): Promise<string[]> {
+  const ids = await unlessMissing(readdir(join(dataDir(), "projects")), []);
+  return ids.filter((id) => ID_PATTERN.test(id) && !id.startsWith(UPLOAD_ID_PREFIX));
+}
+
 /** Every project, samples first, then newest first. It reads every project.json, uploads included. */
 export async function listProjects(): Promise<Project[]> {
   const ids = await unlessMissing(readdir(join(dataDir(), "projects")), []);
@@ -203,11 +219,19 @@ export interface RunOwner {
 
 /**
  * Written when an edit made from the web starts, before any of its result files, so that on a
- * sample the edit is never visible to anyone but its maker.
+ * sample the edit is never visible to anyone but its maker, and so that its maker can find it again
+ * after a reload while it is still being made (listActiveWork).
  */
 export const RUN_EDITOR_FILE = "editor.json";
 export interface RunEditor {
   ownerHash: string;
+  /** The rest is absent in edits made before 2026-10-03, which are never listed as unfinished. */
+  startedAt?: string;
+  baseRunId?: string;
+  cueId?: string;
+  action?: ActiveEdit["action"];
+  language?: ActiveEdit["language"];
+  density?: ActiveEdit["density"];
 }
 
 const OwnerMarkerSchema = z.object({ ownerHash: z.string().min(1) });
@@ -257,8 +281,27 @@ export async function canSeeRun(
   return runVisibleTo(project, owner, viewerHash);
 }
 
+/**
+ * On Cloud Run a file another instance replaced while this one held its old version fails with
+ * ESTALE, which Node reports only by errno ("Unknown system error -116"). Read once more.
+ */
+const STALE_READ_RETRY_MS = 100;
+export async function readFresh(
+  file: string,
+  read: (file: string) => Promise<string> = (f) => readFile(f, "utf8"),
+): Promise<string> {
+  try {
+    return await read(file);
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).errno !== -constants.errno.ESTALE) throw error;
+    console.warn(`ESTALE reading ${file}; reading it again`);
+    await delay(STALE_READ_RETRY_MS);
+    return read(file);
+  }
+}
+
 async function readEvents(file: string): Promise<TimedRunEvent[]> {
-  const lines = (await readFile(file, "utf8")).split("\n");
+  const lines = (await readFresh(file)).split("\n");
   const events: TimedRunEvent[] = [];
   for (const [index, line] of lines.entries()) {
     if (!line) continue;
@@ -296,20 +339,23 @@ async function readSnapshot(
   scriptWritten?: true,
 ): Promise<{ events: TimedRunEvent[]; status: RunStatus }> {
   const eventsFile = join(dir, "events.jsonl");
-  const ownerFile = join(dir, RUN_OWNER_FILE);
-  // The owner file is read at most once, and only when the status depends on it.
-  let owner: Promise<RunOwner | null> | undefined;
-  const readOwner = () =>
-    (owner ??= unlessMissing(readFile(ownerFile, "utf8"), null).then((raw) =>
-      raw === null ? null : (JSON.parse(raw) as RunOwner),
-    ));
+  // When a run made from the web started: its owner file (a generate run) or its editor file (an
+  // edit made since 2026-10-03). Read at most once, and only when the status depends on it.
+  let start: Promise<string | null> | undefined;
+  const readStart = () =>
+    (start ??= (async () => {
+      const owner = await unlessMissing(readFile(join(dir, RUN_OWNER_FILE), "utf8"), null);
+      if (owner !== null) return (JSON.parse(owner) as RunOwner).startedAt;
+      const editor = await unlessMissing(readFile(join(dir, RUN_EDITOR_FILE), "utf8"), null);
+      return editor === null ? null : ((JSON.parse(editor) as RunEditor).startedAt ?? null);
+    })());
   let events: TimedRunEvent[];
   try {
     events = await readEvents(eventsFile);
   } catch (error) {
-    // executeRun writes the owner before starting the event log. This is a real run, even
-    // when a reload reaches it before run_started has been written.
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT" || !(await readOwner())) throw error;
+    // executeRun writes the owner before starting the event log, and an edit writes its events
+    // only when it ends. Either is a real run, even when a reload reaches it before any event.
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT" || !(await readStart())) throw error;
     events = [];
   }
   if (
@@ -319,8 +365,7 @@ async function readSnapshot(
     return { events, status: "done" };
   if (events.some((e) => e.type === "run_failed")) return { events, status: "failed" };
   // Runs started without an owner (scripts, older runs): no run lasts past the limit after its last event.
-  const started = await readOwner();
-  const since = started ? started.startedAt : (await stat(eventsFile)).mtime;
+  const since = (await readStart()) ?? (await stat(eventsFile)).mtime;
   return { events, status: withinTimeLimit(since, now) ? "running" : "interrupted" };
 }
 
@@ -332,40 +377,93 @@ export async function runStatus(
   return (await readRunSnapshot(projectId, runId, now)).status;
 }
 
-/** Unfinished runs this viewer started, still within the time limit, newest first. */
+/** A generate run's id starts with its UTC start (newRunId): 20261003t064307205-en-standard-… */
+const RUN_ID_STAMP = /^(\d{4})(\d{2})(\d{2})t(\d{2})(\d{2})(\d{2})(\d{3})-/;
+/** Its owner file is written a moment after the id is made (analysis lookup, reservation). */
+const RUN_ID_STAMP_SLACK_SECONDS = 60;
+
+/** Whether a run id alone says the run started too long ago to be still going. */
+function startedTooLongAgo(runId: string, now: number): boolean {
+  const stamp = RUN_ID_STAMP.exec(runId);
+  if (!stamp) return false;
+  const [year, month, day, hour, minute, second, ms] = stamp.slice(1).map(Number);
+  const started = Date.UTC(year, month - 1, day, hour, minute, second, ms);
+  return now - started > (RUN_TIME_LIMIT_SECONDS + RUN_ID_STAMP_SLACK_SECONDS) * 1000;
+}
+
+/** Unfinished generate runs and edits this viewer started, within the time limit, newest first. */
+export interface ActiveWork {
+  active: ActiveRun[];
+  edits: ActiveEdit[];
+}
+
+/**
+ * The viewer's runs and edits that are still going, from one pass over the project's runs. A run
+ * whose events already end in run_done is finished, even where its script.json is not yet visible.
+ * Generate runs whose id dates them past the time limit are skipped unread, so the pass costs the
+ * same however many finished runs the sample collects.
+ */
+export async function listActiveWork(
+  projectId: string,
+  viewerHash: string | undefined,
+  now = Date.now(),
+): Promise<ActiveWork> {
+  if (!viewerHash) return { active: [], edits: [] };
+  const root = join(projectDir(projectId), "runs");
+  const runIds = await unlessMissing(readdir(root), []);
+  const unfinished = async (dir: string) => {
+    const { events, status } = await readSnapshot(dir, now);
+    return status === "running" && !events.some((e) => e.type === "run_done");
+  };
+  const found = await mapLimit(
+    runIds.filter((runId) => ID_PATTERN.test(runId) && !startedTooLongAgo(runId, now)),
+    READS_IN_FLIGHT,
+    async (runId): Promise<ActiveRun | ActiveEdit | null> => {
+      const dir = join(root, runId);
+      const raw = await unlessMissing(readFile(join(dir, RUN_OWNER_FILE), "utf8"), null);
+      if (raw !== null) {
+        const owner = JSON.parse(raw) as RunOwner;
+        if (owner.ownerHash !== viewerHash || !withinTimeLimit(owner.startedAt, now)) return null;
+        // The owner file is written just before the first event, so a very young run has none yet.
+        const eventsFile = join(dir, "events.jsonl");
+        const written = await exists(eventsFile);
+        if (!(await unfinished(dir))) return null;
+        return {
+          runId,
+          language: owner.language,
+          density: owner.density,
+          startedAt: owner.startedAt,
+          lastEventAt: written ? (await stat(eventsFile)).mtime.toISOString() : owner.startedAt,
+        };
+      }
+      const marker = await unlessMissing(readFile(join(dir, RUN_EDITOR_FILE), "utf8"), null);
+      if (marker === null) return null;
+      const editor = JSON.parse(marker) as RunEditor;
+      const { startedAt, baseRunId, cueId, action, language, density } = editor;
+      if (editor.ownerHash !== viewerHash || !startedAt || !withinTimeLimit(startedAt, now))
+        return null;
+      if (!baseRunId || !cueId || !action || !language || !density) return null;
+      if (!(await unfinished(dir))) return null;
+      return { runId, baseRunId, cueId, action, language, density, startedAt };
+    },
+  );
+  const newestFirst = (a: { startedAt: string }, b: { startedAt: string }) =>
+    b.startedAt.localeCompare(a.startedAt);
+  return {
+    active: found
+      .filter((r): r is ActiveRun => r !== null && !("baseRunId" in r))
+      .sort(newestFirst),
+    edits: found.filter((r): r is ActiveEdit => r !== null && "baseRunId" in r).sort(newestFirst),
+  };
+}
+
+/** Unfinished generate runs this viewer started, still within the time limit, newest first. */
 export async function listActiveRuns(
   projectId: string,
   viewerHash: string | undefined,
   now = Date.now(),
 ): Promise<ActiveRun[]> {
-  const root = join(projectDir(projectId), "runs");
-  if (!viewerHash) return [];
-  const runIds = await unlessMissing(readdir(root), []);
-  const active = await mapLimit(
-    runIds.filter((runId) => ID_PATTERN.test(runId)),
-    READS_IN_FLIGHT,
-    async (runId): Promise<ActiveRun | null> => {
-      const dir = join(root, runId);
-      const raw = await unlessMissing(readFile(join(dir, RUN_OWNER_FILE), "utf8"), null);
-      if (raw === null) return null;
-      const owner = JSON.parse(raw) as RunOwner;
-      if (owner.ownerHash !== viewerHash || !withinTimeLimit(owner.startedAt, now)) return null;
-      // The owner file is written just before the first event, so a very young run has none yet.
-      const eventsFile = join(dir, "events.jsonl");
-      const written = await exists(eventsFile);
-      if ((await runStatus(projectId, runId, now)) !== "running") return null;
-      return {
-        runId,
-        language: owner.language,
-        density: owner.density,
-        startedAt: owner.startedAt,
-        lastEventAt: written ? (await stat(eventsFile)).mtime.toISOString() : owner.startedAt,
-      };
-    },
-  );
-  return active
-    .filter((r): r is ActiveRun => r !== null)
-    .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+  return (await listActiveWork(projectId, viewerHash, now)).active;
 }
 
 export async function importFile(source: string, projectId: string, name: string): Promise<void> {

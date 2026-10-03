@@ -87,23 +87,85 @@ gcloud secrets add-iam-policy-binding scene-ad-gemini-key --project "$PROJECT_ID
 ## 6. Deploy
 
 ```sh
-GCP_PROJECT_ID="$PROJECT_ID" bash deploy/cloud-run.sh
+# The daily allowance the service has now; for a first deploy, choose one (in US dollars).
+gcloud run services describe scene-ad --project "$PROJECT_ID" --region "$REGION" \
+  --format='yaml(spec.template.spec.containers[0].env)' | grep -A1 'name: DAILY_BUDGET_USD'
+GCP_PROJECT_ID="$PROJECT_ID" DAILY_BUDGET_USD=<dollars> bash deploy/cloud-run.sh
 ```
+
+`DAILY_BUDGET_USD` is required. The script sets the service's variables with `--set-env-vars`, which
+removes every variable the service had, so a value left out or set lower than what was already
+spent today would refuse every live track and edit until 00:00 UTC.
 
 The script runs `gcloud run deploy --source .` with the account of your active gcloud configuration
 (set `CLOUDSDK_ACTIVE_CONFIG_NAME` to pick another). Cloud Build builds the `Dockerfile`, the image goes
 to Artifact Registry, and Cloud Run starts the service with:
 
-- the second-generation execution environment, 2 vCPU, 2 GiB, up to 10 requests per instance, a
-  900-second request timeout, and 0 to 2 instances;
+- the second-generation execution environment, 2 vCPU, 2 GiB, up to 40 requests per instance, a
+  900-second request timeout, and 1 to 8 instances (see "Capacity and cost" below);
 - startup CPU boost, which gcloud also turns on by default for a new service: a starting instance gets
   4 vCPU instead of 2 until 10 seconds after it has started, and the extra CPU is billed for that
-  time. No instance is kept warm, so after a quiet period the first visitor still waits while one
-  starts; the boost was already on when that first response was measured at about 5 seconds;
-- the bucket mounted at `/data`, with `DATA_DIR`, `DATA_BUCKET`, `GCP_PROJECT_ID` and
-  `DAILY_BUDGET_USD` set (the daily API allowance, 5 US dollars unless you set it);
+  time;
+- the bucket mounted at `/data` with Cloud Storage FUSE metadata caching off (see "Shared storage"
+  below), with `DATA_DIR`, `DATA_BUCKET`, `GCP_PROJECT_ID`, `DAILY_BUDGET_USD` (the daily API
+  allowance, as you set it) and `VISITOR_DAILY_BUDGET_USD` (one visitor's share of
+  it, 3 US dollars unless you set it) set;
 - `GOOGLE_API_KEY` from Secret Manager;
 - public access, by turning off the invoker IAM check.
+
+### Capacity and cost
+
+One page load asks for about 30 files at once, and an instance that is converting an upload with
+FFmpeg gets few new requests while it does. With at most 2 instances of 10 requests each, visitors
+got Cloud Run's bare "Rate exceeded." page and pages whose scripts never loaded (QA, 2026-10-03), so
+the script allows 40 requests per instance and up to 8 instances. Instances are billed only while
+they run, so the higher ceiling costs nothing while traffic is low.
+
+One instance is kept running (`--min-instances 1`), so no visitor waits for one to start (about 5
+seconds after a quiet period). That costs about 1.2 US dollars a day at the idle rate for 2 vCPU and
+2 GiB; check the Cloud Run pricing page for your region. To stop paying for it, change the running
+service; this needs no build and leaves its variables as they are:
+
+```sh
+gcloud run services update scene-ad --project "$PROJECT_ID" --region "$REGION" --min-instances 0
+```
+
+The script keeps one instance at every deploy unless you also pass `MIN_INSTANCES=0` (with the same
+`DAILY_BUDGET_USD` as above).
+
+### Shared storage
+
+Every instance reads and writes the same bucket. Cloud Storage FUSE normally caches what it looked
+up for 60 seconds, and that a file is missing for 5 seconds, so one instance could answer with
+another's file as it was up to a minute before: a finished run still "running" and its stages going
+backwards, or a saved edit missing from the list. The script mounts the bucket with
+`metadata-cache-ttl-secs=0;metadata-cache-negative-ttl-secs=0`, so every lookup asks Cloud Storage,
+which is consistent. Each lookup is then a request to Cloud Storage; listings read their files
+several at a time to keep that short.
+
+gcloud takes the options without leading dashes, separated by semicolons (`gcloud run deploy --help`,
+585.0.0). Cloud Run's volume-mount page shows `metadata-cache-ttl-secs` in its example but does not
+mention `metadata-cache-negative-ttl-secs`, a Cloud Storage FUSE option whose 5-second default
+matches what QA measured on the live service. After the first deploy with it, confirm the new
+revision serves traffic and that both options are on the volume:
+
+```sh
+gcloud run services describe scene-ad --project "$PROJECT_ID" --region "$REGION" \
+  --format='yaml(spec.template.spec.volumes)'
+```
+
+If the revision does not start, deploy without `metadata-cache-negative-ttl-secs=0`: a saved edit
+does not depend on it, because the edit's answer already lists the new result.
+
+### Who can spend the allowance
+
+Live tracks and edits draw on one daily allowance (`DAILY_BUDGET_USD`, renewed at 00:00 UTC). Each
+holds 2.50 US dollars of it while it runs and is then charged what its calls cost. A visitor (one
+browser session, identified by its cookie) can have one track or edit in progress at a time, and
+cannot start more once what they used today reaches `VISITOR_DAILY_BUDGET_USD`; the one in
+progress still finishes. A new session costs nothing to get (a private window, cleared cookies), so
+these limits keep an ordinary visitor from holding the allowance, not a script; the daily allowance
+is the hard ceiling either way.
 
 ## 7. Add the sample
 

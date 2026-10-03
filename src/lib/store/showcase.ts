@@ -5,10 +5,10 @@ import type { RunSummary } from "../pipeline/events";
 import type { Cue, SpeechSegment } from "../pipeline/schemas";
 import {
   dataDir,
-  listProjects,
   listRuns,
   readProject,
   runDir,
+  sampleProjectIds,
   type Project,
   type RunListing,
 } from "./projects";
@@ -53,10 +53,20 @@ async function readPin(): Promise<ShowcasePin | null> {
 
 /**
  * The pinned sample, read on its own, so the landing page costs the same however many clips
- * visitors upload. Without a pin, the newest sample, which takes reading every project.
+ * visitors upload. Without a pin, the newest sample; uploads are never read.
  */
 async function showcaseProject(pin: ShowcasePin | null): Promise<Project | null> {
-  if (!pin) return (await listProjects()).find((p) => p.kind === "sample") ?? null;
+  if (!pin) {
+    const samples: Project[] = [];
+    for (const id of await sampleProjectIds()) {
+      const project = await readProject(id).catch((e: NodeJS.ErrnoException) => {
+        if (e.code === "ENOENT") return null;
+        throw e;
+      });
+      if (project?.kind === "sample") samples.push(project);
+    }
+    return samples.sort((a, b) => b.createdAt.localeCompare(a.createdAt))[0] ?? null;
+  }
   let project: Project;
   try {
     project = await readProject(pin.projectId);
