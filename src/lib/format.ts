@@ -14,9 +14,10 @@ export function formatUsd(value: number, lang: UiLang): string {
 
 /** 0:07.4 style, for timestamps inside a clip. */
 export function formatClock(seconds: number): string {
-  const m = Math.floor(seconds / 60);
-  const s = seconds - m * 60;
-  return `${m}:${s.toFixed(1).padStart(4, "0")}`;
+  // Rounded before splitting, so 59.96 reads 1:00.0 and never 0:60.0.
+  const tenths = Math.round(seconds * 10) / 10;
+  const m = Math.floor(tenths / 60);
+  return `${m}:${(tenths - m * 60).toFixed(1).padStart(4, "0")}`;
 }
 
 /** "2 min 16 s" / "2분 16초", for durations of work. */

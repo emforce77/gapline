@@ -143,7 +143,16 @@
   overflow-wrap: anywhere;
 }
 
-.quality-note strong {
+/* The result's heading: the same weight the badge had, as a heading screen readers can jump to. */
+.quality-note h2 {
+  margin: 0;
+  font-size: var(--step-0);
+  font-weight: 700;
+  line-height: 1.5;
+  color: var(--text);
+}
+
+.quality-note q {
   color: var(--text);
 }
 
@@ -327,10 +336,23 @@
   list-style: none;
 }
 
+/* Above the stage record, so the result's files show without scrolling the panel. */
+.downloads {
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+}
+
 .downloads a {
   font-size: var(--step-0);
   text-decoration: none;
   color: var(--text);
+}
+
+@media (pointer: coarse) {
+  .downloads a {
+    display: block;
+    padding: 10px 0;
+  }
 }
 
 .downloads a > span {

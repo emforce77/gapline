@@ -1,8 +1,11 @@
 import type { Cue, Gap, SpeechSegment } from "@/lib/pipeline/schemas";
+import { PictureLane } from "./PictureLane";
 
 const TICK_SECONDS = 5;
 /** Only these ticks stay labelled on a phone, where the clip gets about 3 px per second. */
 const MAJOR_TICK_SECONDS = 10;
+/** The landing shows one sample timeline; its caption names the figure for screen readers. */
+const CAPTION_ID = "sample-timeline-caption";
 
 /**
  * The landing's large timeline of the sample: picture, dialogue, and every room to speak with the
@@ -12,6 +15,7 @@ const MAJOR_TICK_SECONDS = 10;
 export function TimelinePreview({
   clipSeconds,
   stripUrl,
+  stripStepSeconds,
   speech,
   gaps,
   cues,
@@ -20,6 +24,8 @@ export function TimelinePreview({
 }: {
   clipSeconds: number;
   stripUrl: string;
+  /** Seconds covered by each thumbnail in the strip (Project.stripStepSeconds). */
+  stripStepSeconds: number;
   speech: SpeechSegment[];
   gaps: Gap[];
   cues: Cue[];
@@ -49,7 +55,7 @@ export function TimelinePreview({
   );
 
   return (
-    <figure className="annotated">
+    <figure className="annotated" aria-labelledby={CAPTION_ID}>
       <div className="at-scroll">
         <div className="at-grid">
           <div className="at-labels">
@@ -77,7 +83,12 @@ export function TimelinePreview({
                 </span>
               ))}
             </div>
-            <div className="at-track at-picture" style={{ backgroundImage: `url(${stripUrl})` }} />
+            <PictureLane
+              className="at-track at-picture"
+              stripUrl={stripUrl}
+              clipSeconds={clipSeconds}
+              stepSeconds={stripStepSeconds}
+            />
             <div className="at-track">
               {speech.map((s, i) => (
                 <span
@@ -123,7 +134,9 @@ export function TimelinePreview({
           </div>
         </div>
       </div>
-      <figcaption className="label">{labels.caption}</figcaption>
+      <figcaption id={CAPTION_ID} className="label">
+        {labels.caption}
+      </figcaption>
     </figure>
   );
 }

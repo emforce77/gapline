@@ -5,10 +5,12 @@ import { renderToStaticMarkup } from "react-dom/server";
 import {
   featuredLine,
   nextStep,
+  problems,
   RejectionStory,
   sentBackByFinalCheck,
 } from "../src/components/landing/RejectionStory";
 import { en } from "../src/i18n/en";
+import { GUIDELINE_RULES } from "../src/lib/pipeline/guidelines";
 import { ko } from "../src/i18n/ko";
 import type { Cue, CueVersion, Verdict } from "../src/lib/pipeline/schemas";
 
@@ -135,5 +137,84 @@ describe("landing rejection story", () => {
       createElement(RejectionStory, { cue: line8, language: "ko", lang: "en", t: en }),
     );
     assert.ok(!html.includes('class="story-fit"'), html);
+  });
+
+  /**
+   * Line 2 of the pinned English sample (20260928t064307205-en-standard-221ceb): one phrase failed
+   * under two rules, with one fix. The landing printed that fix once per rule.
+   */
+  const skyline = cue("L2", 15, [
+    {
+      text: "The rocket launches above a futuristic city skyline.",
+      by: "write",
+      model: "m",
+      review: {
+        cueId: "L2",
+        pass: false,
+        violations: [
+          {
+            rule: "spoiler",
+            quote: "a futuristic city skyline",
+            reason: "Not shown until 17.5 s.",
+          },
+          { rule: "unseen", quote: "a futuristic city skyline", reason: "Not visible at 15.0 s." },
+        ],
+        fix: "Exhaust pours from the thrusters as the rocket ascends into the sky.",
+      },
+    },
+    {
+      text: "Exhaust pours from the thrusters as the rocket ascends.",
+      by: "revise",
+      model: "m",
+      review: pass,
+      voice: { seconds: 2.9, rate: 1 },
+    },
+  ]);
+
+  it("tells one problem once: one card per quoted phrase, every rule it breaks, one fix", () => {
+    const html = renderToStaticMarkup(
+      createElement(RejectionStory, { cue: skyline, language: "en", lang: "en", t: en }),
+    );
+    assert.equal(html.match(/class="story-verdict"/g)?.length, 1, html);
+    assert.equal(html.match(/class="story-fix"/g)?.length, 1, html);
+    assert.equal(html.match(/class="story-reason"/g)?.length, 1, html);
+    for (const id of ["spoiler", "unseen"]) {
+      const rule = GUIDELINE_RULES.find((r) => r.id === id)!;
+      assert.ok(html.includes(markup(rule.title.en)), rule.title.en);
+      assert.ok(html.includes(markup(rule.source.en)), rule.source.en);
+    }
+  });
+
+  it("keeps different phrases apart, still with one fix for the review", () => {
+    const groups = problems([
+      { rule: "viewer_frame", quote: "appears", reason: "a" },
+      { rule: "clarity", quote: "He", reason: "b" },
+      { rule: "spoiler", quote: " appears ", reason: "c" },
+    ]);
+    assert.deepEqual(
+      groups.map((g) => g.map((v) => v.rule)),
+      [["viewer_frame", "spoiler"], ["clarity"]],
+    );
+    const twoPhrases = cue("L9", 3, [
+      {
+        text: "He sees words appear.",
+        by: "write",
+        model: "m",
+        review: {
+          cueId: "L9",
+          pass: false,
+          violations: [
+            { rule: "viewer_frame", quote: "appear", reason: "a" },
+            { rule: "clarity", quote: "He", reason: "b" },
+          ],
+          fix: "f",
+        },
+      },
+    ]);
+    const html = renderToStaticMarkup(
+      createElement(RejectionStory, { cue: twoPhrases, language: "en", lang: "en", t: en }),
+    );
+    assert.equal(html.match(/class="story-verdict"/g)?.length, 2, html);
+    assert.equal(html.match(/class="story-fix"/g)?.length, 1, html);
   });
 });

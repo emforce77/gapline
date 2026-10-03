@@ -1,0 +1,14 @@
+/*
+ * Status marks the interface draws beside its words (✓ ✗ ⚠ ↺ ↻ − ✕). Pretendard's web subsets leave
+ * these code points out, so without this face they come from whatever symbol font the system has.
+ * GaplineSymbols.woff2 is cut from Pretendard Variable by scripts/build-symbol-font.py (1.9 KB, weight
+ * axis kept; OFL.txt beside it). A page that shows none of these marks never downloads it.
+ */
+@font-face {
+  font-family: "Gapline Symbols";
+  font-style: normal;
+  font-display: swap;
+  font-weight: 45 920;
+  src: url("./GaplineSymbols.woff2") format("woff2");
+  unicode-range: U+2212, U+21BA-21BB, U+26A0, U+2713, U+2715, U+2717;
+}

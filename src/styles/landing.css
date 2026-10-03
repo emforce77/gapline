@@ -304,7 +304,7 @@
 
 .why ul {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 32px;
   margin: 28px 0 0;
   padding: 0;
@@ -326,6 +326,29 @@
   color: var(--text-strong);
 }
 
+/* Citations open their source; the underline says so without a second colour. */
+.why-sources a,
+.rules-sources a,
+.site-footer a {
+  text-underline-offset: 3px;
+  text-decoration-color: var(--border-strong);
+}
+
+.why-sources a:hover,
+.rules-sources a:hover,
+.site-footer a:hover {
+  color: var(--text-strong);
+  text-decoration-color: currentColor;
+}
+
+.rules-sources {
+  margin: 14px 0 0;
+}
+
+.why-close {
+  margin: 36px 0 0;
+}
+
 .site-footer {
   padding-top: 32px;
   border-top: 1px solid var(--border);
@@ -335,6 +358,30 @@
 
 .site-footer p {
   margin: 4px 0;
+}
+
+/* Shown by the root layout's inline script when one of the page's own files failed to load. */
+.load-failure {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 8px 16px;
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--border-strong);
+  background: var(--surface-2);
+  color: var(--text-strong);
+}
+
+.load-failure[hidden] {
+  display: none;
+}
+
+.load-failure p {
+  margin: 0;
 }
 
 .not-found {

@@ -5,24 +5,24 @@ export const ko: Dictionary = {
   meta: {
     title: "갭라인 — 대사와 대사 사이에 맞춘 화면해설",
     description:
-      "갭라인은 대사와 대사 사이에 꼭 맞는 영화 화면해설을 만듭니다. 생성하기를 한 번 누르면 침묵에 맞춰 문장을 쓰고, 한국의 공개 가이드라인으로 검수하고, 낭독해 길이를 잰 뒤, 최종 점검에서 돌아온 문장을 다시 써서 믹스까지 마칩니다. 어떤 문장이든 직접 고칠 수도 있습니다.",
+      "갭라인은 시각장애인 관객을 위한 화면해설을 대사 사이 침묵에 꼭 맞게 쓰고, 검수하고, 낭독해 믹스합니다.",
     project: "{title} — 갭라인",
   },
   nav: { home: "갭라인", language: "English", skip: "본문으로 건너뛰기" },
   landing: {
     eyebrow: "시각장애인을 위한 화면해설",
     title: "대사와 대사 사이에 꼭 맞는 화면해설.",
-    lede: "생성하기를 한 번 누르면 모든 단계가 이어집니다. 갭라인은 실제 침묵에 맞춰 해설 문장을 쓰고, 한국의 공개 가이드라인으로 검수하고, 낭독해 길이를 잰 뒤, 최종 점검에서 돌아온 문장을 다시 써서 믹스합니다. 다른 표현을 원하면 어떤 문장이든 고칠 수 있고, 갭라인은 그 문장만 다시 낭독하고 트랙 전체를 다시 점검합니다.",
+    lede: "생성하기를 한 번 누르면 모든 단계가 이어집니다. 갭라인은 실제 침묵에 맞춰 해설 문장을 쓰고, 한국의 공개 가이드라인으로 검수하고, 낭독해 길이를 잰 뒤, 최종 점검에서 반려된 문장을 다시 써서 믹스합니다. 다른 표현을 원하면 어떤 문장이든 고칠 수 있고, 갭라인은 그 문장만 다시 낭독하고 트랙 전체를 다시 점검합니다.",
     ctaSample: "샘플 열어 보기",
     ctaUpload: "내 영상으로 해 보기",
     seven: {
-      label: "Tears of Steel, 54–60초",
+      label: "Tears of Steel, {from}–{to}초",
       title: "대사가 없는 7초",
       body: "“…locked.” 다음 7초 동안 아무도 말하지 않습니다. 시각장애인 관객에게는 말소리 없이 웅웅거리는 소리만 들리다가 “This is pretty freaky.”가 이어집니다. 두 버전을 들어 보세요.",
       original: "원래 소리",
       described: "해설 넣은 소리",
       narration: "해설 언어",
-      hidePicture: "화면 가리기",
+      hidePicture: "눈 감고 듣기",
       idle: "버튼을 누르면 이 7초를 재생합니다.",
       soundtrack: "말소리 없이 배경음만 흐릅니다.",
       waiting: "침묵. 곧 다음 해설이 나옵니다.",
@@ -120,43 +120,65 @@ export const ko: Dictionary = {
       {
         figure: "2026. 9. 3.",
         text: "10년 소송 끝에 대법원이, 화면해설과 자막 없이 영화를 상영하는 것은 3대 극장 체인의 차별이라고 확정했습니다.",
-        source: "대법원 2022다203507",
-      },
-      {
-        figure: "−54%",
-        text: "2026년 화면해설·자막·수어 방송 제작 지원 예산이 77.6억 원에서 35.8억 원으로 줄었습니다. 의무는 스트리밍까지 넓어졌습니다.",
-        source: "한국시각장애인연합회 성명, 2026. 3. 13.",
+        sources: [
+          {
+            label: "대법원 2022다203507 보도자료",
+            url: "https://www.scourt.go.kr/portal/news/NewsViewAction.work?gubun=6&seqnum=3044&type=0",
+          },
+        ],
       },
       {
         figure: "3개월",
         text: "배리어프리 영화 한 편을 만드는 데 지금도 걸리는 시간입니다. 전문가 10여 명과 1,400만 원(화면해설·자막 포함)이 듭니다.",
-        source: "배리어프리영화위원회 FAQ(날짜 미표기), 2019년 인터뷰",
+        sources: [
+          {
+            label: "배리어프리영화위원회 FAQ(날짜 미표기)",
+            url: "https://barrierfreefilms.or.kr/board_hrgp25/682",
+          },
+          {
+            label: "2019년 인터뷰(보관본)",
+            url: "https://web.archive.org/web/20260511062907/https://futurechosun.com/archives/43832",
+          },
+        ],
       },
     ],
+    whyClose:
+      "갭라인은 이 간극을 메우려고 만들었습니다. 생성하기를 한 번 누르면 영화의 침묵에 맞는 화면해설 트랙을 쓰고, 검수하고, 낭독해 믹스까지 마칩니다.",
     uploadIntro:
-      "90초, 30MB 이하 영상을 받습니다. 영상 준비는 1분 안에 끝나고, 해설 생성은 10분 안팎 걸리며 유료 Google Cloud와 Gemini API를 호출합니다. 생성 한도는 하루 단위이며 모든 방문자가 함께 씁니다. 올린 영상은 그 브라우저에서만 열 수 있습니다.",
+      "90초, 30MB 이하 영상을 받습니다. 영상 준비는 1분 안에 끝납니다. 해설 생성은 보통 2~6분 걸리고(길거나 내용이 많은 영상은 더 걸립니다) 유료 Google Cloud와 Gemini API를 호출합니다. 생성 한도는 하루 단위이며 모든 방문자가 함께 씁니다. 올린 영상은 그 브라우저에서만 열 수 있습니다.",
     uploadTitle: "내 영상",
     uploadHint:
-      "MP4, MOV, WebM, 30MB와 90초 이하. 파일을 여기에 끌어 놓거나 골라 주세요. 65초 샘플의 {language} 해설은 생성에 {time} 걸렸고, 비용은 {cost}입니다.",
+      "MP4, MOV, WebM, 3초~90초, 30MB 이하. 파일을 여기에 끌어 놓거나 골라 주세요. 65초 샘플의 {language} 해설은 생성에 {time} 걸렸고, 비용은 {cost}입니다.",
     uploadChoose: "영상 고르기",
     uploadWorking: "영상을 준비하는 중…",
     uploadTooLong: "90초보다 긴 영상입니다. 한 장면으로 잘라서 다시 올려 주세요.",
     uploadFailed: "이 영상을 읽지 못했습니다. MP4(H.264)로 다시 내보낸 뒤 올려 주세요.",
-    footerFilm:
-      "샘플 영화: Tears of Steel, (CC) Blender Foundation | mango.blender.org, CC BY 3.0.",
-    footerGuides:
-      "가이드라인: 방미통위(옛 방송통신위원회) 『장애인방송 프로그램 제공 가이드라인』(2019), Netflix 화면해설 스타일 가이드 v2.5.",
+    footerFilm: "샘플 영화: Tears of Steel, (CC) Blender Foundation | {site}, {license}.",
+    footerGuides: "가이드라인: {kmcc}, {netflix}.",
+    footerSource: "소스 코드·작동 방식·데모 영상: {repo}.",
+    footerLinks: {
+      repo: "github.com/emforce77/gapline",
+      site: "mango.blender.org",
+      license: "CC BY 3.0",
+      kmcc: "방미통위(옛 방송통신위원회) 『장애인방송 프로그램 제공 가이드라인』(2019, PDF)",
+      netflix: "Netflix 화면해설 스타일 가이드 v2.5(영문)",
+    },
   },
   upload: {
     drop: "놓으면 바로 올라갑니다.",
     checking: "파일을 확인하는 중…",
     uploading: "올리는 중 {percent}",
+    progressLabel: "업로드 진행률",
+    sendingName: "올리는 중…",
+    cancel: "업로드 취소",
+    cancelled: "업로드를 취소했습니다.",
     preparing: "영상을 변환하고 길이를 재는 중입니다. 보통 1분 안에 끝납니다.",
     errors: {
       too_large:
         "이 파일은 {size}입니다. {max}까지 올릴 수 있습니다. 720p로 내보내거나 한 장면으로 잘라서 다시 올려 주세요.",
-      too_long:
-        "이 영상은 {length}입니다. {max}까지 받습니다. 한 장면으로 잘라서 다시 올려 주세요.",
+      too_long: "이 영상은 {length}입니다. 90초까지 받습니다. 한 장면으로 잘라서 다시 올려 주세요.",
+      too_short:
+        "3초보다 짧은 영상이거나 사진 한 장입니다. 설명을 넣을 틈을 찾으려면 3초 이상인 장면이 필요합니다.",
       not_video: "영상 파일이 아닙니다. MP4, MOV, WebM 파일을 골라 주세요.",
       no_video_stream:
         "소리만 있고 화면이 없는 파일입니다. 갭라인은 화면에 보이는 것을 설명하므로 영상이 필요합니다.",
@@ -170,7 +192,7 @@ export const ko: Dictionary = {
     },
     status: {
       budget_busy:
-        "지금 다른 방문자의 해설이 생성되고 있습니다. 영상은 지금 올릴 수 있고, 그 생성이 끝나면 새로 생성할 수 있습니다. 보통 10분 안팎이면 됩니다.",
+        "지금은 다른 방문자들이 시작한 해설 생성이 오늘 한도의 남은 몫을 쓰고 있습니다. 영상은 지금 올릴 수 있고, 그중 하나가 끝나면 새로 생성할 수 있습니다. 생성은 보통 2~6분 걸립니다.",
       budget_daily:
         "오늘의 실시간 생성 한도를 다 썼습니다. 영상은 지금 올려 두고 한도가 다시 채워진 뒤 생성할 수 있으며, 샘플의 기록된 결과는 언제든 재생됩니다.",
     },
@@ -179,29 +201,50 @@ export const ko: Dictionary = {
     leaveNote: "연결이 끊기면 이 페이지를 새로 고치세요. 진행 중인 생성을 이어서 보여 줍니다.",
     lost: "연결이 끊겼지만 생성은 서버에서 계속됩니다. 몇 초마다 진행 상황을 확인합니다…",
     following: "시작한 생성을 이어서 보고 있습니다. 몇 초마다 진행 상황을 확인합니다…",
-    active: "{time}에 시작한 {language} 해설이 아직 만들어지고 있습니다.",
+    elapsed:
+      "생성을 시작한 지 {elapsed} 지났습니다. 대부분 2~6분 걸리며, 길거나 내용이 많은 영상은 더 걸립니다.",
+    confirming: "생성을 시작하는 순간 연결이 끊겼습니다. 서버에서 생성이 시작됐는지 확인하는 중…",
+    active: "{time}에 시작한 {language} {density} 해설이 아직 만들어지고 있습니다.",
     follow: "이어서 보기",
     unreachable:
       "갭라인이 응답하지 않아 이 페이지가 생성 진행 확인을 멈췄습니다. 생성은 서버에서 계속되어 끝날 수 있으니, 연결이 돌아오면 다시 확인하거나 나중에 이 페이지를 새로 고쳐 주세요.",
     interrupted: "생성이 끝나지 못하고 멈춰 결과가 저장되지 않았습니다. 다시 생성할 수 있습니다.",
     notStarted: "생성이 시작되지 않았습니다. 다시 시도해 주세요.",
+    notStartedChecked:
+      "갭라인이 응답하지 않았고 새로 시작된 생성도 보이지 않아, 생성이 시작되지 않은 것으로 보입니다. 인터넷 연결을 확인하고 다시 시도해 주세요.",
     notFound: "이 생성 기록을 찾을 수 없습니다. 다른 브라우저에서 시작한 것일 수 있습니다.",
-    loadFailed: "결과를 불러오지 못했습니다. 페이지를 새로 고쳐 주세요.",
+    loadFailed: "결과를 불러오지 못했습니다. 결과는 저장되어 있으니 잠시 뒤 다시 시도해 주세요.",
+    savedNotListed:
+      "수정한 내용은 새 결과로 저장됐지만, 이 페이지에서 아직 열지 못했습니다. 페이지를 새로 고치면 볼 수 있습니다.",
+    editPending:
+      "{line} 수정을 아직 낭독하고 점검하는 중입니다(지금까지 {elapsed}). 저장되면 새 버전이 여기에서 열립니다.",
+    editStopped:
+      "{line} 수정이 저장되기 전에 멈췄습니다. 수정하기 전 결과는 그대로이니, 이 문장을 다시 수정할 수 있습니다.",
+    editUnknown:
+      "{line} 수정이 저장됐는지 이 페이지에서 확인하지 못했습니다. 나중에 페이지를 새로 고쳐 확인해 주세요.",
     renews: "{time}에 다시 채워집니다({wait}).",
     reference: "참조 번호: {runId}.",
     retry: "다시 시도",
     checkAgain: "다시 확인",
     littleRoom:
-      "이 영상에서 대사가 없는 구간은 {room}뿐입니다. 해설을 제대로 넣으려면 {needed} 이상이 필요합니다. 해설은 아무도 말하지 않는 곳에만 들어가므로, 대사나 내레이션이 계속되는 영상에는 해설이 거의 들어가지 않습니다. 말 사이에 쉼이 있는 장면이 더 잘 맞습니다.",
+      "이 영상에서 해설을 넣을 만큼 긴 침묵은 모두 {room}뿐입니다. 해설을 제대로 넣으려면 {needed} 이상이 필요합니다. 해설은 아무도 말하지 않는 약 {pause} 이상의 쉼에만 들어가므로, 대사나 내레이션이 계속되는 영상에는 해설이 거의 들어가지 않습니다. 쉼이 긴 장면이 더 잘 맞습니다.",
     status: {
       budget_busy:
-        "지금 다른 방문자의 해설이 생성되고 있습니다. 그 생성이 끝나면 새로 시작할 수 있으며, 보통 10분 안팎이면 됩니다.",
-      budget_daily: "오늘의 실시간 생성 한도를 다 썼습니다. 샘플의 결과는 계속 재생됩니다.",
+        "지금은 다른 방문자들이 시작한 해설 생성이 오늘 한도의 남은 몫을 쓰고 있습니다. 그중 하나가 끝나면 새로 시작할 수 있습니다. 생성은 보통 2~6분 걸립니다.",
+      budget_daily: "오늘의 실시간 생성 한도를 다 썼습니다. 이미 만든 결과는 계속 재생됩니다.",
+      visitor_busy:
+        "직접 시작한 다른 해설 생성이나 수정이 아직 진행 중입니다. 방문자마다 한 번에 하나씩 만들 수 있어, 그 작업이 끝나면 새로 시작할 수 있습니다.",
+      visitor_daily:
+        "오늘 쓸 수 있는 실시간 생성 몫을 다 썼습니다. 이미 만든 결과는 계속 재생됩니다.",
     },
     errors: {
       budget_busy:
-        "다른 방문자의 해설이 생성되고 있고, 오늘 한도로는 한 번에 하나만 만들 수 있습니다. 그 생성이 끝나면 다시 시도해 주세요. 보통 10분 안팎이면 됩니다.",
-      budget_daily: "오늘의 실시간 생성 한도를 다 썼습니다. 샘플의 결과는 계속 재생됩니다.",
+        "지금은 다른 방문자들이 시작한 해설 생성이 오늘 한도의 남은 몫을 쓰고 있어 생성을 시작하지 못했습니다. 그중 하나가 끝나면 다시 시도해 주세요. 생성은 보통 2~6분 걸립니다.",
+      budget_daily: "오늘의 실시간 생성 한도를 다 썼습니다. 이미 만든 결과는 계속 재생됩니다.",
+      visitor_busy:
+        "먼저 시작한 해설 생성이나 수정이 아직 진행 중입니다. 방문자마다 한 번에 하나씩만 할 수 있으니, 그 작업이 끝나면 다시 시도해 주세요.",
+      visitor_daily:
+        "오늘 쓸 수 있는 실시간 생성 몫을 다 썼습니다. 이미 만든 결과는 계속 재생됩니다.",
       run_allowance:
         "이번 생성이 비용 상한에 닿아 멈췄고, 결과는 저장되지 않았습니다. 더 짧은 영상은 비용이 덜 듭니다.",
       provider_busy: "모델이 지금 과부하 상태입니다. 1~2분 뒤 다시 시도해 주세요.",
@@ -220,8 +263,11 @@ export const ko: Dictionary = {
         "이 페이지에서 보낸 요청이 아니어서 거부되었습니다. 페이지를 새로 고친 뒤 다시 시도해 주세요.",
       not_found: "이 영상을 더 이상 찾을 수 없습니다. 페이지를 새로 고쳐 주세요.",
       invalid_request: "요청을 이해하지 못했습니다. 페이지를 새로 고친 뒤 다시 시도해 주세요.",
-      connection:
-        "갭라인에 연결할 수 없어 생성이 시작되지 않았습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.",
+      run_active:
+        "이 영상에서 시작한 생성이 아직 진행 중입니다. 아래에서 이어서 보거나 끝날 때까지 기다려 주세요.",
+      connection: "갭라인에 연결할 수 없습니다. 인터넷 연결을 확인하고 다시 시도해 주세요.",
+      server_busy:
+        "지금 갭라인에 요청이 몰려 생성을 시작하지 못했습니다. 1분 뒤 다시 시도해 주세요.",
       unknown: "생성이 끝나지 못하고 멈췄습니다. 다시 시도해 주세요.",
     },
     noRetry: {
@@ -240,8 +286,11 @@ export const ko: Dictionary = {
   },
   failure: {
     title: "영상을 여는 중에 문제가 생겼습니다.",
-    body: "오류 내용은 브라우저 콘솔에 기록했습니다.",
+    body: "일시적인 문제일 수 있습니다. 다시 시도하거나 페이지를 새로 고쳐 주세요.",
     retry: "다시 시도",
+    partial:
+      "이 페이지의 일부를 불러오지 못했습니다. 갭라인이 붐비는 중일 수 있으니 새로 고쳐 주세요.",
+    reload: "새로 고침",
   },
   workspace: {
     narration: "해설 언어",
@@ -252,13 +301,22 @@ export const ko: Dictionary = {
     regenerate: "다시 생성",
     generating: "생성하는 중…",
     liveNote:
-      "실시간 생성은 유료 API를 호출하고 10분 안팎 걸립니다. 기록된 결과는 그대로 남습니다.",
+      "실시간 생성은 유료 API를 호출합니다. 보통 2~6분 걸리며, 길거나 내용이 많은 영상은 더 걸립니다. 새 결과가 나올 때까지 지금 결과는 계속 재생됩니다.",
+    newVersion: "새 버전 (생성하는 중…)",
+    unfinishedVersion: "새 버전 (완료되지 않음)",
+    loadingRun: "결과를 불러오는 중…",
+    runFinished:
+      "생성이 끝났습니다. 해설 {lines}이 들어간 영상을 ‘해설과 함께 재생’으로 들을 수 있습니다.",
+    runFinishedEmpty:
+      "생성이 끝났지만 이 영상의 침묵에 맞는 해설 문장이 없어, 영상에 해설이 들어가지 않았습니다.",
+    replayFinished: "다시 보기가 끝났습니다.",
     samplePrivate: "이 샘플에서 만든 버전은 이 브라우저에서 나만 볼 수 있습니다.",
     replay: "과정 다시 보기",
     replaying: "{speed}배속으로 다시 보는 중",
     stopReplay: "다시 보기 멈춤",
     noRun: "생성하기를 누르면 {language} 트랙을 만듭니다.",
     noRunHint: "65초 샘플의 {language} 해설 생성에 {time}, {cost}가 들었습니다.",
+    noRunHintHere: "이 영상의 {language} 해설 생성에 {time}, {cost}가 들었습니다.",
     adOn: "해설 켬",
     adOff: "해설 끔",
     eyesClosed: "눈 감고 듣기",
@@ -267,15 +325,17 @@ export const ko: Dictionary = {
     play: "재생",
     playDescribed: "해설과 함께 재생",
     pause: "일시정지",
-    keys: "단축키: Space 재생 · D 해설 · E 눈 감고 듣기",
+    keys: "플레이어에 초점이 있을 때 단축키: Space·K 재생 · D 해설 · E 눈 감고 듣기",
     captionIdle: "해설이 나오는 동안 여기에 문장이 표시됩니다.",
-    dialogue: "대사",
+    dialogue: "인식된 대사",
+    videoFailed: "영상을 불러오지 못했습니다.",
     downloads: "내려받기",
     downloadDescribed: "해설 입힌 영상 (MP4)",
     downloadNarration: "해설 음성 트랙 (WAV)",
     downloadVtt: "해설 텍스트 트랙 (WebVTT)",
     downloadScript: "대본·검수 기록 (JSON)",
     notRecorded: "이전 결과에는 기록되지 않음",
+    noDescription: "이 결과에는 해설 없음",
     selected: "{line} 선택됨",
     stageAnnounce: "{stage}: {state}",
   },
@@ -285,6 +345,9 @@ export const ko: Dictionary = {
     restored: "{line} 복원",
     changed: "{line} 수정",
     removed: "{line} 삭제",
+    moved: "{line} 위치 이동",
+    basedOnMoved:
+      "“{parent}”에서 이어진 결과입니다. {line}은 문장은 그대로 두고 시작 위치만 옮겨 다시 낭독했고, 나머지 문장은 그대로 재사용했습니다.",
     basedOn:
       "“{parent}”에서 이어진 결과입니다. 사람이 쓴 문장으로 {line} 한 줄만 다시 낭독했고, 나머지 문장은 그대로 재사용했습니다.",
     basedOnRemoved:
@@ -293,6 +356,8 @@ export const ko: Dictionary = {
   timeline: {
     picture: "화면",
     dialogue: "대사",
+    recognized: "인식 결과",
+    soundless: "소리가 없는 클립이라 피해야 할 대사가 없습니다.",
     room: "해설 가능 침묵",
     narration: "해설",
     seconds: "{n}초",
@@ -311,6 +376,7 @@ export const ko: Dictionary = {
     mix: "믹스",
     waiting: "대기",
     reused: "이 클립의 이전 실행 결과 재사용",
+    skipped: "고칠 점 없음",
     running: "진행 중 · {elapsed}",
     done: "{seconds}초",
     doneState: "완료",
@@ -320,6 +386,8 @@ export const ko: Dictionary = {
     stoppedState: "중단됨",
     relistenFound: "침묵 {gaps}곳 · 들린 단어 {words}개 · 줄어든 침묵 {blocked}",
     relistenQuiet: "침묵 {gaps}곳 · 들린 말 없음",
+    relistenNone: "다시 들을 침묵 없음",
+    relistenSoundless: "소리가 없는 클립이라 다시 들을 구간 없음",
   },
   line: {
     title: "해설 {n}",
@@ -371,12 +439,14 @@ export const ko: Dictionary = {
       shortened: "길이에 맞춰 줄임",
     },
     evidence: "모델의 장면 메모 (읽지 않음)",
-    pickHint: "타임라인에서 해설 문장을 고르면 쓰기·검수·낭독 과정을 볼 수 있습니다.",
+    pickHint:
+      "타임라인이나 ‘문장 선택’ 목록에서 해설 문장을 고르면(키보드로는 해당 문장으로 옮긴 뒤 Enter) 쓰기·검수·낭독 과정을 볼 수 있습니다.",
     play: "여기부터 재생",
     close: "진행 상황으로",
   },
   metrics: {
     lines: "읽은 문장",
+    line: "읽은 문장",
     fit: "침묵 안에 맞음",
     overlap: "인식된 대사와 겹친 해설",
     caught: "점검에서 반려",

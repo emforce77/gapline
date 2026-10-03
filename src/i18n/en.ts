@@ -5,24 +5,25 @@ export const en = {
   meta: {
     title: "Gapline — audio description that fits between the lines",
     description:
-      "Gapline makes audio description for film that fits between the lines. One press of Generate writes each line to fit a silence, checks it against Korea's published guideline, voices and measures it, rewrites what the final check sends back and mixes the track. You can still edit any line.",
+      "Gapline writes audio description for blind and low-vision viewers that fits the silences between lines of dialogue, then checks, voices and mixes it.",
     project: "{title} — Gapline",
   },
   nav: { home: "Gapline", language: "한국어", skip: "Skip to content" },
   landing: {
     eyebrow: "Audio description for blind and low-vision viewers",
     title: "Descriptions that fit between the lines.",
-    lede: "One press of Generate runs every step: Gapline writes each line to fit a real silence, checks it against Korea's published guideline, voices and measures it, rewrites any line its final check sends back, and mixes the track. Want different words? You can still edit any line; Gapline re-voices just that one and checks the track again.",
+    lede: "One press of Generate runs every step: Gapline writes each line to fit a real silence, checks it against Korea's published guideline, voices and measures it, rewrites any line its final check rejects, and mixes the track. Want different words? You can still edit any line; Gapline re-voices just that one and checks the track again.",
     ctaSample: "Open the sample",
     ctaUpload: "Try your own clip",
     seven: {
-      label: "Tears of Steel, 54–60 s",
+      /** {from} and {to} are the whole seconds of the window the player plays (page.tsx). */
+      label: "Tears of Steel, {from}–{to} s",
       title: "Seven seconds with no dialogue",
-      body: "After “…locked.”, nobody speaks for seven seconds. A blind viewer hears no words, only a hum, then “This is pretty freaky.” Listen to both versions.",
+      body: "After “…locked,” nobody speaks for seven seconds. A blind viewer hears no words, only a hum, then “This is pretty freaky.” Listen to both versions.",
       original: "Original sound",
       described: "With description",
       narration: "Narration",
-      hidePicture: "Hide the picture",
+      hidePicture: "Eyes closed",
       idle: "Press a button to play the seven seconds.",
       soundtrack: "No words here. Only the soundtrack.",
       waiting: "Silence. The next description starts in a moment.",
@@ -40,7 +41,7 @@ export const en = {
       picture: "Picture",
       dialogue: "Dialogue",
       dialogueStat: "{n} stretches, {s}",
-      room: "Room to speak",
+      room: "Usable silence",
       roomStat: "{n} silences, {s}",
       narration: "Narration",
       narrationStat: "{n} lines",
@@ -48,7 +49,7 @@ export const en = {
     shortest: "shortest: {s}",
     sevenMark: "the seven seconds",
     timelineNote:
-      "Silences come from the speech recognizer's word timings (Chirp 3), and each silence is then heard again on its own. That second listen found the opening launch call Chirp 3 had placed two seconds early, so no line lands on it.",
+      "Silences come from the speech recognizer's word timings (Chirp 3), and each silence is then heard again on its own. That second listen caught the opening launch call, which the recognizer had placed two seconds early, so no line is placed over it.",
     flowTitle: "How a line gets made",
     flow: [
       {
@@ -80,8 +81,9 @@ export const en = {
       },
       {
         name: "Final check and mix",
-        detail: "A final check reviews the whole voiced track, then the film ducks under each line",
-        loop: "rewrites a line the final check sends back; may add one where a silence still has room",
+        detail:
+          "A final check reviews the whole voiced track, then the film's sound is lowered under each line",
+        loop: "rewrites a line the final check rejects; may add one where a silence is still free",
         service: "Gemini 3.8 Flash · FFmpeg on Cloud Run",
       },
     ],
@@ -98,14 +100,14 @@ export const en = {
         remove: "Removed by editor",
       },
       rejected: "Rejected",
-      sentBack: "Sent back by the final check",
+      sentBack: "Rejected by the final check",
       passed: "Passed review",
       suggestion: "Suggested fix",
       /** What became of a rejected version, by who made the next one. */
       next: {
         revise: "Gapline rewrote the line from this suggestion and reviewed it again.",
         final:
-          "This draft had passed review and been voiced. The final check, which reviews the whole voiced track, sent it back, so Gapline rewrote the line from the suggestion.",
+          "This draft had passed review and been voiced. The final check, which reviews the whole voiced track, rejected it, so Gapline rewrote the line from the suggestion.",
         human:
           "Its rewrites still broke a rule, so Gapline dropped the line instead of voicing it. The next version was written by hand.",
       },
@@ -115,7 +117,7 @@ export const en = {
     rulesSummary: "All {n} review rules and where they come from",
     measuredTitle: "Measured on the sample",
     measuredRun:
-      "One {language} run of the 65-second clip cost {cost} in API calls and took {time}. {fit} of {shipped} lines landed inside their silence, with {overlap} of narration over the speech Chirp 3 recognized.",
+      "One {language} run of the 65-second clip cost {cost} in API calls and took {time}. {fit} of {shipped} lines landed inside their silence, with {overlap} of narration over recognized speech.",
     measuredEdit: "Changing this line by hand afterwards cost {cost} and took {time}.",
     measuredReused:
       "Hearing and watching were reused from an earlier run of this clip, so their cost and time are not included.",
@@ -125,44 +127,71 @@ export const en = {
       {
         figure: "3 Sep 2026",
         text: "After a ten-year lawsuit, Korea's Supreme Court confirmed that the three big cinema chains discriminate when films lack audio description and captions.",
-        source: "Supreme Court of Korea, case 2022다203507",
-      },
-      {
-        figure: "−54%",
-        text: "Korea's 2026 subsidy for described, captioned and signed TV fell from ₩7.76B to ₩3.58B while duties widened to streaming.",
-        source: "Korea Blind Union statement, 13 Mar 2026",
+        sources: [
+          {
+            label: "Supreme Court of Korea, case 2022Da203507 (press release, in Korean)",
+            url: "https://www.scourt.go.kr/portal/news/NewsViewAction.work?gubun=6&seqnum=3044&type=0",
+          },
+        ],
       },
       {
         figure: "3 months",
         text: "What one accessible Korean film still takes: about ten specialists and ₩14M (≈US$10k), for description and captions together.",
-        source: "Barrier-Free Film Committee FAQ (undated); 2019 interview",
+        sources: [
+          {
+            label: "Barrier-Free Film Committee FAQ (undated, in Korean)",
+            url: "https://barrierfreefilms.or.kr/board_hrgp25/682",
+          },
+          {
+            label: "2019 interview (archived, in Korean)",
+            url: "https://web.archive.org/web/20260511062907/https://futurechosun.com/archives/43832",
+          },
+        ],
       },
     ],
+    whyClose:
+      "Gapline is built for that gap: one press of Generate writes, checks, voices and mixes a description track that fits the film's own silences.",
     uploadIntro:
-      "Clips up to 90 seconds and 30 MB. Preparing a clip takes under a minute; generating its description takes about 10 minutes and calls paid Google Cloud and Gemini APIs, within a daily allowance shared by every visitor. Only the browser that uploaded a clip can open it.",
+      "Clips up to 90 seconds and 30 MB. Preparing a clip takes under a minute; generating its description usually takes 2–6 minutes, longer for a long or busy clip, and calls paid Google Cloud and Gemini APIs, within a daily allowance shared by every visitor. Only the browser that uploaded a clip can open it.",
     uploadTitle: "Your clip",
     uploadHint:
-      "MP4, MOV or WebM, up to 30 MB and 90 seconds. Drop the file here or choose it. Generating {language} narration for the 65-second sample took {time} and cost {cost}.",
+      "MP4, MOV or WebM, 3 to 90 seconds and up to 30 MB. Drop the file here or choose it. Generating {language} narration for the 65-second sample took {time} and cost {cost}.",
     uploadChoose: "Choose a video",
     uploadWorking: "Preparing the clip…",
     uploadTooLong: "This clip is longer than 90 seconds. Trim it to one scene and try again.",
     uploadFailed:
       "Gapline could not read this video. Export it again as MP4 (H.264) and try again.",
-    footerFilm:
-      "Sample film: Tears of Steel, (CC) Blender Foundation | mango.blender.org, CC BY 3.0.",
-    footerGuides:
-      "Guidelines: KMCC Accessible Broadcasting Guideline (2019), Netflix Audio Description Style Guide v2.5.",
+    /** Each {name} becomes a link labelled by footerLinks (page.tsx). */
+    footerFilm: "Sample film: Tears of Steel, (CC) Blender Foundation | {site}, {license}.",
+    footerGuides: "Guidelines: {kmcc}; {netflix}.",
+    footerSource: "Source code, method and demo film: {repo}.",
+    footerLinks: {
+      repo: "github.com/emforce77/gapline",
+      site: "mango.blender.org",
+      license: "CC BY 3.0",
+      kmcc: "Korea Communications Commission (now the Korea Media and Communications Commission, KMCC), Guidelines for Providing Accessible Broadcast Programs (2019, PDF in Korean)",
+      netflix: "Netflix Audio Description Style Guide v2.5",
+    },
   },
   upload: {
     drop: "Drop the video to upload it.",
     checking: "Checking the file…",
     uploading: "Uploading, {percent}",
+    /** The progress bar's accessible name. */
+    progressLabel: "Upload progress",
+    /** The Choose button's accessible name while sending: fixed, so a screen reader does not read
+     *  every percent the button shows; the polite region announces the progress in quarters. */
+    sendingName: "Uploading…",
+    cancel: "Cancel upload",
+    cancelled: "Upload cancelled.",
     preparing: "Converting and measuring the clip. This usually takes under a minute.",
     errors: {
       too_large:
         "This file is {size}; Gapline takes up to {max}. Export it at 720p, or trim it to one scene, and try again.",
       too_long:
-        "This clip runs {length}; Gapline takes up to {max}. Trim it to one scene and try again.",
+        "This clip runs {length}; Gapline takes clips up to 90 seconds. Trim it to one scene and try again.",
+      too_short:
+        "This clip is shorter than 3 seconds, or is a single picture. Gapline needs a scene of at least 3 seconds to find a pause to describe.",
       not_video: "That file is not a video. Choose an MP4, MOV or WebM file.",
       no_video_stream:
         "This file has sound but no picture. Gapline describes what is on screen, so it needs a video.",
@@ -176,7 +205,7 @@ export const en = {
     },
     status: {
       budget_busy:
-        "Another visitor's description is being made right now. You can upload now; generating can start when it finishes, usually within 10 minutes.",
+        "Descriptions other visitors started hold the rest of today's allowance right now. You can upload now; generating can start when one of them finishes, and runs usually take 2–6 minutes.",
       budget_daily:
         "Today's live allowance is used up. You can upload now and generate after it renews; the sample's recorded results play any time.",
     },
@@ -185,7 +214,10 @@ export const en = {
     leaveNote: "If the connection drops, reload this page to pick the run up again.",
     lost: "The connection dropped, but the run keeps going on the server. Checking on it every few seconds…",
     following: "Following the run you started. Checking on it every few seconds…",
-    active: "You started a description in {language} at {time}. It is still being made.",
+    elapsed: "Running for {elapsed}. Most runs take 2–6 minutes; long or busy clips take longer.",
+    confirming:
+      "The connection dropped as the run was starting. Checking whether it began on the server…",
+    active: "You started a {density} description in {language} at {time}. It is still being made.",
     follow: "Follow it",
     unreachable:
       "Gapline stopped answering, so this page stopped checking on the run. It may still finish on the server: check again once you are back online, or reload this page later.",
@@ -193,22 +225,41 @@ export const en = {
     interrupted:
       "The run stopped without finishing, so no result was saved. You can generate again.",
     notStarted: "The run did not start. Try again.",
+    /** A start whose answer was lost, after the page looked for the run it may have begun. */
+    notStartedChecked:
+      "Gapline did not answer, and no new run of yours has appeared, so it most likely did not start. Check your connection and try again.",
     notFound: "That run is not here. It may belong to another browser.",
-    loadFailed: "This result could not be loaded. Reload the page.",
+    loadFailed: "This result did not load; it is still saved. Try again in a moment.",
+    savedNotListed:
+      "Your edit was saved as a new result, but this page could not open it yet. Reload the page to see it.",
+    editPending:
+      "Your edit of {line} is still being voiced and checked ({elapsed} so far). The new version opens here when it is saved.",
+    editStopped:
+      "Your edit of {line} stopped before it was saved. The result it was made from is unchanged; you can edit the line again.",
+    editUnknown:
+      "This page could not learn whether your edit of {line} was saved. Reload the page later to see.",
     renews: "It renews at {time} ({wait}).",
     reference: "Reference: {runId}.",
     retry: "Try again",
     littleRoom:
-      "This clip has {room} without speech; Gapline needs at least {needed} to describe much. Descriptions only go where nobody speaks, so constant dialogue or voice-over leaves few or no lines. A scene with pauses works better.",
+      "Only {room} of this clip is silent long enough to hold a line; Gapline needs at least {needed} of silence to say much. A line fits only in a pause of about {pause} or more where nobody speaks, so constant dialogue or voice-over leaves few or no lines. A scene with longer pauses works better.",
     status: {
       budget_busy:
-        "Another visitor's description is being made right now. A new one can start when it finishes, usually within 10 minutes.",
-      budget_daily: "Today's live allowance is used up; the sample's finished results still play.",
+        "Descriptions other visitors started hold the rest of today's allowance right now. A new one can start when one of them finishes, and runs usually take 2–6 minutes.",
+      budget_daily: "Today's live allowance is used up; finished results still play.",
+      visitor_busy:
+        "Your other description or edit is still being made, and each visitor runs one at a time. A new one can start when it finishes.",
+      visitor_daily:
+        "You have used your share of today's live allowance; finished results still play.",
     },
     errors: {
       budget_busy:
-        "Another visitor's description is being made, and today's allowance covers one at a time. Try again when it finishes, usually within 10 minutes.",
-      budget_daily: "Today's live allowance is used up; the sample's finished results still play.",
+        "Descriptions other visitors started hold the rest of today's allowance right now, so this run did not start. Try again when one of them finishes; runs usually take 2–6 minutes.",
+      budget_daily: "Today's live allowance is used up; finished results still play.",
+      visitor_busy:
+        "Your other description or edit is still being made, and each visitor runs one at a time. Try again when it finishes.",
+      visitor_daily:
+        "You have used your share of today's live allowance; finished results still play.",
       run_allowance:
         "This run reached its spending cap and stopped, so nothing was saved. A shorter clip needs less.",
       provider_busy: "The model is overloaded right now. Try again in a minute or two.",
@@ -226,8 +277,10 @@ export const en = {
         "The request was refused because it did not come from this page. Reload the page and try again.",
       not_found: "This clip is not here any more. Reload the page.",
       invalid_request: "The request was not understood. Reload the page and try again.",
-      connection:
-        "Gapline could not be reached, so the run did not start. Check your connection and try again.",
+      run_active:
+        "Your run of this clip is still being made. Follow it below, or wait for it to finish.",
+      connection: "Gapline could not be reached. Check your connection and try again.",
+      server_busy: "Gapline is busy right now, so the run did not start. Try again in a minute.",
       unknown: "The run stopped before finishing. Try again.",
     },
     /** For a code whose failure may or may not repeat, when the run said it would (retryable: false). */
@@ -247,8 +300,12 @@ export const en = {
   },
   failure: {
     title: "Something broke while opening this clip.",
-    body: "The error was logged in your browser console.",
+    body: "It may be a passing problem. Try again, or reload the page.",
     retry: "Try again",
+    /** Shown by the root layout when one of the page's own scripts or styles failed to load. */
+    partial:
+      "Part of this page did not load, probably because Gapline is busy. Reload to try again.",
+    reload: "Reload",
   },
   workspace: {
     narration: "Narration",
@@ -258,7 +315,19 @@ export const en = {
     generate: "Generate",
     regenerate: "Generate again",
     generating: "Generating…",
-    liveNote: "A live run calls paid APIs and takes about 10 minutes. The recorded result stays.",
+    liveNote:
+      "A live run calls paid APIs. It usually takes 2–6 minutes, longer for a long or busy clip. Your current result keeps playing until the new one is ready.",
+    /** The version list's entry for a run being made. */
+    newVersion: "New version (generating…)",
+    /** The version list's entry for a run that ended without a result (stopped, or not answering). */
+    unfinishedVersion: "New version (not finished)",
+    loadingRun: "Loading this result…",
+    /** Announced once when a live run finishes; {lines} is editor.lines ("5 lines"). */
+    runFinished:
+      "Finished: the described film has {lines}. Press Play with description to hear it.",
+    runFinishedEmpty:
+      "Finished, but no line fit this clip's silences, so the film has no description.",
+    replayFinished: "Replay finished.",
     samplePrivate: "Versions you make on this sample are visible only to you, in this browser.",
     replay: "Replay the run",
     replaying: "Replaying at {speed}× speed",
@@ -266,6 +335,7 @@ export const en = {
     noRun: "Press Generate to make a track in {language}.",
     noRunHint:
       "Generating {language} narration for the 65-second sample took {time} and cost {cost}.",
+    noRunHintHere: "Generating {language} narration for this clip took {time} and cost {cost}.",
     adOn: "Description on",
     adOff: "Description off",
     eyesClosed: "Eyes closed",
@@ -274,15 +344,18 @@ export const en = {
     play: "Play",
     playDescribed: "Play with description",
     pause: "Pause",
-    keys: "Keys: Space play · D description · E eyes closed",
-    captionIdle: "Narration shows here while it speaks.",
-    dialogue: "Dialogue",
+    keys: "Keys, with the player focused: Space or K play · D description · E eyes closed",
+    captionIdle: "Narration text appears here as it is spoken.",
+    /** Machine speech recognition: its slips must not read as the film's own words. */
+    dialogue: "Speech as recognized",
+    videoFailed: "The video didn't load.",
     downloads: "Downloads",
     downloadDescribed: "Described film (MP4)",
     downloadNarration: "Narration stem (WAV)",
     downloadVtt: "Text track (WebVTT)",
     downloadScript: "Script and review log (JSON)",
     notRecorded: "not recorded for this older result",
+    noDescription: "no description in this result",
     selected: "{line} selected",
     stageAnnounce: "{stage}: {state}",
   },
@@ -292,32 +365,40 @@ export const en = {
     restored: "{line} restored",
     changed: "{line} changed",
     removed: "{line} removed",
+    moved: "{line} moved",
     basedOn:
       "Edited from “{parent}”. {line} was written by a person and re-voiced; every other line is reused as it was.",
+    basedOnMoved:
+      "Edited from “{parent}”. {line} keeps its words and was moved to a new start, then re-voiced; every other line is reused as it was.",
     basedOnRemoved:
       "Edited from “{parent}”. An editor removed {line}; every other line is reused as it was, and the final check ran again on what remains.",
   },
   timeline: {
     picture: "Picture",
-    dialogue: "Dialogue",
-    room: "Room to speak",
+    dialogue: "Speech",
+    /** Under the speech row's name: the words are machine recognition, slips included. */
+    recognized: "as recognized",
+    /** In the speech row of a clip whose soundtrack is silent or missing (the re-listen says so). */
+    soundless: "No sound in this clip, so there is no dialogue to avoid.",
+    room: "Usable silence",
     narration: "Narration",
     seconds: "{n} s",
-    relistenSpeech: "Dialogue found on re-listen, {from} to {to}: {text}",
+    relistenSpeech: "Dialogue found when the silence was re-checked, {from} to {to}: {text}",
   },
   stages: {
     hear: "Hear",
-    relisten: "Re-listen",
+    relisten: "Re-check silences",
     watch: "Watch",
-    gaps: "Find room",
+    gaps: "Find silences",
     write: "Write",
     review: "Review",
     voice: "Voice",
     verify: "Final check",
-    fix: "Apply the check",
+    fix: "Rewrite flagged lines",
     mix: "Mix",
     waiting: "Waiting",
     reused: "reused from an earlier run of this clip",
+    skipped: "Nothing to fix",
     running: "Working · {elapsed}",
     done: "{seconds} s",
     doneState: "done",
@@ -325,8 +406,11 @@ export const en = {
     stopped: "Stopped",
     lost: "Connection lost",
     stoppedState: "stopped",
-    relistenFound: "Silences: {gaps} · words heard: {words} · room closed: {blocked}",
-    relistenQuiet: "Silences: {gaps} · no words heard",
+    relistenFound:
+      "Silences re-checked: {gaps} · missed words found: {words} · silence lost to speech: {blocked}",
+    relistenQuiet: "Silences re-checked: {gaps} · no missed speech",
+    relistenNone: "No silences to re-check",
+    relistenSoundless: "No sound in this clip, so nothing to re-check",
   },
   line: {
     title: "Line {n}",
@@ -339,12 +423,12 @@ export const en = {
       removed: "removed by editor",
       pending: "in progress",
     },
-    room: "Room",
+    room: "Time available",
     spoken: "Spoken",
     rate: "Speed {rate}×",
     fits: "Fits its silence",
     voiced: "Voiced: {seconds} at {rate}×",
-    tooLong: "longer than its {room} room",
+    tooLong: "longer than the {room} it has",
     history: "How this line was made",
     by: {
       write: "Drafted",
@@ -360,8 +444,8 @@ export const en = {
     rejected: "Rejected",
     fix: "Fix",
     dropped: {
-      no_room: "Dropped: no room to speak it",
-      invalid_placement: "Rejected: start is outside the named gap",
+      no_room: "Dropped: no free silence to speak it in",
+      invalid_placement: "Rejected: it starts outside its silence",
       unchanged: "Rejected: the words did not change",
       review: "Dropped: still broke a rule after rewriting",
       too_long: "Dropped: too long for its silence even after shortening",
@@ -371,28 +455,30 @@ export const en = {
       rejectedOnce: "Rejected once",
       rejectedTwice: "Rejected twice",
       rejectedMany: "Rejected {n} times",
-      sentBack: "Sent back by the final check",
+      sentBack: "Rejected by the final check",
       byEditor: "then fixed by an editor",
       sameWords: "then passed with the same words",
       rewritten: "then passed after a rewrite",
       shortened: "shortened to fit",
     },
-    evidence: "Gapline notes from the model (not narrated)",
+    evidence: "What the model saw (not spoken)",
     pickHint:
-      "Select a narration line on the timeline to see how it was written, reviewed and voiced.",
+      "Select a narration line on the timeline, or in “Choose a line” (with the keyboard, move to it and press Enter), to see how it was written, reviewed and voiced.",
     play: "Play from here",
     close: "Back to the run",
   },
   metrics: {
     lines: "lines voiced",
+    /** `lines` for a result with exactly one. */
+    line: "line voiced",
     fit: "fit their silence",
     overlap: "narration over recognized speech",
-    caught: "sent back by a check",
-    cost: "Estimated API cost",
+    caught: "rejected by a check",
+    cost: "estimated API cost",
     time: "processing time",
   },
   editor: enEditor,
-  coverage: { title: "Reviewer found missing" },
+  coverage: { title: "Moments the reviewer found missing" },
 } as const;
 
 type Widen<T> = T extends string

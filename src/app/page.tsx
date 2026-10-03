@@ -17,9 +17,22 @@ import { loadShowcases, type Showcase } from "@/lib/store/showcase";
 
 export const dynamic = "force-dynamic";
 
-/** The seven seconds of the story: after "…locked." (53.7 s) until "This is pretty freaky." (60.9 s). */
-const SEVEN_START_SECONDS = 54.0;
-const SEVEN_END_SECONDS = 60.4;
+/**
+ * The seven seconds of the story: the transcript is silent from "…locked." (ends 53.72 s) until
+ * "This is pretty freaky." (starts 60.88 s). The window keeps a few frames clear of both lines and
+ * plays exactly 7.0 s. Its start must stay after 53.72 s, or `before` below picks the line ahead of it.
+ */
+const SEVEN_START_SECONDS = 53.8;
+const SEVEN_END_SECONDS = 60.8;
+
+/** Where the footer's citations lead; the link text comes from the catalog. */
+const FOOTER_URLS = {
+  repo: "https://github.com/emforce77/gapline",
+  site: "https://mango.blender.org/",
+  license: "https://creativecommons.org/licenses/by/3.0/",
+  kmcc: "https://www.kmcc.go.kr/download.do?fileSeq=62457",
+  netflix: "https://partnerhelp.netflixstudios.com/hc/en-us/articles/215510667",
+};
 
 type Preview = NonNullable<Showcase["preview"]>;
 
@@ -28,6 +41,31 @@ function emphasize(template: string, values: Record<string, string | number>): R
   return template
     .split(/\{(\w+)\}/)
     .map((part, i) => (i % 2 === 1 ? <strong key={i}>{String(values[part])}</strong> : part));
+}
+
+/** A citation that opens its source; every claim on the page is one click from where it came from. */
+function Source({ href, children }: { href: string; children: React.ReactNode }) {
+  return (
+    <a href={href} target="_blank" rel="noopener noreferrer">
+      {children}
+    </a>
+  );
+}
+
+/** Like fill(), but each {name} becomes a link to FOOTER_URLS[name], labelled from the catalog. */
+function linked(
+  template: string,
+  labels: Record<keyof typeof FOOTER_URLS, string>,
+): React.ReactNode[] {
+  return template.split(/\{(\w+)\}/).map((part, i) => {
+    if (i % 2 === 0) return part;
+    const name = part as keyof typeof FOOTER_URLS;
+    return (
+      <Source key={i} href={FOOTER_URLS[name]}>
+        {labels[name]}
+      </Source>
+    );
+  });
 }
 
 function narrationTrack(projectId: string, preview: Preview, lang: UiLang): NarrationTrack {
@@ -123,7 +161,12 @@ export default async function LandingPage() {
           </div>
           {project && tracks.length ? (
             <div className="hero-demo" id="seven">
-              <p className="label">{t.landing.seven.label}</p>
+              <p className="label">
+                {fill(t.landing.seven.label, {
+                  from: Math.round(SEVEN_START_SECONDS),
+                  to: Math.round(SEVEN_END_SECONDS),
+                })}
+              </p>
               <h2>{t.landing.seven.title}</h2>
               <p className="hero-demo-body">{t.landing.seven.body}</p>
               <SevenSeconds
@@ -144,6 +187,7 @@ export default async function LandingPage() {
             <TimelinePreview
               clipSeconds={project.clipSeconds}
               stripUrl={`/api/projects/${project.id}/media/strip.jpg`}
+              stripStepSeconds={project.stripStepSeconds}
               speech={analysis.speech}
               gaps={gaps}
               cues={featured.cues}
@@ -202,6 +246,9 @@ export default async function LandingPage() {
                     </li>
                   ))}
                 </ul>
+                <p className="label rules-sources">
+                  {linked(t.landing.footerGuides, t.landing.footerLinks)}
+                </p>
               </details>
             </div>
             <RejectionStory
@@ -268,16 +315,25 @@ export default async function LandingPage() {
               <li key={item.figure}>
                 <strong>{item.figure}</strong>
                 <span>{item.text}</span>
-                <span className="label">{item.source}</span>
+                <span className="label why-sources">
+                  {item.sources.map((s, i) => (
+                    <span key={s.url}>
+                      {i > 0 ? " · " : null}
+                      <Source href={s.url}>{s.label}</Source>
+                    </span>
+                  ))}
+                </span>
               </li>
             ))}
           </ul>
+          <p className="section-lede why-close">{t.landing.whyClose}</p>
         </section>
       </main>
 
       <footer className="site-footer">
-        <p>{t.landing.footerFilm}</p>
-        <p>{t.landing.footerGuides}</p>
+        <p>{linked(t.landing.footerFilm, t.landing.footerLinks)}</p>
+        <p>{linked(t.landing.footerGuides, t.landing.footerLinks)}</p>
+        <p>{linked(t.landing.footerSource, t.landing.footerLinks)}</p>
       </footer>
     </div>
   );

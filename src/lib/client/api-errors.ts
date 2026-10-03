@@ -10,6 +10,7 @@ import {
   MAX_UPLOAD_SECONDS,
   type ApiErrorBody,
   type BudgetErrorCode,
+  type LiveStatus,
   type RequestErrorCode,
   type RunErrorCode,
   type UploadErrorCode,
@@ -30,8 +31,12 @@ export type UploadFailure =
   | { code: "unexpected"; status: number }
   | { code: Exclude<UploadFailureCode, "too_large" | "too_long" | "unexpected"> };
 
-/** Why a run did not start or did not finish; `connection` means the start request never arrived. */
-export type RunFailureCode = RunErrorCode | RequestErrorCode | "connection";
+/**
+ * Why a run did not start or did not finish. Two are the browser's own: `connection`, no answer
+ * arrived (whether the request did is unknown), and `server_busy`, the platform answered for the
+ * app (Cloud Run's "Rate exceeded." page, a gateway error), so the run did not start.
+ */
+export type RunFailureCode = RunErrorCode | RequestErrorCode | "connection" | "server_busy";
 
 const UPLOAD_CODES: readonly UploadErrorCode[] = [
   "forbidden",
@@ -39,6 +44,7 @@ const UPLOAD_CODES: readonly UploadErrorCode[] = [
   "not_video",
   "too_large",
   "too_long",
+  "too_short",
   "no_video_stream",
   "unreadable",
   "internal",
@@ -46,6 +52,8 @@ const UPLOAD_CODES: readonly UploadErrorCode[] = [
 const RUN_CODES: readonly RunFailureCode[] = [
   "budget_busy",
   "budget_daily",
+  "visitor_busy",
+  "visitor_daily",
   "run_allowance",
   "provider_busy",
   "provider_failed",
@@ -57,7 +65,9 @@ const RUN_CODES: readonly RunFailureCode[] = [
   "forbidden",
   "not_found",
   "invalid_request",
+  "run_active",
   "connection",
+  "server_busy",
 ];
 
 export function isUploadErrorCode(code: unknown): code is UploadErrorCode {
@@ -182,8 +192,9 @@ function hasNoRetryText(code: RunFailureCode, t: Dictionary): code is NoRetryCod
 }
 
 /**
- * The sentence for a run that did not start or did not finish. Budget refusals name the renewal
- * time; other failures after the run started carry the run id as a reference for the server log.
+ * The sentence for a run that did not start or did not finish. Daily refusals (the shared allowance,
+ * or this visitor's share of it) name the renewal time; other failures after the run started carry
+ * the run id as a reference for the server log.
  * A code that may or may not repeat follows the run's `retryable` flag, like the page's retry button.
  */
 export function runErrorMessage(
@@ -194,9 +205,9 @@ export function runErrorMessage(
   now = Date.now(),
 ): string {
   const errors = t.live.errors;
-  if (failure.code === "budget_daily") {
-    if (!failure.resetAt) return errors.budget_daily;
-    return `${errors.budget_daily} ${fill(t.live.renews, formatReset(failure.resetAt, lang, now))}`;
+  if (failure.code === "budget_daily" || failure.code === "visitor_daily") {
+    if (!failure.resetAt) return errors[failure.code];
+    return `${errors[failure.code]} ${fill(t.live.renews, formatReset(failure.resetAt, lang, now))}`;
   }
   if (isBudgetCode(failure.code)) return errors[failure.code];
   const code = isRunFailureCode(failure.code) ? failure.code : null;
@@ -206,6 +217,21 @@ export function runErrorMessage(
       ? t.live.noRetry[code]
       : errors[code];
   return runId ? `${message} ${fill(t.live.reference, { runId })}` : message;
+}
+
+/**
+ * The sentence for a start the server refused before any stream. An answer without the API's JSON
+ * came from the platform in front of it: busy when it says to retry, otherwise the run did not start.
+ */
+export function refusedStartMessage(
+  refusal: { body: Partial<ApiErrorBody>; transient: boolean },
+  t: Dictionary,
+  lang: UiLang,
+  now = Date.now(),
+): string {
+  if (refusal.body.error)
+    return runErrorMessage({ ...refusal.body, code: refusal.body.error }, t, lang, null, now);
+  return refusal.transient ? t.live.errors.server_busy : t.live.notStarted;
 }
 
 /** What the page says before a paid run when /api/live-status refuses one. */
@@ -219,4 +245,42 @@ export function liveStatusMessage(
 ): string {
   if (reason === "budget_busy") return messages.budget_busy;
   return `${messages.budget_daily} ${fill(t.live.renews, formatReset(resetAt, lang, now))}`;
+}
+
+/**
+ * What the workspace says before a paid run when /api/live-status refuses one: the shared allowance
+ * first, then this visitor's own limit (their other run or edit, or their daily share); null when a
+ * run could start.
+ */
+export function liveStatusNotice(
+  status: LiveStatus,
+  t: Dictionary,
+  lang: UiLang,
+  now = Date.now(),
+): string | null {
+  if (status.canStart) return null;
+  const messages = t.live.status;
+  if (status.reason)
+    return liveStatusMessage(status.reason, status.resetAt, messages, t, lang, now);
+  if (status.visitor === "visitor_busy") return messages.visitor_busy;
+  if (status.visitor === "visitor_daily")
+    return `${messages.visitor_daily} ${fill(t.live.renews, formatReset(status.resetAt, lang, now))}`;
+  return null;
+}
+
+/**
+ * What the upload card says when /api/live-status refuses a run: the shared allowance in the upload
+ * card's own words (a clip can still be uploaded and generated later), else this visitor's own limit
+ * in the workspace's words, so the landing page and the workspace name it alike; null when a run
+ * could start.
+ */
+export function uploadStatusNotice(
+  status: LiveStatus,
+  t: Dictionary,
+  lang: UiLang,
+  now = Date.now(),
+): string | null {
+  if (status.reason)
+    return liveStatusMessage(status.reason, status.resetAt, t.upload.status, t, lang, now);
+  return liveStatusNotice(status, t, lang, now);
 }

@@ -2,18 +2,21 @@ import type { Metadata } from "next";
 import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { cache } from "react";
-import { originalRun } from "@/components/workspace/labels";
+import { orderRuns, originalRun } from "@/components/workspace/labels";
 import { Workspace } from "@/components/workspace/Workspace";
-import { asUiLang, dictionary, fill, UI_LANG_COOKIE } from "@/i18n";
+import { asUiLang, dictionary, fill, UI_LANG_COOKIE, type UiLang } from "@/i18n";
 import { I18nProvider } from "@/i18n/client";
-import { listRuns, readAnalysis, type Project } from "@/lib/store/projects";
-import { loadShowcase } from "@/lib/store/showcase";
-import { accessibleProject, publicProject, viewerHash } from "@/lib/store/access";
+import { listRuns, readAnalysis, readRunSnapshot, type Project } from "@/lib/store/projects";
+import { loadShowcases } from "@/lib/store/showcase";
+import { accessibleProject, accessibleRun, publicProject, viewerHash } from "@/lib/store/access";
 
 export const dynamic = "force-dynamic";
 
 /** The metadata and the page share one read of the project per request. */
 const projectFor = cache(accessibleProject);
+
+/** Both narration languages: the sample opens each on its own pinned result. */
+const NARRATIONS: readonly UiLang[] = ["en", "ko"];
 
 /** The tab names the clip, so a screen reader and a crowded tab bar both say what is open. */
 export async function generateMetadata({
@@ -26,6 +29,22 @@ export async function generateMetadata({
   const project = await projectFor((await params).id);
   // An unknown or private clip renders the 404 page; its tab says so instead of the landing title.
   return { title: project ? fill(t.meta.project, { title: project.title }) : t.notFound.metaTitle };
+}
+
+/**
+ * Whether ?run= names a run this viewer can open that has no finished result yet (still going,
+ * or stopped: the workspace follows it and says which). Another viewer's run, a run that does not
+ * exist, or a malformed id is not one, and the page opens on its default result instead.
+ */
+async function unfinishedRun(projectId: string, runId: string): Promise<boolean> {
+  if (!(await accessibleRun(projectId, runId))) return false;
+  try {
+    await readRunSnapshot(projectId, runId);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
+    throw error;
+  }
 }
 
 export default async function ProjectPage({
@@ -46,32 +65,55 @@ export default async function ProjectPage({
     notFound();
   }
   const viewer = await viewerHash();
-  const loading = loadShowcase(lang);
-  const [runs, analysis, showcase] = await Promise.all([
+  // The viewer's language first: its preview is the run the landing page describes.
+  const loading = loadShowcases([lang, ...NARRATIONS.filter((l) => l !== lang)]);
+  const [runs, analysis, showcases] = await Promise.all([
     // On the sample, the public results and this viewer's own; another viewer's ?run= is not found.
     // Without a session that is the public listing the showcase reads anyway, when this is its sample.
     viewer
       ? listRuns(project, viewer)
-      : loading.then((s) => (s?.project.id === project.id ? s.runs : listRuns(project, undefined))),
+      : loading.then((s) =>
+          s?.[lang].project.id === project.id ? s[lang].runs : listRuns(project, undefined),
+        ),
     readAnalysis(project.id),
     loading,
   ]);
-  // The sample's cost and time quote the same run as the landing page: the original automatic run
-  // behind the pinned result in the viewer's language.
-  const measured = (showcase && originalRun(showcase.runs, showcase.preview?.runId)) ?? null;
-  // The sample opens on that same pinned result, so "Open the sample" shows the run the landing page
-  // describes (in English, the run the film and the deck describe).
+  const showcase = showcases?.[lang]?.project.id === project.id ? showcases[lang] : null;
+  // The sample opens each narration language on its pinned result, so "Open the sample" shows the
+  // run the landing page describes (in English, the run the film and the deck describe).
+  const pins: Record<string, string> = Object.fromEntries(
+    showcase
+      ? NARRATIONS.flatMap((l) => {
+          const preview = showcases![l].preview;
+          return preview ? [[preview.language, preview.runId]] : [];
+        })
+      : [],
+  );
+  // The empty panel's "… took … and cost …" line: this clip's own newest original run, or else
+  // the sample's original run behind the pinned result in the viewer's language (as the landing).
+  const own =
+    project.kind === "sample"
+      ? undefined
+      : orderRuns(runs).find((r) => !r.summary?.parentRunId && r.summary);
+  const sample = showcases?.[lang];
+  const measured = own ?? (sample && originalRun(sample.runs, sample.preview?.runId)) ?? null;
+
+  const named = (await searchParams).run;
+  const finished = named ? runs.some((r) => r.runId === named) : false;
+  const following = named && !finished ? await unfinishedRun(project.id, named) : false;
   return (
     <I18nProvider lang={lang} t={dictionary(lang)}>
       <Workspace
         project={project}
         initialRunId={
-          (await searchParams).run ??
-          (showcase?.project.id === project.id ? showcase.preview?.runId : undefined)
+          named && (finished || following) ? named : (showcase?.preview?.runId ?? undefined)
         }
+        missingRunId={named && !finished && !following ? named : undefined}
         initialRuns={runs}
         analysis={analysis}
         measured={measured}
+        measuredHere={Boolean(own)}
+        pins={pins}
       />
     </I18nProvider>
   );

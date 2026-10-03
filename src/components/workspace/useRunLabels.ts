@@ -2,12 +2,14 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useI18n } from "@/i18n/client";
+import { retryTransient, RunRequestError } from "@/lib/client/run-stream";
 import type { RunListing } from "@/lib/store/projects";
 import { noteFromScript, runLabel, type RunNote } from "./labels";
 
 /**
  * Human labels for result versions. An edited result's label names the line the editor changed,
- * which only its script.json records, so those scripts are fetched once per edited run.
+ * which only its script.json records, so those scripts are fetched once per edited run (retried
+ * while the server is briefly busy; a label without its note still names the edit's depth).
  */
 export function useRunLabels(
   projectId: string,
@@ -25,17 +27,27 @@ export function useRunLabels(
   useEffect(() => {
     if (!missing.length) return;
     let cancelled = false;
-    Promise.all(
-      missing.map(async (runId) => {
-        const response = await fetch(`/api/projects/${projectId}/media/runs/${runId}/script.json`);
-        if (!response.ok) throw new Error(`script.json for ${runId}: HTTP ${response.status}`);
-        return [runId, noteFromScript(await response.json())] as const;
-      }),
-    )
-      .then((loaded) => {
-        if (!cancelled) setNotes((current) => ({ ...current, ...Object.fromEntries(loaded) }));
-      })
-      .catch((e: unknown) => console.error("Could not label edited results", e));
+    // One script that does not load leaves only its own label without a note.
+    Promise.allSettled(
+      missing.map((runId) =>
+        retryTransient(async () => {
+          const response = await fetch(
+            `/api/projects/${projectId}/media/runs/${runId}/script.json`,
+          );
+          if (!response.ok)
+            throw new RunRequestError(response.status, { error: `script.json for ${runId}` });
+          return [runId, noteFromScript(await response.json())] as const;
+        }),
+      ),
+    ).then((settled) => {
+      const loaded = settled.flatMap((s) => {
+        if (s.status === "fulfilled") return [s.value];
+        console.error("Could not label an edited result", s.reason);
+        return [];
+      });
+      if (!cancelled && loaded.length)
+        setNotes((current) => ({ ...current, ...Object.fromEntries(loaded) }));
+    });
     return () => {
       cancelled = true;
     };
@@ -48,7 +60,7 @@ export function useRunLabels(
       new Map(
         runs.map((r) => [
           r.runId,
-          runLabel(r, runs, notes[r.runId] ?? undefined, t, lang, localTime),
+          runLabel(r, runs, notes[r.runId] ?? undefined, t, lang, localTime, notes),
         ]),
       ),
     [runs, notes, t, lang, localTime],

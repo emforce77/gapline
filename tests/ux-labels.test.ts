@@ -237,35 +237,96 @@ describe("interface copy", () => {
   });
 
   it("gives one duration for a new track wherever a wait is mentioned", () => {
+    // Measured live runs took 2.3–6.4 min (fix round 3, 2026-10-03); the sample's 65 s took 6 min 27 s.
     for (const catalog of [en, ko]) {
       for (const text of strings(catalog)) {
         assert.doesNotMatch(text, /few minutes|several minutes|몇 분/, text);
+        assert.doesNotMatch(text, /10 minutes|up to 10\b|about 2 minutes|10분|2분쯤/, text);
       }
     }
-    for (const status of [en.live.status, en.upload.status]) {
-      assert.match(status.budget_busy, /usually within 10 minutes\.$/);
-    }
-    assert.match(en.live.errors.budget_busy, /usually within 10 minutes\.$/);
-    for (const text of [
-      ko.live.status.budget_busy,
+    const english = [
+      en.landing.uploadIntro,
+      en.upload.status.budget_busy,
+      en.live.elapsed,
+      en.live.status.budget_busy,
+      en.live.errors.budget_busy,
+      en.workspace.liveNote,
+    ];
+    const korean = [
+      ko.landing.uploadIntro,
       ko.upload.status.budget_busy,
+      ko.live.elapsed,
+      ko.live.status.budget_busy,
       ko.live.errors.budget_busy,
-    ]) {
-      assert.match(text, /보통 10분 안팎이면 됩니다\.$/);
+      ko.workspace.liveNote,
+    ];
+    for (const text of english) assert.match(text, /2–6 minutes/, text);
+    for (const text of korean) assert.match(text, /2~6분/, text);
+    for (const text of [en.landing.uploadIntro, en.live.elapsed, en.workspace.liveNote]) {
+      assert.match(text, /long or busy clip/, text);
     }
   });
 
-  it("names the landing's seven seconds by the window its player plays (54.0–60.4 s)", () => {
-    assert.equal(en.landing.seven.label, "Tears of Steel, 54–60 s");
-    assert.equal(ko.landing.seven.label, "Tears of Steel, 54–60초");
+  it("names the landing's seven seconds by the window its player plays (53.8–60.8 s)", () => {
+    // page.tsx fills the label with the window's rounded ends, so it cannot drift from the player.
+    const window = { from: Math.round(53.8), to: Math.round(60.8) };
+    assert.equal(fill(en.landing.seven.label, window), "Tears of Steel, 54–61 s");
+    assert.equal(fill(ko.landing.seven.label, window), "Tears of Steel, 54–61초");
   });
 
   it("names the final check the same way in the stage list and the editor", () => {
     assert.equal(en.stages.verify, "Final check");
     assert.equal(ko.stages.verify, "최종 점검");
-    assert.equal(en.stages.fix, "Apply the check");
+    assert.equal(en.stages.fix, "Rewrite flagged lines");
     assert.equal(ko.stages.fix, "점검 결과 반영");
     assert.ok(ko.editor.checked.startsWith(ko.stages.verify), ko.editor.checked);
     assert.ok(en.editor.checked.startsWith(en.stages.verify), en.editor.checked);
+  });
+
+  it("links every landing citation, and keeps Hangul out of the English ones", () => {
+    for (const catalog of [en, ko]) {
+      for (const item of catalog.landing.why) {
+        assert.ok(item.sources.length > 0, item.figure);
+        for (const source of item.sources) assert.match(source.url, /^https:\/\//, source.label);
+      }
+      // Each {name} in the footer becomes a link labelled by footerLinks.
+      for (const template of [
+        catalog.landing.footerFilm,
+        catalog.landing.footerGuides,
+        catalog.landing.footerSource,
+      ]) {
+        for (const [, name] of template.matchAll(/\{(\w+)\}/g)) {
+          assert.ok(name in catalog.landing.footerLinks, `${name} in ${template}`);
+        }
+      }
+    }
+    const english = strings([en.landing.why, en.landing.footerLinks, en.landing.footerGuides]);
+    for (const text of english) assert.doesNotMatch(text, /[\uac00-\ud7a3]/, text);
+  });
+
+  it("calls the KMCC by its name once in English, wherever the footer cites it", () => {
+    assert.match(en.landing.footerLinks.kmcc, /Korea Media and Communications Commission, KMCC/);
+  });
+
+  it("says one word for a line the check turned down, and spells out its jargon", () => {
+    for (const text of strings([en.landing, en.line, en.metrics, en.stages])) {
+      assert.doesNotMatch(text, /sen[dt]s? back|room closed|\bducks\b|Find room|Re-listen\b/, text);
+    }
+  });
+
+  it("calls one line's room the time it has, in the inspector and in a refused edit", () => {
+    assert.equal(en.line.room, "Time available");
+    for (const text of strings([en.line, en.editor])) {
+      assert.doesNotMatch(text, /^Room$|\bof room\b/, text);
+    }
+  });
+
+  it("gives the upload button one fixed name while the progress counts up", () => {
+    // UploadCard names the focused button with sendingName while sending, so a screen reader does
+    // not read each percent; the polite region announces quarters with `uploading`.
+    for (const catalog of [en, ko]) {
+      assert.doesNotMatch(catalog.upload.sendingName, /\{/, catalog.upload.sendingName);
+      assert.match(catalog.upload.uploading, /\{percent\}/);
+    }
   });
 });

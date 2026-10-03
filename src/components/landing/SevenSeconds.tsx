@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { formatClock } from "@/lib/format";
+import { PlayIcon } from "../PlayIcon";
 
 export interface NarrationLine {
   start: number;
@@ -79,6 +80,7 @@ export function SevenSeconds({
   useEffect(() => {
     if (!playing) return;
     let frame = 0;
+    let last = video.current?.currentTime ?? 0;
     const tick = () => {
       const el = video.current;
       if (!el) return;
@@ -89,6 +91,10 @@ export function SevenSeconds({
         setEnded(true);
         return;
       }
+      // Some engines (WebKit's GStreamer port) never fire `playing` after a seek's `waiting`; a clock
+      // that moves forward means sound is playing. A stall stops the clock, so "Loading…" still shows.
+      if (el.currentTime > last && !el.seeking) setLoading(false);
+      last = el.currentTime;
       setTime(el.currentTime);
       frame = requestAnimationFrame(tick);
     };
@@ -164,7 +170,9 @@ export function SevenSeconds({
         <video
           ref={video}
           src={src}
-          preload="auto"
+          // Only the metadata and the poster frame before a press: the clip is 13 MB and the window
+          // plays 7 s of it. "none" would leave the frame black and never fire loadedmetadata.
+          preload="metadata"
           playsInline
           onPlay={() => setPlaying(true)}
           onPause={() => {
@@ -241,17 +249,18 @@ export function SevenSeconds({
         {(["original", "described"] as Version[]).map((v) => {
           const active = version === v && (playing || loading);
           return (
+            // A play/pause button: its label carries the state ("Pause" while playing), so it has no
+            // aria-pressed, which would read "Pause, pressed" as if playback were paused.
             <button
               key={v}
               type="button"
               className={`button${v === "described" ? " primary" : ""}`}
-              aria-pressed={active}
               onClick={() => press(v)}
             >
               {active && loading ? (
                 <span className="spinner" aria-hidden="true" />
               ) : (
-                <span aria-hidden="true">{active ? "❚❚" : "▶"}</span>
+                <PlayIcon pause={active} />
               )}
               {active ? `${labels.pause}` : v === "original" ? labels.original : labels.described}
             </button>

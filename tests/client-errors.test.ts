@@ -92,7 +92,7 @@ describe("uploadErrorMessage", () => {
   it("says the clip length when it is known, and the page label when it is not", () => {
     assert.equal(
       uploadErrorMessage({ code: "too_long", seconds: 125 }, en, "en", labels),
-      "This clip runs 2 min 5 s; Gapline takes up to 1 min 30 s. Trim it to one scene and try again.",
+      "This clip runs 2 min 5 s; Gapline takes clips up to 90 seconds. Trim it to one scene and try again.",
     );
     assert.equal(uploadErrorMessage({ code: "too_long" }, en, "en", labels), labels.tooLong);
     assert.equal(uploadErrorMessage({ code: "unreadable" }, en, "en", labels), labels.failed);
@@ -104,7 +104,7 @@ describe("uploadErrorMessage", () => {
     }
     assert.match(
       uploadErrorMessage({ code: "too_long", seconds: 125 }, ko, "ko", labels),
-      /2분 5초.*1분 30초/,
+      /2분 5초.*90초까지/,
     );
   });
 });

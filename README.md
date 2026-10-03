@@ -53,15 +53,16 @@ Making one Korean film accessible still takes about three months, about ten spec
 
 1. Open the [live demo](https://scene-ad-117546381357.asia-northeast3.run.app). It starts with seven
    seconds of _Tears of Steel_ where nobody speaks. Play **Original sound**, then **With description**,
-   and turn on **Hide the picture** to hear it the way a blind viewer would.
+   and turn on **Eyes closed** to hear it the way a blind viewer would.
 2. Choose **Open the sample** for the full 65 seconds, with Korean and English tracks. Press play, turn
    on **Eyes closed**, and switch **Description off** and on to compare. The Korean track came from
    one automatic run: seven lines, each inside its silence, one of them rewritten by Gapline after the
    final check sent it back.
 3. Select a narration line on the timeline. You see what the model saw in the scene, every draft, the
    rule that rejected a draft with its guideline page, and the voiced length against the room it had.
-4. Choose **Try your own clip** and upload up to 90 seconds and 30 MB. A new track takes about 10 minutes.
-   New tracks share a daily allowance on the public demo; when it runs out, the sample keeps playing.
+4. Choose **Try your own clip** and upload up to 90 seconds and 30 MB. A new track usually takes 2–6
+   minutes, longer for a long or busy clip. New tracks share a daily allowance on the public demo; when
+   it runs out, the sample keeps playing.
 
 ## How the AI works
 
@@ -69,14 +70,15 @@ The model decides what to say. Plain code decides where it may be said, whether 
 how long it takes to say, and when to stop trying.
 
 1. **Hear.** Speech-to-Text (Chirp 3) returns a start and end time for every spoken word.
-2. **Re-listen.** Every silence long enough for a line is cut out with half a second on each side and
-   recognized again on its own, three at a time. Any word heard there turns that stretch back into
-   speech. Over a long stretch of audio a recognizer can attach a phrase to the wrong moment; a short
-   slice keeps it where it is spoken. Hearing never waits for watching; the two run side by side.
+2. **Re-check silences.** Every silence long enough for a line is cut out with half a second on each
+   side and recognized again on its own, three at a time. Any word heard there turns that stretch
+   back into speech. Over a long stretch of audio a recognizer can attach a phrase to the wrong
+   moment; a short slice keeps it where it is spoken. Hearing never waits for watching; the two run
+   side by side.
 3. **Watch.** Gemini 3.8 Flash watches the whole clip, picture and sound. It maps shots, on-screen
    text, key sounds, and people, with the second each name is first spoken.
-4. **Find room.** Code removes speech and story-critical sounds from the timeline, keeps a 0.25 s margin
-   around them, and skips silences shorter than 1.2 s.
+4. **Find silences.** Code removes speech and story-critical sounds from the timeline, keeps a
+   0.25 s margin around them, and skips silences shorter than 1.2 s.
 5. **Write.** Gemini writes each line for one named silence, sized to its room: Korean is counted in
    syllables and English in words, calibrated on the narrator's measured pace. A line that starts
    outside the silence it names is dropped, never moved.
@@ -90,15 +92,16 @@ how long it takes to say, and when to stop trying.
    one rewrite left, and it is voiced again. A line that still does not fit is dropped.
 8. **Final check.** The reviewer audits exactly the lines that will be heard, once. It lists lines that
    break a rule and moments the finished track still misses.
-9. **Apply the check.** Gapline rewrites each failing line from the check's fix, and can write a new
-   line for a missing moment where its silence still has free room: from 0.3 s after the last voiced
-   line before it, at least 1.0 s. Both are reviewed and voiced like any other line. The track is not
-   audited a second time; the check's list is updated with the fixes. What it still lists, such as a
-   moment with no free silence left, stays in the result, which reads **Final check · notes**, or
-   **Final check passed** when nothing is listed.
-10. **Mix.** FFmpeg lowers the film by 9 dB under each line and sets the narration to −16 LUFS. You get
-    a described MP4, a narration WAV, a WebVTT text track and a JSON script with every version and
-    verdict.
+9. **Rewrite flagged lines.** Gapline rewrites each failing line from the check's fix, and can write
+   a new line for a missing moment where its silence still has free room: from 0.3 s after the last
+   voiced line before it, at least 1.0 s. Both are reviewed and voiced like any other line. The
+   track is not audited a second time; the check's list is updated with the fixes. What it still
+   lists, such as a moment with no free silence left, stays in the result, which reads
+   **Final check · notes**, or **Final check passed** when nothing is listed.
+10. **Mix.** FFmpeg sets each line a little above the film around it (−26 to −16 LUFS) and lowers the
+    film under it until the voice is 10 LU louder, with peaks under −1 dBTP. You get
+    a described MP4 (audio tagged as audio description), a narration WAV,
+    a WebVTT text track and a JSON script with every version and verdict.
 11. **Edit (optional).** You can rewrite or move any line, bring back one the loop dropped, or remove
     one. A rewritten line is voiced at normal speed and the whole track is reviewed again. If it runs
     long or breaks a rule, Gapline returns the reason and leaves your words as they are. A removal voices
@@ -116,11 +119,11 @@ run live over server-sent events.
 Line 5 of the Korean sample track (23 September), in the room from 47.2 s to 49.83 s, where the
 screen reads "MEMORY PLAYBACK":
 
-| Step        | Line                                                             | What happened                                                                                                                                                             |
-| ----------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Draft       | "홀로그램 재생창이 뜬다." (A hologram playback window comes up.) | Passed review and was voiced in 2.32 s.                                                                                                                                   |
-| Final check | the same line                                                    | Sent back, _Viewer or camera framing_ (KMCC p.8–9): "뜬다" (comes up) frames it from the screen's side. Fix: read the text that appears on screen, like "전체 기억 재생." |
-| Fix         | "전체 기억 재생." (Full memory playback.)                        | Rewritten by Gapline from the check's fix. Passed review and was voiced in 1.74 s of its 2.63 s of room, before the mix.                                                    |
+| Step        | Line                                                             | What happened                                                                                                                                                            |
+| ----------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Draft       | "홀로그램 재생창이 뜬다." (A hologram playback window comes up.) | Passed review and was voiced in 2.32 s.                                                                                                                                  |
+| Final check | the same line                                                    | Rejected, _Viewer or camera framing_ (KMCC p.8–9): "뜬다" (comes up) frames it from the screen's side. Fix: read the text that appears on screen, like "전체 기억 재생." |
+| Fix         | "전체 기억 재생." (Full memory playback.)                        | Rewritten by Gapline from the check's fix. Passed review and was voiced in 1.74 s of its 2.63 s of room, before the mix.                                                 |
 
 Not every fix works. At 63.0 s the reviewer rejected "화면이 암전된다." (The screen goes black.) and
 "암전된다." (Goes black.) as viewer framing, then "남자가 뇌를 응시한다." (The man gazes at the brain.) as
@@ -135,7 +138,7 @@ source. The rules live in [`src/lib/pipeline/guidelines.ts`](src/lib/pipeline/gu
 
 | Rule                             | A line fails when it                                                                                                                              | Source                                                                                                                                                                                               |
 | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Reveals too early                | names a person, or reveals a plot point, before the film does (on-screen titles and signs are fine)                                               | KMCC p.7 (characters); Netflix §1.2                                                                                                                                                                  |
+| Reveals too early                | names a person, or reveals a plot point, before the film does (on-screen titles and signs are fine)                                               | KMCC p.8 (describe movement as it happens), p.7 (characters); Netflix §5.1 (foreshadowing), §1.2                                                                                                     |
 | Not on screen                    | states anything the clip does not show or let you hear, including outside knowledge of the film                                                   | KMCC p.8 (nothing beyond the picture), p.10 (review)                                                                                                                                                 |
 | Interprets instead of describing | names an emotion or judgment instead of the action or expression that shows it                                                                    | KMCC p.9 (behaviour, not feelings); Netflix §1.2                                                                                                                                                     |
 | Tense or person                  | is not in present tense and third person                                                                                                          | KMCC p.8 (present tense, neutral third person); Netflix §1.2                                                                                                                                         |
@@ -180,12 +183,12 @@ flowchart LR
 Gemini costs logged by the direct client are estimates from reported token usage and configured
 token rates. Historical evaluation figures below retain the charges recorded for those runs.
 
-| Service                                   | What it does in Gapline                                                                                                                                                                                                 |
+| Service                                   | What it does in Gapline                                                                                                                                                                                               |
 | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Cloud Run (second-generation environment) | Runs the Next.js app and FFmpeg in one container. Streams each run's progress to the browser.                                                                                                                         |
 | Speech-to-Text v2, Chirp 3                | Times every spoken word. Called at the `us` multi-region, where Chirp 3 is served.                                                                                                                                    |
 | Gemini 3.8 Flash                          | Watches the clip, writes and rewrites lines, reviews them and runs the final check, with a reasoning level set per stage.                                                                                             |
-| Text-to-Speech, Chirp 3 HD                | Speaks each line with one narrator per language. Gapline measures the returned audio.                                                                                                                                   |
+| Text-to-Speech, Chirp 3 HD                | Speaks each line with one narrator per language. Gapline measures the returned audio.                                                                                                                                 |
 | Cloud Storage                             | Holds clips, saved analysis and every run, mounted into Cloud Run as a volume. The daily allowance and edit requests use conditional writes, so two instances cannot spend the same money or run the same edit twice. |
 | Secret Manager                            | Holds the model API key.                                                                                                                                                                                              |
 | Cloud Build and Artifact Registry         | Build the container from source on every deploy.                                                                                                                                                                      |
@@ -342,7 +345,9 @@ docs/               architecture, evaluation, deployment
   [Hanbid speaking Korean](https://commons.wikimedia.org/wiki/File:WIKITONGUES-_Hanbid_speaking_Korean.webm),
   [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). Used for evaluation only; the
   clips are not in this repository.
-- Font: [Pretendard](https://github.com/orioncactus/pretendard), SIL Open Font License 1.1.
+- Font: [Pretendard](https://github.com/orioncactus/pretendard), SIL Open Font License 1.1. The
+  status marks (✓ ✗ ⚠ ↺ ↻ −) come from _Gapline Symbols_, a renamed subset of it built by
+  `scripts/build-symbol-font.py` (`src/styles/fonts/`, licence in `OFL.txt` there).
 - Review rules cite the KMCC accessible-broadcasting guideline and the Netflix Audio Description
   Style Guide v2.5.
 

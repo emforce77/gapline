@@ -1,8 +1,9 @@
+import { Fragment } from "react";
 import { fill, type UiLang } from "@/i18n";
 import type { Dictionary } from "@/i18n/en";
 import { formatSeconds } from "@/lib/format";
 import { GUIDELINE_RULES } from "@/lib/pipeline/guidelines";
-import type { Cue, CueVersion, Language } from "@/lib/pipeline/schemas";
+import type { Cue, CueVersion, Language, Violation } from "@/lib/pipeline/schemas";
 import { glossFor } from "@/components/workspace/glosses";
 
 const RULES = new Map(GUIDELINE_RULES.map((r) => [r.id, r]));
@@ -31,6 +32,20 @@ export function featuredLine(cues: Cue[]): Cue | null {
     byTime.find(rejected) ??
     null
   );
+}
+
+/**
+ * A version's violations, one group per quoted words. The reviewer lists every rule a phrase breaks,
+ * so one problem (a skyline named before it is on screen) can come back under two rules; the story
+ * tells it once, with every rule and clause it breaks.
+ */
+export function problems(violations: Violation[]): Violation[][] {
+  const byQuote = new Map<string, Violation[]>();
+  for (const v of violations) {
+    const quote = v.quote.trim();
+    byQuote.set(quote, [...(byQuote.get(quote) ?? []), v]);
+  }
+  return [...byQuote.values()];
 }
 
 /** What became of a rejected version, told by who made the next one; null when nothing follows. */
@@ -73,6 +88,7 @@ export function RejectionStory({
     <ol className="story">
       {cue.versions.map((version, i) => {
         const failed = version.review && !version.review.pass;
+        const groups = failed ? problems(version.review!.violations) : [];
         const step = nextStep(version, cue.versions[i + 1]);
         // The measured ending belongs to the version that shipped, whoever wrote it.
         const shipped = i === last && cue.status === "fits" ? version.voice : undefined;
@@ -84,30 +100,38 @@ export function RejectionStory({
             <p className="story-text">
               <Text text={version.text} lang={lang} textLang={language} />
             </p>
-            {failed
-              ? version.review!.violations.map((v, j) => {
-                  const rule = RULES.get(v.rule);
-                  return (
-                    <div key={j} className="story-verdict">
-                      <p className="story-rule">
-                        <span aria-hidden="true">✗ </span>
-                        {sentBackByFinalCheck(version) ? r.sentBack : r.rejected}:{" "}
-                        <strong>{rule?.title[lang] ?? v.rule}</strong>
-                      </p>
-                      <p className="story-source label">{rule?.source[lang]}</p>
-                      <p className="story-reason">
-                        <Text text={v.reason} lang={lang} textLang={language} />
-                      </p>
-                      {version.review!.fix ? (
-                        <p className="story-fix">
-                          <span className="label">{r.suggestion}: </span>
-                          <Text text={version.review!.fix} lang={lang} textLang={language} />
-                        </p>
-                      ) : null}
-                    </div>
-                  );
-                })
-              : null}
+            {groups.map((group, j) => (
+              <div key={j} className="story-verdict">
+                <p className="story-rule">
+                  <span aria-hidden="true">✗ </span>
+                  {sentBackByFinalCheck(version) ? r.sentBack : r.rejected}:{" "}
+                  {group.map((v, k) => (
+                    <Fragment key={k}>
+                      {k > 0 ? " / " : null}
+                      <strong>{RULES.get(v.rule)?.title[lang] ?? v.rule}</strong>
+                    </Fragment>
+                  ))}
+                </p>
+                {group.map((v, k) => (
+                  <p key={k} className="story-source label">
+                    {RULES.get(v.rule)?.source[lang]}
+                  </p>
+                ))}
+                {/* One reason: two rules on the same words word one problem twice (on the pinned
+                    sample, "not shown until the cut at 17.5 s" and "not visible at 15.0 s"); the
+                    titles and clauses above name every rule it breaks. */}
+                <p className="story-reason">
+                  <Text text={group[0].reason} lang={lang} textLang={language} />
+                </p>
+                {/* A review has one fix, however many problems it lists: told once, last. */}
+                {j === groups.length - 1 && version.review!.fix ? (
+                  <p className="story-fix">
+                    <span className="label">{r.suggestion}: </span>
+                    <Text text={version.review!.fix} lang={lang} textLang={language} />
+                  </p>
+                ) : null}
+              </div>
+            ))}
             {version.review?.pass ? (
               <p className="story-pass">
                 <span aria-hidden="true">✓ </span>

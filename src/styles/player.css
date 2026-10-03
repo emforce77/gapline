@@ -4,6 +4,11 @@
   gap: 10px;
 }
 
+/* Focusable only so a click on the picture brings the player's keys into reach; no ring for that. */
+.player:focus {
+  outline: none;
+}
+
 .player-frame {
   position: relative;
   border-radius: var(--radius);
@@ -12,10 +17,15 @@
   border: 1px solid var(--border);
 }
 
+/*
+ * The clip's own shape (Player.tsx sets --clip-ratio from the video; the sample's 2.39 until then),
+ * no taller than 70% of the screen: a portrait clip is centred between black bars.
+ */
 .player-frame video {
   display: block;
-  width: 100%;
-  aspect-ratio: 2.39 / 1;
+  width: min(100%, calc(70svh * var(--clip-ratio, 2.39)));
+  aspect-ratio: var(--clip-ratio, 2.39);
+  margin-inline: auto;
   background: #000;
   cursor: pointer;
 }
@@ -60,10 +70,12 @@
 }
 
 /* The line being spoken, under the picture: followable with the sound off. */
+/* The tag sits beside the text while the text keeps about 16 characters' room, above it otherwise. */
 .caption-strip {
   display: flex;
+  flex-wrap: wrap;
   align-items: baseline;
-  gap: 12px;
+  gap: 2px 12px;
   min-height: 52px;
   padding: 12px 16px;
   border: 1px solid var(--border);
@@ -79,6 +91,8 @@
 }
 
 .caption-text {
+  flex: 1 1 16rem;
+  min-width: 0;
   font-size: var(--step-1);
   color: var(--muted);
 }
@@ -134,6 +148,16 @@
     flex-basis: 100%;
     order: 4;
   }
+}
+
+/* A finger: a taller slider to hit, and no keyboard hint (a touch screen has no keys to press). */
+@media (pointer: coarse) {
+  .player-seek {
+    height: 44px;
+  }
+}
+
+@media (hover: none) and (pointer: coarse) {
   .keys-hint {
     display: none;
   }

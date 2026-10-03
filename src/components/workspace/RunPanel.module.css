@@ -1,0 +1,12 @@
+/* Generate keeps focus while its run goes: marked disabled, not disabled; its label says why. */
+.generate[aria-disabled="true"] {
+  cursor: progress;
+}
+
+.generate:global(.primary)[aria-disabled="true"]:hover {
+  background: var(--accent);
+}
+
+.generate:global(.ghost)[aria-disabled="true"]:hover {
+  background: transparent;
+}

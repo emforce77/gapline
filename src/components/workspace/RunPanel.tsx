@@ -4,21 +4,30 @@ import { fill } from "@/i18n";
 import { useI18n } from "@/i18n/client";
 import type { Density, Language } from "@/lib/pipeline/schemas";
 import type { RunListing } from "@/lib/store/projects";
+import { orderRuns } from "./labels";
+import styles from "./RunPanel.module.css";
 
 type Mode = "idle" | "live" | "replay";
+
+/** The version list's entry for a run being made, or one that ended without a result. */
+const NEW_VERSION = "new";
 
 /**
  * Which result is shown and how to make another. Once a result exists, playing it is the primary
  * action (in the player); generating again is a paid live run, so it stays secondary and says so.
+ * While the page is busy (a run or an edit), Generate is marked disabled but keeps its focus, so a
+ * keyboard user stays where they pressed; while a run cannot start (`blocked`), it is disabled.
  */
 export function RunPanel({
   runs,
   labels,
   current,
+  unfinished,
   narration,
   density,
   mode,
   busy,
+  blocked,
   canReplay,
   replaySpeed,
   emptyHint,
@@ -33,10 +42,17 @@ export function RunPanel({
   runs: RunListing[];
   labels: Map<string, string>;
   current: RunListing | null;
+  /**
+   * The page shows a run that ended without a result (stopped, or no longer answering): the list
+   * marks it instead of `current`, so picking `current` opens that result again.
+   */
+  unfinished: boolean;
   narration: Language;
   density: Density;
   mode: Mode;
   busy: boolean;
+  /** A run cannot start now: the viewer's own is still going, or today's allowance is spent. */
+  blocked: boolean;
   canReplay: boolean;
   replaySpeed: number;
   emptyHint: string | null;
@@ -49,21 +65,29 @@ export function RunPanel({
   onStopReplay: () => void;
   onGenerate: () => void;
 }) {
-  const { t } = useI18n();
-  const shown = runs.filter((r) => r.language === narration && r.density === density);
+  const { t, lang } = useI18n();
+  const shown = orderRuns(runs.filter((r) => r.language === narration && r.density === density));
+  const live = mode === "live";
+  // The version list's entry for a run that has no result to choose.
+  const pending = live ? t.workspace.newVersion : unfinished ? t.workspace.unfinishedVersion : null;
   return (
     <div className="run-panel">
       {shown.length ? (
         <label className="result-picker">
           {t.editor.history}
           <select
-            value={current?.runId ?? ""}
+            value={pending ? NEW_VERSION : (current?.runId ?? "")}
             disabled={busy || mode === "replay"}
             onChange={(e) => onChooseRun(e.target.value)}
           >
             <option value="" disabled>
               —
             </option>
+            {pending ? (
+              <option value={NEW_VERSION} disabled>
+                {pending}
+              </option>
+            ) : null}
             {shown.map((r) => (
               <option key={r.runId} value={r.runId} title={r.runId}>
                 {labels.get(r.runId)}
@@ -78,7 +102,8 @@ export function RunPanel({
             {t.workspace.narration}
           </span>
           <div className="segmented" role="group" aria-labelledby="narration-label">
-            {(["ko", "en"] as Language[]).map((l) => (
+            {/* The page's language first, as on the landing. */}
+            {([lang, lang === "en" ? "ko" : "en"] as Language[]).map((l) => (
               <button
                 key={l}
                 type="button"
@@ -125,11 +150,14 @@ export function RunPanel({
         ) : null}
         <button
           type="button"
-          className={current ? "button ghost" : "button primary"}
-          disabled={busy || mode === "replay"}
-          onClick={onGenerate}
+          className={`${current ? "button ghost" : "button primary"} ${styles.generate}`}
+          aria-disabled={busy || undefined}
+          disabled={blocked || mode === "replay"}
+          onClick={() => {
+            if (!busy) onGenerate();
+          }}
         >
-          {busy ? (
+          {live ? (
             <>
               <span className="spinner" aria-hidden="true" /> {t.workspace.generating}
             </>

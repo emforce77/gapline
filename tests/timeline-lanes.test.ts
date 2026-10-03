@@ -31,6 +31,15 @@ describe("stackCueBoxes", () => {
     assert.equal(lanes.get("L8"), 0);
   });
 
+  it("keeps the wider touch spacing between boxes on one lane", () => {
+    const touching = [
+      { id: "a", left: 0, right: 36 },
+      { id: "b", left: 40, right: 76 },
+    ];
+    assert.equal(stackCueBoxes(touching).count, 1);
+    assert.equal(stackCueBoxes(touching, 8).count, 2);
+  });
+
   it("reports one lane when there is nothing to place", () => {
     assert.equal(stackCueBoxes([]).count, 1);
   });

@@ -12,7 +12,7 @@
 .tl-labels,
 .tl-body {
   display: grid;
-  grid-template-rows: 20px 48px 22px 46px;
+  grid-template-rows: 20px 48px 32px 46px;
   row-gap: 8px;
 }
 
@@ -26,8 +26,9 @@
   align-items: center;
 }
 
-/* The narration row is the room row: its label names both. */
-.tl-labels .tl-label-room {
+/* The narration row is the room row: its label names both. The speech row says it is recognized. */
+.tl-labels .tl-label-room,
+.tl-labels .tl-label-speech {
   flex-direction: column;
   align-items: flex-start;
   justify-content: center;
@@ -36,7 +37,13 @@
   font-weight: 600;
 }
 
-.tl-label-room small {
+.tl-labels .tl-label-speech {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.tl-label-room small,
+.tl-label-speech small {
   font-size: 11px;
   font-weight: 500;
   color: var(--muted);
@@ -77,9 +84,30 @@
 }
 
 .tl-picture {
-  background-size: 100% 100%;
-  background-repeat: no-repeat;
   opacity: 0.85;
+}
+
+/* Whole thumbnails side by side (PictureLane.tsx), each cropped to its slot, never stretched. */
+.picture-lane {
+  overflow: hidden;
+}
+
+.picture-frame {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.picture-frame img {
+  position: absolute;
+  max-width: none;
+  user-select: none;
+}
+
+/* Eyes closed hides the picture everywhere, the timeline's thumbnails too. */
+.ws-left:has(.eyes-closed) .tl-picture .picture-frame {
+  visibility: hidden;
 }
 
 .tl-dialogue {
@@ -95,6 +123,18 @@
 .tl-dialogue.relisten {
   background: repeating-linear-gradient(-45deg, var(--dialogue) 0 2px, transparent 2px 5px);
   box-shadow: inset 0 0 0 1px var(--dialogue);
+}
+
+/* A clip without sound has an empty speech row; it says why instead of looking unfinished. */
+.tl-soundless {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  padding: 0 8px;
+  font-size: 11px;
+  line-height: 1.2;
+  color: var(--muted);
 }
 
 .tl-room {
@@ -124,7 +164,7 @@
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  min-width: 24px;
+  min-width: var(--cue-min, 24px);
   padding: 0 7px;
   border-radius: 4px;
   border: 1px solid var(--accent);
@@ -144,17 +184,18 @@
 
 /*
  * Lines too close to sit side by side on screen (a phone gives about 4 px per second, a box is at
- * least 24 px) stack in lanes; Timeline.tsx sets --lanes on the timeline and --lane on each box.
+ * least --cue-min wide) stack in lanes; Timeline.tsx sets --lanes, --cue-min and --lane-pitch on the
+ * timeline (larger on a touch screen, which always uses lanes) and --lane on each box.
  */
 .timeline.stacked .tl-labels,
 .timeline.stacked .tl-body {
-  grid-template-rows: 20px 48px 22px calc(16px + var(--lanes) * 26px);
+  grid-template-rows: 20px 48px 32px calc(16px + var(--lanes) * var(--lane-pitch, 26px));
 }
 
 .timeline.stacked .tl-narration .cue {
-  top: calc(14px + var(--lane) * 26px);
+  top: calc(14px + var(--lane) * var(--lane-pitch, 26px));
   bottom: auto;
-  height: 24px;
+  height: var(--cue-min, 24px);
 }
 
 .cue.approved {
@@ -218,10 +259,24 @@
   .tl-tick.minor {
     display: none;
   }
-  .tl-room-label {
-    display: none;
+}
+
+/*
+ * Forced colours (Windows High Contrast) drop background colours and shadows: the dialogue bars get
+ * an outline (dashed when re-listened), the playhead and the line being spoken keep a visible mark.
+ */
+@media (forced-colors: active) {
+  .tl-dialogue {
+    border: 1px solid CanvasText;
   }
-  .tl-labels .tl-label-room small {
-    display: none;
+  .tl-dialogue.relisten {
+    border-style: dashed;
+  }
+  .tl-playhead {
+    forced-color-adjust: none;
+    background: CanvasText;
+  }
+  .cue.speaking {
+    border-width: 3px;
   }
 }

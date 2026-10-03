@@ -1,12 +1,14 @@
 "use client";
 
+import { Fragment } from "react";
 import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { formatSeconds } from "@/lib/format";
 import { GUIDELINE_RULES } from "@/lib/pipeline/guidelines";
 import type { Cue, CueVersion, Language } from "@/lib/pipeline/schemas";
 import { diffWords } from "./diff";
-import { Gloss } from "./glosses";
+import { Gloss, glossFor } from "./glosses";
+import { languageName } from "./labels";
 
 const RULES = new Map(GUIDELINE_RULES.map((r) => [r.id, r]));
 
@@ -20,6 +22,7 @@ function VersionText({
   previous: CueVersion | undefined;
   language: Language | null;
 }) {
+  const { t, lang } = useI18n();
   // A removal keeps the words that were taken out; they are struck, not diffed.
   if (version.by === "remove") {
     return (
@@ -35,18 +38,51 @@ function VersionText({
       </p>
     );
   }
+  const parts = diffWords(previous.text, version.text);
   return (
     <p className="version-text" lang={language ?? undefined}>
-      {diffWords(previous.text, version.text).map((part, i) =>
-        part.kind === "same" ? (
-          <span key={i}>{part.text}</span>
-        ) : part.kind === "added" ? (
-          <ins key={i}>{part.text}</ins>
-        ) : (
-          <del key={i}>{part.text}</del>
-        ),
-      )}
+      {parts.map((part, i) => (
+        <Fragment key={i}>
+          {part.kind === "same" ? (
+            <span>{part.text}</span>
+          ) : part.kind === "added" ? (
+            <ins>
+              <span className="sr-only" lang={lang}>
+                {t.editor.diff.added}{" "}
+              </span>
+              {part.text}
+            </ins>
+          ) : (
+            <del>
+              <span className="sr-only" lang={lang}>
+                {t.editor.diff.removed}{" "}
+              </span>
+              {part.text}
+            </del>
+          )}
+          {/* A changed last word has no space after it: a real one keeps "skyline. ascends." apart
+              for screen readers, Braille and copying, outside the struck or underlined words. */}
+          {i < parts.length - 1 && !/\s$/.test(part.text) ? " " : null}
+        </Fragment>
+      ))}
     </p>
+  );
+}
+
+/**
+ * Under a reviewer's note in the narration's language: its English gloss when the page has one; when
+ * it has none and the page is in another language, a label that says which language the note is in,
+ * so an untranslated note reads as the reviewer's own words, not as a glitch.
+ */
+export function NoteGloss({ text, textLang }: { text: string; textLang: Language | null }) {
+  const { t, lang } = useI18n();
+  if (!textLang || textLang === lang) return null;
+  const gloss = glossFor(text, lang, textLang);
+  if (gloss) return <span className="gloss">{gloss}</span>;
+  return (
+    <span className="label note-language">
+      {fill(t.editor.reviewerLanguage, { language: languageName(textLang, lang) })}
+    </span>
   );
 }
 
@@ -115,7 +151,7 @@ export function VersionHistory({ cue, language }: { cue: Cue; language: Language
                             “{v.quote}”
                           </span>
                           <span lang={language ?? undefined}>{v.reason}</span>
-                          <Gloss text={v.reason} pageLang={lang} textLang={language} />
+                          <NoteGloss text={v.reason} textLang={language} />
                           <span className="label">{rule?.source[lang]}</span>
                         </li>
                       );
@@ -124,7 +160,7 @@ export function VersionHistory({ cue, language }: { cue: Cue; language: Language
                   {version.review.fix ? (
                     <p className="fix">
                       {t.line.fix}: <span lang={language ?? undefined}>{version.review.fix}</span>
-                      <Gloss text={version.review.fix} pageLang={lang} textLang={language} />
+                      <NoteGloss text={version.review.fix} textLang={language} />
                     </p>
                   ) : null}
                 </div>

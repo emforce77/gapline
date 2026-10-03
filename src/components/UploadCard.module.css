@@ -5,6 +5,22 @@
   background: var(--surface-2);
 }
 
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 8px;
+}
+
+/* aria-disabled while uploading (focus stays on it): looks like the disabled state. */
+.choose[aria-disabled="true"] {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.choose[aria-disabled="true"]:hover {
+  background: var(--surface-2);
+}
+
 .progress {
   display: block;
   width: 100%;

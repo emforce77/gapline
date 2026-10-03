@@ -9,9 +9,22 @@ export const enEditor = {
   title: "Edit this line",
   text: "Description",
   start: "Start (seconds)",
-  startRange: "Can start: {min}–{max} s",
+  /** The same starts the field takes and a placement refusal names; {end} is where the room ends. */
+  startRange: "Start between {first} and {last} s; the spoken line has to end by {end} s.",
   save: "Review and re-voice",
-  saving: "Reviewing your edit… {elapsed}",
+  /** The button while an edit runs; the step is told from its usual timing (see use-elapsed.ts). */
+  saving: {
+    voicing: "Voicing… {elapsed}",
+    reviewing: "Reviewing… {elapsed}",
+    long: "Still reviewing… {elapsed}",
+  },
+  /** Under the button while an edit runs: what Gapline is doing, announced once per step. */
+  progress: {
+    voicing:
+      "Voicing your words and measuring how long they run. Then Gapline reviews the whole track again and mixes it.",
+    reviewing: "Reviewing the whole track again, then mixing. This usually takes about a minute.",
+    long: "This review is taking longer than most; some take three minutes or more.",
+  },
   saved: "Saved as a new result.",
   hint: "A new result preserves the original. Only this line is re-voiced; your words are never automatically shortened.",
   legacy: "Generate a new result to edit lines with missing audio.",
@@ -20,30 +33,65 @@ export const enEditor = {
   remove: {
     open: "Remove this line",
     confirm:
-      "Remove this line from the narration? Gapline makes a new result without it and checks again what the track still misses. The current result stays as it is.",
+      "Remove this line from the narration? Gapline saves a new result without it and checks again what the track now misses. Your current result is kept.",
     yes: "Remove line",
     no: "Keep it",
-    removing: "Removing and re-checking… {elapsed}",
+    removing: {
+      reviewing: "Re-checking… {elapsed}",
+      long: "Still re-checking… {elapsed}",
+    },
+    progress: {
+      reviewing:
+        "Reviewing the track again without this line, then mixing. This usually takes about a minute.",
+      long: "This review is taking longer than most; some take three minutes or more.",
+    },
   },
+  /** Beside a reviewer's note written in the narration's language, when the page has no gloss of it. */
+  reviewerLanguage: "Reviewer's note in {language}",
+  /** Read before each change in a version's words, so a screen reader says what was struck or added. */
+  diff: { removed: "removed:", added: "added:" },
   history: "Result version",
   reviewNeeded: "Final check · notes",
   checked: "Final check passed",
   autoFixed: "After the final check, Gapline fixed {lines} on its own.",
   lines: { one: "1 line", other: "{n} lines" },
-  missingLead: "It also noted moments that have no line:",
+  missingLead: "Moments that still have no line:",
   failingLead: "Lines it still flags:",
+  takenOutLead: "Lines Gapline took out instead of fixing:",
+  unvoicedLead: "Lines Gapline wrote but did not voice:",
+  noLines: "No description was added",
+  noLinesWhy: {
+    no_room:
+      "This clip has no pause of about {pause} or more without speech or a key sound, so there is nowhere a line could be spoken.",
+    unwritten: "Gapline found {room} without speech but wrote no line for it.",
+    removed: "An editor removed every line.",
+    dropped:
+      "Every line Gapline wrote was too long for its silence or still broke a rule after rewriting, so none is voiced. Choose a line to try other words.",
+  },
+  littleCovered: "Only part of this clip is described",
+  coverage:
+    "Narration: {lines}, {narrated} in all. It speaks only where nobody else does: {room} of this {clip} clip.",
+  checkedNote: "The final check passed.",
   optional: "You can still change any line.",
   noRoom: "no free silence left here",
   uncertainty: "API cost is unresolved; the displayed amount is a known subtotal.",
   seek: "Playback position",
+  /** The slider's spoken value, in words: screen readers read "0:15.4" as digits. */
+  seekValue: "{time} of {total}",
   track: "Audio track",
   picture: "Picture visibility",
   failed: "The edit could not be completed. Your original is preserved.",
   errors: {
     too_long:
-      "Spoken, these words run past the {room} of room from {start}. Shorten them or start earlier.",
+      "Spoken, these words run longer than the {room} s available from {start} s. Shorten them or start earlier.",
+    spoken:
+      "Spoken, these words take {spoken} s, but from {start} s there are only {room} s. Cut about {over} s.",
+    spokenEarlier:
+      "Spoken, these words take {spoken} s, but from {start} s there are only {room} s. Cut about {over} s, or start at {latest} s or earlier.",
     review:
       "The reviewer rejected these words. Gapline does not rewrite an editor's words; change them and try again.",
+    why: "Why",
+    suggestion: "Suggested fix",
     placement:
       "The start has to stay between {min} and {max} seconds, clear of the lines around it.",
     unchanged: "Change the words or the start time first.",
@@ -56,9 +104,19 @@ export const koEditor: Dictionary["editor"] = {
   title: "이 문장 수정",
   text: "해설 문장",
   start: "시작 시각(초)",
-  startRange: "시작 가능: {min}–{max}초",
+  startRange: "{first}초에서 {last}초 사이에 시작하고, 낭독은 {end}초까지 끝나야 합니다.",
   save: "다시 검수 · 다시 낭독",
-  saving: "수정 문장을 검수하는 중… {elapsed}",
+  saving: {
+    voicing: "낭독 중… {elapsed}",
+    reviewing: "검수 중… {elapsed}",
+    long: "아직 검수 중… {elapsed}",
+  },
+  progress: {
+    voicing:
+      "고친 문장을 낭독하고 길이를 재고 있습니다. 이어서 트랙 전체를 다시 검수하고 믹스합니다.",
+    reviewing: "트랙 전체를 다시 검수한 뒤 믹스합니다. 보통 1분쯤 걸립니다.",
+    long: "평소보다 검수가 오래 걸리고 있습니다. 3분 넘게 걸리기도 합니다.",
+  },
   saved: "새 결과로 저장했습니다.",
   hint: "원본은 그대로 두고 새 결과를 만듭니다. 이 문장만 다시 낭독하고, 고친 문장은 자동으로 줄이지 않습니다.",
   legacy: "문장별 음성이 없는 결과입니다. 새로 생성한 뒤 편집할 수 있습니다.",
@@ -70,27 +128,58 @@ export const koEditor: Dictionary["editor"] = {
       "이 문장을 해설에서 뺄까요? 이 문장을 뺀 새 결과를 만들고, 트랙에서 빠진 정보를 다시 점검합니다. 지금 결과는 그대로 남습니다.",
     yes: "삭제",
     no: "취소",
-    removing: "삭제하고 다시 점검하는 중… {elapsed}",
+    removing: {
+      reviewing: "다시 점검 중… {elapsed}",
+      long: "아직 점검 중… {elapsed}",
+    },
+    progress: {
+      reviewing: "이 문장을 뺀 트랙 전체를 다시 검수한 뒤 믹스합니다. 보통 1분쯤 걸립니다.",
+      long: "평소보다 검수가 오래 걸리고 있습니다. 3분 넘게 걸리기도 합니다.",
+    },
   },
+  reviewerLanguage: "검수 의견 원문({language})",
+  diff: { removed: "삭제:", added: "추가:" },
   history: "결과 버전",
   reviewNeeded: "최종 점검 · 참고",
   checked: "최종 점검 통과",
   autoFixed: "최종 점검 뒤 갭라인이 {lines}을 스스로 고쳤습니다.",
   lines: { one: "1문장", other: "{n}문장" },
-  missingLead: "해설이 없는 순간도 적어 두었습니다:",
+  missingLead: "아직 해설이 없는 순간:",
   failingLead: "여전히 지적된 문장:",
+  takenOutLead: "고치지 못해 갭라인이 뺀 문장:",
+  unvoicedLead: "갭라인이 썼지만 낭독하지 않은 문장:",
+  noLines: "해설을 넣지 못했습니다",
+  noLinesWhy: {
+    no_room:
+      "이 클립에는 말소리나 중요한 소리 없이 약 {pause} 이상 이어지는 구간이 없어 해설을 넣을 자리가 없습니다.",
+    unwritten: "말소리가 없는 구간 {room}을 찾았지만 해설 문장을 쓰지 않았습니다.",
+    removed: "편집자가 모든 문장을 삭제했습니다.",
+    dropped:
+      "갭라인이 쓴 문장이 모두 침묵보다 길거나 다시 써도 조항을 어겨, 낭독한 문장이 없습니다. 문장을 골라 다른 표현으로 고쳐 볼 수 있습니다.",
+  },
+  littleCovered: "클립의 일부에만 해설이 들어갔습니다",
+  coverage:
+    "해설 {lines}, 모두 {narrated}. 해설은 아무도 말하지 않는 구간에만 들어가며, 이 {clip} 클립에서 그런 구간은 {room}입니다.",
+  checkedNote: "최종 점검을 통과했습니다.",
   optional: "어떤 문장이든 직접 고칠 수 있습니다.",
   noRoom: "남은 침묵이 없음",
   uncertainty: "API 비용이 미확정입니다. 표시 금액은 확인된 비용의 합계입니다.",
   seek: "재생 위치",
+  seekValue: "{total} 중 {time}",
   track: "음성 트랙",
   picture: "화면 표시",
   failed: "수정을 완료하지 못했습니다. 원본은 보존되어 있습니다.",
   errors: {
     too_long:
-      "읽는 시간이 {start}부터 남은 자리({room})보다 깁니다. 문장을 줄이거나 더 일찍 시작해 주세요.",
+      "읽는 시간이 {start}초부터 남은 자리({room}초)보다 깁니다. 문장을 줄이거나 더 일찍 시작해 주세요.",
+    spoken:
+      "읽으면 {spoken}초가 걸리는데, {start}초부터 남은 자리는 {room}초뿐입니다. 약 {over}초 줄여 주세요.",
+    spokenEarlier:
+      "읽으면 {spoken}초가 걸리는데, {start}초부터 남은 자리는 {room}초뿐입니다. 약 {over}초 줄이거나, {latest}초까지 앞당겨 시작해 주세요.",
     review:
       "검수에서 반려되었습니다. 갭라인은 편집자의 문장을 대신 고치지 않으니, 직접 고친 뒤 다시 시도해 주세요.",
+    why: "이유",
+    suggestion: "수정 제안",
     placement: "시작 시각은 앞뒤 문장과 겹치지 않게 {min}초에서 {max}초 사이여야 합니다.",
     unchanged: "문장이나 시작 시각을 바꾼 뒤 저장해 주세요.",
     busy: "이 수정은 아직 처리 중입니다. 잠시 후 페이지를 새로 고쳐 확인해 주세요.",

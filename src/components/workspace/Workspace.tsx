@@ -1,11 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { flushSync } from "react-dom";
 import { fill } from "@/i18n";
 import { useI18n } from "@/i18n/client";
-import { fetchRun } from "@/lib/client/run-stream";
+import {
+  fetchFinishedRun,
+  fetchRunList,
+  findSavedRun,
+  READ_RETRY_DELAYS_MS,
+} from "@/lib/client/run-stream";
+import { pinRunInUrl, runInUrl, unpinRunInUrl } from "@/lib/client/run-url";
 import { useLiveRun } from "@/lib/client/use-live-run";
+import { usePendingEdit } from "@/lib/client/use-pending-edit";
 import type { TimedRunEvent } from "@/lib/pipeline/events";
 import { findGaps } from "@/lib/pipeline/gaps";
 import {
@@ -14,19 +21,29 @@ import {
   interruptRun,
   loseRun,
   reduceRun,
-  STAGES,
   type RunView,
 } from "@/lib/pipeline/reduce";
 import type { Density, Language, SceneMap, SpeechSegment } from "@/lib/pipeline/schemas";
 import type { Project, RunListing } from "@/lib/store/projects";
+import { runFinishedAnnouncement, stageAnnouncement } from "./announcements";
 import { EditLine } from "./CueEditor";
 import { LineDetail, StageList } from "./Inspector";
 import { languageName, lineNumbers, sampleRunFigures } from "./labels";
+import { LinePicker } from "./LinePicker";
 import { LiveRunNotices, littleRoomOf } from "./LiveRunNotices";
 import { Player, type PlayerHandle } from "./Player";
+import {
+  isOlderSnapshot,
+  listAfterRun,
+  settingKey,
+  shownRun,
+  type ShownSnapshot,
+} from "./run-choice";
+import { RunAlert, type Alert } from "./RunAlert";
 import { RunPanel } from "./RunPanel";
 import { Coverage, Downloads, EditSummary, Metrics, QualityNote } from "./RunResult";
-import { CuePicker, Timeline } from "./Timeline";
+import { Timeline } from "./Timeline";
+import { useAnnouncer } from "./use-announcer";
 import { useRunLabels } from "./useRunLabels";
 import { WorkspaceHeader } from "./WorkspaceHeader";
 
@@ -35,6 +52,12 @@ const REPLAY_TARGET_SECONDS = 24;
 const MIN_REPLAY_SPEED = 4;
 /** "Play from here" starts this long before the line, so its lead-in is heard. */
 const PLAY_LEAD_IN_SECONDS = 1;
+/**
+ * Waits before each new read of a listed result that came back unfinished: about a minute in all,
+ * as long as another instance's storage view can lag (its 60 s metadata cache). A busy answer is
+ * retried for about seven seconds (READ_RETRY_DELAYS_MS) before the page says so.
+ */
+const STALE_RUN_RETRY_DELAYS_MS: readonly number[] = [1_000, 2_000, 4_000, 8_000, 15_000, 30_000];
 
 type Mode = "idle" | "live" | "replay";
 
@@ -43,55 +66,77 @@ export function Workspace({
   initialRuns,
   analysis,
   measured,
+  measuredHere,
   initialRunId,
+  missingRunId,
+  pins,
 }: {
   project: Project;
   initialRuns: RunListing[];
   analysis: { speech: SpeechSegment[]; scene: SceneMap } | null;
-  /** The run the empty panel's "the sample took … and cost …" line quotes (see sampleRunFigures). */
+  /** The run the empty panel's "… took … and cost …" line quotes (see sampleRunFigures). */
   measured: RunListing | null;
+  /** `measured` is this clip's own run; otherwise it is the sample's. */
+  measuredHere: boolean;
+  /** A finished result to open on, or a run of this viewer's that has not finished (followed). */
   initialRunId?: string;
+  /** The ?run= of the link, when it names nothing this viewer can open. */
+  missingRunId?: string;
+  /** The sample's pinned run per narration language: the default result for that language. */
+  pins: Record<string, string>;
 }) {
   const { t, lang } = useI18n();
   const pinned = initialRuns.find((r) => r.runId === initialRunId);
   const [narration, setNarration] = useState<Language>((pinned?.language as Language) ?? lang);
   const [density, setDensity] = useState<Density>((pinned?.density as Density) ?? "standard");
   const [runs, setRuns] = useState(initialRuns);
+  // The version shown for each narration language and density (settingKey), once one is chosen.
+  const [chosen, setChosen] = useState<Record<string, string>>(
+    pinned ? { [settingKey(pinned)]: pinned.runId } : {},
+  );
   const [events, setEvents] = useState<TimedRunEvent[] | null>(null);
   const [view, setView] = useState<RunView | null>(null);
+  // The finished result shown before a live run began: it stays playable until the new one is ready.
+  const [held, setHeld] = useState<RunView | null>(null);
   // A run named in the address without a finished result is followed from the first render.
   const resuming = Boolean(initialRunId) && !pinned;
   const [mode, setMode] = useState<Mode>(resuming ? "live" : "idle");
   const [replaySpeed, setReplaySpeed] = useState(1);
   const [selected, setSelected] = useState<string | null>(null);
   const [time, setTime] = useState(0);
-  // The alert under the player. `ownFailure`: it is the stopped run's own reason (not a refused
-  // start or a load error), the only case a retry of that run answers. Only then does the notice
-  // on whether a run could start show beside it; a refusal already says why none can. `lostRunId`:
-  // the page stopped checking on that run because the server could not be reached.
-  const [error, setError] = useState<{
-    message: string;
-    ownFailure: boolean;
-    lostRunId?: string;
-  } | null>(null);
+  const [error, setError] = useState<Alert | null>(
+    missingRunId ? { message: t.live.notFound, ownFailure: false } : null,
+  );
   const [editing, setEditing] = useState(false);
-  const [chosenRunId, setChosenRunId] = useState<string | null>(initialRunId ?? null);
-  const [announcement, setAnnouncement] = useState("");
+  // Edits found after a reload that have since ended; the run list is not read again for them.
+  const [settledEdits, setSettledEdits] = useState<string[]>([]);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const { announcement, announce } = useAnnouncer();
   const player = useRef<PlayerHandle>(null);
   const stageList = useRef<HTMLOListElement>(null);
   const timers = useRef<number[]>([]);
-  const viewBeforeRun = useRef<RunView | null>(null);
   // Counts live runs begun on this page. A shown result's fetch that resolves after one began
   // must not replace the live view with the old run's stages.
   const liveRuns = useRef(0);
+  // The followed run's saved events so far, and how much of it is on screen (polls can lag).
+  const liveEvents = useRef<TimedRunEvent[]>([]);
+  const liveShown = useRef<ShownSnapshot>({ events: 0, done: false });
+  // The line to open again once a saved edit's result has loaded.
+  const reselect = useRef<string | null>(null);
+  const pickHint = useId();
   const { labels, notes } = useRunLabels(project.id, runs);
 
-  const current =
-    runs.find(
-      (r) => r.runId === chosenRunId && r.language === narration && r.density === density,
-    ) ??
-    runs.find((r) => r.language === narration && r.density === density && r.summary) ??
-    null;
+  const current = shownRun(runs, { language: narration, density }, chosen, pins);
+  // The result the address names (or, with no ?run=, the one it opens on): the address is written
+  // only when the shown result changes.
+  const pinnedInUrl = useRef<string | null>((resuming ? initialRunId : current?.runId) ?? null);
+  // The result being fetched, or fetched, to play while a run is made (held), when none was loaded.
+  const holding = useRef<string | null>(null);
+
+  /** Shows `run` for its narration language and density from now on. */
+  const choose = useCallback((run: { runId: string; language: string; density: string }) => {
+    setChosen((c) => ({ ...c, [settingKey(run)]: run.runId }));
+  }, []);
 
   const stopReplay = useCallback(() => {
     timers.current.forEach((id) => window.clearTimeout(id));
@@ -100,80 +145,145 @@ export function Workspace({
 
   useEffect(() => stopReplay, [stopReplay]);
 
+  // A link to a run the server could not find: say so (the alert) and stop naming it. After Back
+  // or Forward the props can predate the address, so a finished run the address names is shown.
+  useEffect(() => {
+    if (missingRunId) {
+      unpinRunInUrl();
+      return;
+    }
+    const named = runs.find((r) => r.runId === runInUrl());
+    if (!named || named.runId === initialRunId) return;
+    pinnedInUrl.current = named.runId;
+    setNarration(named.language as Language);
+    setDensity(named.density as Density);
+    choose(named);
+    // Once, on arrival.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // The address names the result on screen, so a reload, a bookmark or a shared link comes back to
+  // it. A live run names itself (use-live-run); a run that stopped keeps its name until another
+  // result is shown, so reloading shows why it stopped.
+  useEffect(() => {
+    if (mode === "live" || !current || current.runId === pinnedInUrl.current) return;
+    pinnedInUrl.current = current.runId;
+    pinRunInUrl(current.runId);
+    // Only when the shown result changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.runId]);
+
   useEffect(() => {
     if (mode === "live") return;
+    // A result the page holds whole (a run that just finished here) is not read again.
+    if (current && view?.runId === current.runId && view.summary && events) return;
     stopReplay();
     setMode("idle");
     setSelected(null);
     // A result that is still loading (or fails to load) must not keep the previous run's
-    // media, downloads and editor under the newly selected version or language.
+    // media, downloads and editor under the newly selected version or language. The same result,
+    // played while a run was made (opened again after the run stopped), plays on as it loads.
     setEvents(null);
     setView(null);
-    setError(null);
+    setHeld((h) => (h && h.runId === current?.runId ? h : null));
+    holding.current = null;
+    setError((e) => (e && (e.ownFailure || e.lostRunId || e.reload) ? null : e));
     if (!current) return;
     let cancelled = false;
     const begun = liveRuns.current;
-    fetchRun(project.id, current.runId)
-      .then(({ events: loaded }) => {
+    const reopen = reselect.current;
+    reselect.current = null;
+    fetchFinishedRun(project.id, current.runId, STALE_RUN_RETRY_DELAYS_MS)
+      .then((loaded) => {
         if (cancelled || liveRuns.current !== begun) return;
+        const folded = foldRun(loaded, project.clipSeconds);
         setEvents(loaded);
-        setView(foldRun(loaded, project.clipSeconds));
+        setView(folded);
+        // After a save, the edited line opens again in its new version.
+        if (reopen && folded.cues.some((c) => c.id === reopen)) setSelected(reopen);
       })
       .catch((e: unknown) => {
         if (cancelled || liveRuns.current !== begun) return;
         console.error(e);
-        setError({ message: t.live.loadFailed, ownFailure: false });
+        setError({ message: t.live.loadFailed, ownFailure: false, reload: true });
       });
     return () => {
       cancelled = true;
     };
-    // Reload only when the shown run changes.
+    // Reload only when the shown run changes, or when asked to (loadAttempt).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [current?.runId]);
+  }, [current?.runId, loadAttempt]);
 
-  // Stage changes during a live run or a replay are announced once each, politely. When a run
-  // stops, the stage it stopped in is announced (the alert under the player says why and what next).
-  const stageKey = view ? STAGES.map((s) => view.stages[s].state).join(",") : "";
+  // A live run's progress is announced politely, as where it is now (stageAnnouncement); the alert
+  // under the player says why a run stopped and what next, and its end is said with its result
+  // (onEnd). A replay says only that it started and ended.
+  const said = view && mode === "live" ? stageAnnouncement(view, t, lang) : null;
   useEffect(() => {
-    if (!view || mode === "idle") return;
-    // Checking again on a lost run: nothing new is known until a check answers.
-    if (STAGES.some((s) => view.stages[s].state === "lost")) return;
-    const stopped = STAGES.find((s) => view.stages[s].state === "stopped");
-    if (view.error && !stopped) return;
-    const running = STAGES.find((s) => view.stages[s].state === "running");
-    const last = [...STAGES].reverse().find((s) => view.stages[s].state === "done");
-    const stage = stopped ?? running ?? last;
-    if (!stage) return;
-    setAnnouncement(
-      fill(t.workspace.stageAnnounce, {
-        stage: t.stages[stage],
-        state: stopped
-          ? t.stages.stoppedState
-          : running
-            ? t.stages.runningState
-            : t.stages.doneState,
-      }),
-    );
+    if (said) announce(said.text, said.settle);
+    // Once per change of where the run is.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stageKey, mode]);
+  }, [said?.text]);
+
+  /**
+   * Fetches `runId`'s result to play while a run is made or after it stopped (held), when the page
+   * had not loaded it. A later load of the shown result, or a run's new result, makes it moot.
+   */
+  function holdResult(runId: string) {
+    if (holding.current === runId) return;
+    holding.current = runId;
+    fetchFinishedRun(project.id, runId, STALE_RUN_RETRY_DELAYS_MS)
+      .then((loaded) => {
+        if (holding.current === runId) setHeld(foldRun(loaded, project.clipSeconds));
+      })
+      .catch((e: unknown) => {
+        if (holding.current === runId) holding.current = null;
+        console.error(`result ${runId} to play during a run did not load`, e);
+      });
+  }
 
   // Live runs: streamed, followed by polling when the stream drops, resumed from ?run= on reload.
   const live = useLiveRun({
     projectId: project.id,
-    initialRunId,
+    initialRunId: resuming ? initialRunId : undefined,
+    ignoredRunId: missingRunId,
     finishedRunIds: initialRuns.map((r) => r.runId),
     handlers: {
       onBegin: () => {
         liveRuns.current += 1;
-        viewBeforeRun.current = view;
+        liveEvents.current = [];
+        liveShown.current = { events: 0, done: false };
+        // What plays while the new run is made: the finished result on screen (a replay's whole run),
+        // else the one played before (a retry), else the chosen version, fetched now (a run followed
+        // after a reload, or begun while the result was still loading).
+        const onScreen = mode === "replay" && events ? foldRun(events, project.clipSeconds) : view;
+        if (onScreen?.files) {
+          holding.current = null;
+          setHeld(onScreen);
+        } else if (!held?.files && current) holdResult(current.runId);
         stopReplay();
         setMode("live");
         setError(null);
         setSelected(null);
         setView(emptyRun(project.clipSeconds));
       },
-      onEvent: (event) => setView((v) => reduceRun(v ?? emptyRun(project.clipSeconds), event)),
+      onEvent: (event) => {
+        if (event.type !== "writer_delta") {
+          liveEvents.current.push(event);
+          liveShown.current = {
+            events: liveEvents.current.length,
+            done: liveShown.current.done || event.type === "run_done",
+          };
+        }
+        setView((v) => reduceRun(v ?? emptyRun(project.clipSeconds), event));
+      },
       onEvents: (loaded, status) => {
+        // A poll answered by a lagging read must not take the page back to an earlier stage.
+        if (isOlderSnapshot(liveShown.current, { events: loaded, status })) {
+          console.warn(`older snapshot ignored: ${loaded.length} events, ${status}`);
+          return;
+        }
+        liveEvents.current = loaded;
+        liveShown.current = { events: loaded.length, done: status === "done" };
         const started = loaded[0];
         if (started?.type === "run_started") {
           setNarration(started.language);
@@ -183,15 +293,34 @@ export function Workspace({
         setView(status === "interrupted" ? interruptRun(folded) : folded);
       },
       onEnd: (list, finishedRunId, started) => {
-        if (!started) setView(viewBeforeRun.current);
-        if (list) setRuns(list);
-        const finished = list?.find((r) => r.runId === finishedRunId);
-        if (finished) {
-          setNarration(finished.language as Language);
-          setDensity(finished.density as Density);
-          setChosenRunId(finished.runId);
-        }
         setMode("idle");
+        if (!started) {
+          setView(held);
+          // Nothing of the run was shown and nothing came before it: load the shown result.
+          if (!held) setLoadAttempt((n) => n + 1);
+        }
+        if (!finishedRunId) {
+          if (list) setRuns(list);
+          // A run that stopped: the version from before it plays on (a fetch that failed is retried).
+          if (started && !held?.files && current) holdResult(current.runId);
+          return;
+        }
+        // A run the page watched finish is shown even when the list does not have it yet.
+        const watched = view?.runId === finishedRunId ? view : null;
+        const after = listAfterRun(list, runs, finishedRunId, watched, new Date().toISOString());
+        const finished = after.finished;
+        setRuns(after.runs);
+        if (!finished) return;
+        setNarration(finished.language as Language);
+        setDensity(finished.density as Density);
+        choose(finished);
+        setHeld(null);
+        holding.current = null;
+        if (watched) {
+          // The page holds the whole run: no second read, and Replay works at once.
+          setEvents(liveShown.current.done ? liveEvents.current : null);
+          announce(runFinishedAnnouncement(watched, t));
+        }
       },
       onStopped: (message) => setError({ message, ownFailure: true }),
       onLost: (runId, message) => {
@@ -206,9 +335,61 @@ export function Workspace({
         setError(null);
         setSelected(null);
       },
+      onNotFound: () => setError({ message: t.live.notFound, ownFailure: false }),
       onError: (message) => setError({ message, ownFailure: false }),
     },
   });
+
+  // An edit started before a reload: the page shows the result it was made from, keeps the editor
+  // and Generate locked, and opens the new version when the edit is saved.
+  const pendingEdit = live.edits.find((e) => !settledEdits.includes(e.runId)) ?? null;
+  useEffect(() => {
+    if (!pendingEdit) return;
+    setNarration(pendingEdit.language);
+    setDensity(pendingEdit.density);
+    choose({ ...pendingEdit, runId: pendingEdit.baseRunId });
+    // Once per edit found.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingEdit?.runId]);
+  usePendingEdit(project.id, pendingEdit, {
+    onSaved: (edit, listed) => {
+      setSettledEdits((s) => [...s, edit.runId]);
+      void showSaved(edit.runId, edit.cueId, listed);
+    },
+    onEnded: (edit, code) => {
+      setSettledEdits((s) => [...s, edit.runId]);
+      const line = fill(t.line.title, { n: numbers.get(edit.cueId) ?? "" });
+      setError({
+        message: fill(code ? t.live.editStopped : t.live.editUnknown, { line }),
+        ownFailure: false,
+      });
+    },
+  });
+
+  /**
+   * Opens the result an edit saved, as `listed` (the save's own answer) has it, or as a new read
+   * of the list once it does: never another version in its place. Until then the version it was
+   * made from stays on screen.
+   */
+  async function showSaved(runId: string, cueId: string, listed?: RunListing[]) {
+    const found = await findSavedRun(
+      runId,
+      listed,
+      async () => (await fetchRunList(project.id, READ_RETRY_DELAYS_MS)).runs,
+    );
+    if (!found) {
+      console.error(`saved edit ${runId} is not listed yet`);
+      setError({ message: t.live.savedNotListed, ownFailure: false });
+      return;
+    }
+    const { runs: list, saved } = found;
+    reselect.current = cueId;
+    setRuns(list);
+    setNarration(saved.language as Language);
+    setDensity(saved.density as Density);
+    choose(saved);
+    announce(t.editor.saved);
+  }
 
   function replay() {
     if (!events) return;
@@ -220,6 +401,7 @@ export function Workspace({
     setReplaySpeed(speed);
     setMode("replay");
     setView(emptyRun(project.clipSeconds));
+    announce(fill(t.workspace.replaying, { speed }));
     for (const event of replayed) {
       timers.current.push(
         window.setTimeout(
@@ -228,7 +410,15 @@ export function Workspace({
         ),
       );
     }
-    timers.current.push(window.setTimeout(() => setMode("idle"), (lastT / speed) * 1000 + 400));
+    timers.current.push(
+      window.setTimeout(
+        () => {
+          setMode("idle");
+          announce(t.workspace.replayFinished);
+        },
+        (lastT / speed) * 1000 + 400,
+      ),
+    );
   }
 
   // The whole saved run: a replay lists only the stages it goes through.
@@ -254,11 +444,29 @@ export function Workspace({
   }, [view, analysis, project.clipSeconds]);
 
   const final = view?.files && view.runId && mode !== "replay" ? view : null;
+  // While a new run is made, or after one stopped, the result from before it still plays.
+  const playable = final ?? (mode !== "replay" && held?.files && held.runId ? held : null);
   const media = (file: string) => `/api/projects/${project.id}/media/${file}`;
-  const describedUrl = final ? media(`runs/${final.runId}/${final.files!.described}`) : null;
+  const describedUrl = playable
+    ? media(`runs/${playable.runId}/${playable.files!.described}`)
+    : null;
   const numbers = useMemo(() => lineNumbers(shown?.cues ?? []), [shown?.cues]);
+  const playableNumbers = useMemo(() => lineNumbers(playable?.cues ?? []), [playable?.cues]);
   const selectedCue = shown?.cues.find((c) => c.id === selected) ?? null;
-  const busy = mode === "live" || editing;
+
+  function closeLine(line: string) {
+    flushSync(() => setSelected(null));
+    // The Back button is gone: focus goes back to the line it was opened from.
+    const marker = document.querySelector<HTMLElement>(
+      `.tl-narration [data-cue-id="${CSS.escape(line)}"]`,
+    );
+    if (marker?.offsetParent) marker.focus();
+    else document.querySelector<HTMLElement>(".cue-picker select")?.focus();
+  }
+  const busy = mode === "live" || editing || Boolean(pendingEdit);
+  // A run of this clip the viewer started elsewhere (another tab, before Back) is still going, or
+  // today's allowance is spent: the server would refuse, and the notices say why.
+  const blocked = live.active.length > 0 || live.status?.canStart === false;
   const cueLanguage = shown?.language ?? narration;
   const sceneEvidence = shown?.scene?.shots
     .filter((s) => selectedCue && selectedCue.start >= s.start && selectedCue.start < s.end)
@@ -267,6 +475,7 @@ export function Workspace({
   const parentRunId = final?.summary?.parentRunId;
   const littleRoom = littleRoomOf(view, shown, Boolean(analysis), project.clipSeconds);
   const editNote = final?.runId ? notes[final.runId] : null;
+  const pendingLine = pendingEdit ? numbers.get(pendingEdit.cueId) : undefined;
   // A run that started and then failed or was interrupted can be tried again with its settings, while
   // the alert gives its own reason, that reason would not simply repeat, and a run could start now.
   const stoppedRun =
@@ -276,18 +485,32 @@ export function Workspace({
     view.retryable !== false &&
     view.language &&
     view.density &&
-    live.status?.canStart !== false
+    !blocked
       ? { language: view.language, density: view.density }
       : null;
 
   function select(id: string) {
     if (editing) return;
     setSelected(id);
-    setAnnouncement(
+    announce(
       fill(t.workspace.selected, { line: fill(t.line.title, { n: numbers.get(id) ?? id }) }),
     );
     const cue = shown?.cues.find((c) => c.id === id);
     if (cue) player.current?.seek(cue.start);
+  }
+
+  /** Runs `action`, which removes the focused control, and puts focus on the stage list instead. */
+  function thenFocusStages(action: () => void) {
+    flushSync(action);
+    stageList.current?.focus();
+  }
+
+  /** The viewer picked something else to see: messages about the last attempt are done. */
+  function act<A extends unknown[]>(action: (...args: A) => void) {
+    return (...args: A) => {
+      setError(null);
+      action(...args);
+    };
   }
 
   return (
@@ -304,51 +527,30 @@ export function Workspace({
             originalUrl={media("clip.mp4")}
             posterUrl={media("poster.jpg")}
             describedUrl={describedUrl}
-            cues={final?.cues ?? []}
+            cues={playable?.cues ?? []}
             speech={shown?.speech ?? []}
             filmLanguage={project.filmLanguageCode}
-            narrationLanguage={final?.language ?? null}
-            lineNumbers={numbers}
+            narrationLanguage={playable?.language ?? null}
+            lineNumbers={playableNumbers}
             onTime={setTime}
           />
 
           {error ? (
-            <div className="ws-error run-error">
-              <p role="alert">
-                <span aria-hidden="true">⚠ </span>
-                {error.message}
-              </p>
-              {stoppedRun ? (
-                <button
-                  type="button"
-                  className="button small"
-                  onClick={() => void live.start(stoppedRun)}
-                >
-                  <span aria-hidden="true">↻</span> {t.live.retry}
-                </button>
-              ) : null}
-              {error.lostRunId ? (
-                <button
-                  type="button"
-                  className="button small"
-                  onClick={() => {
-                    const runId = error.lostRunId!;
-                    flushSync(() => live.checkAgain(runId));
-                    // This alert and its button are gone now; the stage list says where the run is.
-                    stageList.current?.focus();
-                  }}
-                >
-                  <span aria-hidden="true">↻</span> {t.live.checkAgain}
-                </button>
-              ) : null}
-            </div>
+            <RunAlert
+              alert={error}
+              onRetry={stoppedRun ? () => thenFocusStages(() => void live.start(stoppedRun)) : null}
+              onCheckAgain={(runId) => thenFocusStages(() => live.checkAgain(runId))}
+              onReload={() => setLoadAttempt((n) => n + 1)}
+            />
           ) : null}
 
           {shown ? (
             <Timeline
               clipSeconds={project.clipSeconds}
               stripUrl={media("strip.jpg")}
+              stripStepSeconds={project.stripStepSeconds}
               speech={shown.speech}
+              soundless={shown.relisten?.soundless === true}
               gaps={shown.gaps}
               cues={shown.cues}
               lineNumbers={numbers}
@@ -360,13 +562,14 @@ export function Workspace({
             />
           ) : null}
           {final?.cues.length ? (
-            <CuePicker
+            <LinePicker
               cues={final.cues}
               lineNumbers={numbers}
               language={cueLanguage}
-              selectedCueId={selected}
+              openCueId={selected}
               disabled={busy}
-              onSelect={select}
+              describedBy={pickHint}
+              onOpen={select}
             />
           ) : null}
           {final?.summary ? <Metrics summary={final.summary} /> : null}
@@ -382,14 +585,24 @@ export function Workspace({
           ) : null}
         </div>
 
-        <aside className="ws-inspector">
+        <aside
+          className="ws-inspector"
+          onKeyDown={(event) => {
+            // Escape leaves the line like its Back button; the edit form and the remove question
+            // handle their own Escape first and stop it.
+            if (event.key !== "Escape" || event.nativeEvent.isComposing) return;
+            if (!selectedCue || editing || event.defaultPrevented) return;
+            event.preventDefault();
+            closeLine(selectedCue.id);
+          }}
+        >
           {selectedCue ? (
             <>
               <button
                 type="button"
                 className="button ghost small back"
                 disabled={editing}
-                onClick={() => setSelected(null)}
+                onClick={() => closeLine(selectedCue.id)}
               >
                 <span aria-hidden="true">←</span> {t.line.close}
               </button>
@@ -399,7 +612,7 @@ export function Workspace({
                 language={cueLanguage}
                 evidence={sceneEvidence}
                 editor={
-                  final && mode === "idle" ? (
+                  final && mode === "idle" && !pendingEdit ? (
                     <EditLine
                       key={`${final.runId}-${selectedCue.id}`}
                       projectId={project.id}
@@ -409,13 +622,9 @@ export function Workspace({
                       gaps={final.gaps}
                       language={cueLanguage}
                       onBusy={setEditing}
-                      onSaved={async (id) => {
-                        const response = await fetch(`/api/projects/${project.id}/runs`);
-                        if (!response.ok) throw new Error(t.editor.failed);
-                        setRuns((await response.json()).runs);
-                        setChosenRunId(id);
-                        setAnnouncement(t.editor.saved);
-                      }}
+                      onSaved={(id: string, listed?: RunListing[]) =>
+                        showSaved(id, selectedCue.id, listed)
+                      }
                     />
                   ) : null
                 }
@@ -434,20 +643,39 @@ export function Workspace({
                 density={density}
                 mode={mode}
                 busy={busy}
+                blocked={blocked}
                 canReplay={Boolean(events) && mode !== "live"}
                 replaySpeed={replaySpeed}
                 emptyHint={
                   measured?.summary
-                    ? fill(
-                        t.workspace.noRunHint,
-                        sampleRunFigures(measured.language, measured.summary, lang),
-                      )
+                    ? [
+                        fill(
+                          measuredHere ? t.workspace.noRunHintHere : t.workspace.noRunHint,
+                          sampleRunFigures(measured.language, measured.summary, lang),
+                        ),
+                        measured.summary.analysisReused?.speech ||
+                        measured.summary.analysisReused?.scene
+                          ? t.landing.measuredReused
+                          : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" ")
                     : null
                 }
                 sample={project.kind === "sample"}
-                onChooseRun={setChosenRunId}
-                onNarration={setNarration}
-                onDensity={setDensity}
+                unfinished={mode === "idle" && view !== null && !final}
+                onChooseRun={act((runId: string) => {
+                  const run = runs.find((r) => r.runId === runId);
+                  if (!run) return;
+                  choose(run);
+                  if (run.runId !== current?.runId) return;
+                  // The chosen version, picked while a stopped run is on screen: open its result.
+                  pinnedInUrl.current = run.runId;
+                  pinRunInUrl(run.runId);
+                  setLoadAttempt((n) => n + 1);
+                })}
+                onNarration={act(setNarration)}
+                onDensity={act(setDensity)}
                 onReplay={replay}
                 onStopReplay={() => {
                   stopReplay();
@@ -462,32 +690,56 @@ export function Workspace({
                 status={live.status}
                 showStatus={mode !== "live" && (!error || error.ownFailure)}
                 littleRoom={littleRoom}
-                busy={busy}
-                onFollow={live.follow}
+                busy={mode === "live"}
+                pendingEdit={
+                  pendingEdit && pendingLine !== undefined
+                    ? {
+                        line: fill(t.line.title, { n: pendingLine }),
+                        startedAt: pendingEdit.startedAt,
+                      }
+                    : null
+                }
+                runSeconds={mode === "live" && view?.runId ? view.t : null}
+                runStartedAt={mode === "live" ? live.since : null}
+                onFollow={(runId) => thenFocusStages(() => live.follow(runId))}
               />
+              {final?.files ? (
+                <Downloads
+                  base={media(`runs/${final.runId}`)}
+                  files={final.files}
+                  described={final.cues.some((c) => c.status === "fits")}
+                />
+              ) : null}
               {parentRunId && editNote ? (
                 <EditSummary parent={labels.get(parentRunId) ?? parentRunId} note={editNote} />
               ) : null}
-              {view && !parentRunId ? (
+              {view && !parentRunId && (view.runId || mode !== "idle") ? (
                 <StageList
                   ref={stageList}
                   view={view}
                   trace={mode === "replay" ? trace : null}
                   clockRate={mode === "live" ? 1 : mode === "replay" ? replaySpeed : 0}
+                  startedAt={mode === "live" ? live.since : null}
                 />
               ) : null}
-              {!view && !busy ? (
+              {!view && !busy && !current && !live.active.length ? (
                 <p className="empty">
                   {fill(t.workspace.noRun, { language: languageName(narration, lang) })}
+                </p>
+              ) : null}
+              {!view && current && !error?.reload ? (
+                <p className="empty" role="status">
+                  <span className="spinner" aria-hidden="true" /> {t.workspace.loadingRun}
                 </p>
               ) : null}
               {/* A finished result shows the final check's list (QualityNote) instead. */}
               {view?.coverage.length && view.summary === null ? (
                 <Coverage coverage={view.coverage} language={cueLanguage} />
               ) : null}
-              {final ? <p className="label hint">{t.line.pickHint}</p> : null}
-              {final?.files ? (
-                <Downloads base={media(`runs/${final.runId}`)} files={final.files} />
+              {final?.cues.length ? (
+                <p className="label hint" id={pickHint}>
+                  {t.line.pickHint}
+                </p>
               ) : null}
             </>
           )}

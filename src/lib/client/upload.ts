@@ -60,13 +60,18 @@ export function readVideoSeconds(file: File): Promise<number | null> {
 /** Thrown when the upload never got an HTTP answer (offline, connection reset). */
 export class UploadNetworkError extends Error {}
 
+/** Thrown when `signal` stopped the upload: the visitor cancelled it, or its page went away. */
+export class UploadCancelledError extends Error {}
+
 /**
  * POSTs the file as multipart `video` and reports sending progress (0 to 1). XMLHttpRequest is used
  * because fetch cannot report upload progress. Resolves with the raw answer, whatever its status.
+ * Aborting `signal` stops the request and rejects with UploadCancelledError.
  */
 export function sendClip(
   file: File,
   onProgress: (fraction: number) => void,
+  signal?: AbortSignal,
 ): Promise<{ status: number; contentType: string; text: string }> {
   const body = new FormData();
   body.append("video", file);
@@ -83,7 +88,13 @@ export function sendClip(
         text: request.responseText,
       });
     request.onerror = () => reject(new UploadNetworkError("The upload got no answer"));
-    request.onabort = () => reject(new UploadNetworkError("The upload was aborted"));
+    request.onabort = () =>
+      reject(
+        signal?.aborted
+          ? new UploadCancelledError("The upload was cancelled")
+          : new UploadNetworkError("The upload was aborted"),
+      );
+    signal?.addEventListener("abort", () => request.abort(), { once: true });
     request.open("POST", "/api/projects");
     request.send(body);
   });

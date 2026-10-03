@@ -48,6 +48,12 @@
   margin: -4px 0 8px;
 }
 
+/* Which language a reviewer's note is in, where the page has no gloss of it. */
+.verdict .note-language,
+.edit-error .note-language {
+  display: block;
+}
+
 .line-text.struck {
   text-decoration: line-through;
   color: var(--muted);
@@ -152,10 +158,6 @@
   text-decoration-color: var(--danger);
 }
 
-.version-text del + ins {
-  margin-left: 0.3em;
-}
-
 .version-text ins {
   color: var(--text-strong);
   text-decoration: underline;
@@ -204,6 +206,12 @@
   border-radius: 0 4px 4px 0;
 }
 
+/* The clause source, the gloss and the language note under each reason sit on the danger tint. */
+.verdict.fail li .label,
+.verdict.fail li .gloss {
+  color: var(--muted-on-danger);
+}
+
 .verdict .quote {
   color: var(--text-strong);
   overflow-wrap: anywhere;
@@ -243,8 +251,26 @@
   display: none;
 }
 
+/* The mark turns as the form opens, so a click shows it registered even under the pointer. */
+.edit-line > summary .disclosure-mark {
+  flex: none;
+  margin-right: 6px;
+  transition: transform 150ms ease;
+}
+
+.edit-line:not([open]) > summary .disclosure-mark {
+  transform: rotate(-90deg);
+}
+
 .edit-line[open] > summary {
   background: var(--surface-3);
+  border-color: var(--border-input);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .edit-line > summary .disclosure-mark {
+    transition: none;
+  }
 }
 
 .cue-editor {
@@ -267,6 +293,7 @@
   margin: 0 0 12px;
 }
 
+/* 16 px text: iOS Safari zooms the page into any field smaller than that when it takes focus. */
 .cue-picker select,
 .cue-editor textarea,
 .cue-editor input,
@@ -275,10 +302,61 @@
   min-width: 0;
   padding: 10px;
   font: inherit;
+  font-size: 1rem;
   color: var(--text);
   border: 1px solid var(--border-input);
   border-radius: var(--radius-sm);
   background: var(--surface);
+}
+
+/* Locked while a request runs: read-only, so a focused field keeps its focus. */
+.cue-editor textarea:read-only,
+.cue-editor input:read-only {
+  color: var(--muted);
+  cursor: default;
+}
+
+/* The button that started a request keeps focus while it runs: marked disabled, not disabled. */
+.cue-editor .button[aria-disabled="true"],
+.remove-confirm .button[aria-disabled="true"] {
+  cursor: progress;
+}
+
+.cue-editor .button.primary[aria-disabled="true"],
+.cue-editor .button.primary[aria-disabled="true"]:hover {
+  background: var(--accent);
+}
+
+.remove-confirm .button.danger[aria-disabled="true"]:hover {
+  background: var(--danger-soft);
+}
+
+/* What the running request is doing, under its button; empty (and flat) when nothing runs. */
+.edit-progress {
+  margin: 10px 0 0;
+}
+
+.edit-progress:empty {
+  margin: 0;
+}
+
+.edit-error {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+}
+
+.edit-error p {
+  margin: 0;
+}
+
+.edit-error-label {
+  font-weight: 600;
+}
+
+.edit-error .label,
+.edit-error .gloss {
+  color: var(--muted-on-danger);
 }
 
 .cue-editor textarea {
@@ -286,7 +364,7 @@
   resize: vertical;
 }
 
-/* Removing a line: a quiet button under the editor, then an explicit question before anything runs. */
+/* Removing a line: a quiet button beside "Edit this line", then an explicit question first. */
 .remove-line {
   display: grid;
   gap: 10px;
@@ -323,4 +401,9 @@
 
 .button.danger:hover:not(:disabled) {
   background: rgba(217, 132, 116, 0.24);
+}
+
+/* The final check found nothing to fix: a finished step, like "done". */
+.stage.skipped {
+  color: var(--text);
 }

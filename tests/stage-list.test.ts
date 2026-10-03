@@ -84,6 +84,45 @@ describe("listedStages", () => {
   });
 });
 
+describe("a final check that finds nothing to fix", () => {
+  // The stages of runs/…-3d7cbe (events.jsonl): the final check passed every line, so the run went
+  // from "verify" straight to "mix" and emitted nothing for "fix".
+  const clean: TimedRunEvent[] = [
+    started,
+    ...staged([
+      ["hear", 0, 21.2],
+      ["watch", 0, 38.5],
+      ["relisten", 21.2, 30.1],
+      ["gaps", 38.5, 38.5],
+      ["write", 38.5, 92.4],
+      ["review", 92.4, 141.3],
+      ["voice", 141.3, 146.9],
+      ["verify", 146.9, 177.86],
+      ["mix", 177.99, 183.44],
+    ]),
+    { ...done, t: 183.64 },
+  ].sort((a, b) => a.t - b.t);
+  const mixStarts = clean.findIndex((e) => e.type === "stage" && e.stage === "mix");
+
+  it("keeps the row waiting until the mix starts, then says there was nothing to fix", () => {
+    assert.equal(foldRun(clean.slice(0, mixStarts), CLIP_SECONDS).stages.fix.state, "waiting");
+    for (let i = mixStarts + 1; i <= clean.length; i++)
+      assert.equal(foldRun(clean.slice(0, i), CLIP_SECONDS).stages.fix.state, "skipped");
+  });
+
+  it("lists the row from the live run to the finished one, so it never vanishes", () => {
+    const live = foldRun(clean.slice(0, mixStarts + 1), CLIP_SECONDS);
+    assert.deepEqual(listedStages(live, null), STAGES);
+    const finished = foldRun(clean, CLIP_SECONDS);
+    assert.deepEqual(listedStages(finished, null), STAGES);
+    assert.deepEqual(listedStages(emptyRun(CLIP_SECONDS), finished), STAGES);
+  });
+
+  it("leaves runs from before the final check as they were", () => {
+    assert.equal(foldRun(SAVED_TRACE, CLIP_SECONDS).stages.fix.state, "waiting");
+  });
+});
+
 describe("a run that stops before its result", () => {
   // Hear and watch run side by side; the run fails 9.4 s into watch, after hear and re-listen.
   const failing: TimedRunEvent[] = [
@@ -195,14 +234,12 @@ describe("a run that stops before its result", () => {
     assert.equal(view.stages.mix.seconds, 1);
     assert.ok(STAGES.slice(0, -1).every((s) => view.stages[s].state === "done"));
     assert.deepEqual(listedStages(view, null), STAGES);
-    // With nothing for the final check to fix, "fix" never runs and stays unlisted.
+    // With nothing for the final check to fix, "fix" never runs: it is listed as skipped.
     const skipped = all.filter((e) => e.type !== "stage" || e.stage !== "fix");
     const unfixed = foldRun([started, ...skipped, { ...failed, t: 10.2 }], CLIP_SECONDS);
     assert.equal(unfixed.stages.mix.state, "stopped");
-    assert.deepEqual(
-      listedStages(unfixed, null),
-      STAGES.filter((s) => s !== "fix"),
-    );
+    assert.equal(unfixed.stages.fix.state, "skipped");
+    assert.deepEqual(listedStages(unfixed, null), STAGES);
   });
 
   describe("when the page loses touch with it", () => {

@@ -9,6 +9,7 @@ import type { RunView } from "@/lib/pipeline/reduce";
 import type { Cue, Language } from "@/lib/pipeline/schemas";
 import { Gloss } from "./glosses";
 import { listedStages } from "./listed-stages";
+import { runClockSeconds } from "./run-choice";
 import { VersionHistory } from "./VersionHistory";
 
 /**
@@ -22,11 +23,14 @@ export function StageList({
   view,
   trace,
   clockRate,
+  startedAt = null,
   ref,
 }: {
   view: RunView;
   trace: RunView | null;
   clockRate: number;
+  /** When a live run began (ISO); after a reload its last event can be minutes old. */
+  startedAt?: string | null;
   ref?: Ref<HTMLOListElement>;
 }) {
   const { t, lang } = useI18n();
@@ -39,7 +43,12 @@ export function StageList({
     const timer = setInterval(() => setNow(Date.now()), 250);
     return () => clearInterval(timer);
   }, [clockRate]);
-  const runClock = clockRate > 0 ? anchor.t + ((now - anchor.wall) / 1000) * clockRate : view.t;
+  const runClock =
+    clockRate === 1
+      ? runClockSeconds(anchor, now, startedAt)
+      : clockRate > 0
+        ? anchor.t + ((now - anchor.wall) / 1000) * clockRate
+        : view.t;
   const stages = listedStages(view, trace);
 
   return (
@@ -60,6 +69,13 @@ export function StageList({
             <span className="label">
               <span aria-hidden="true">✓ </span>
               {fill(t.stages.done, { seconds: (s.seconds ?? 0).toFixed(1) })}
+            </span>
+          );
+        } else if (s.state === "skipped") {
+          status = (
+            <span className="label">
+              <span aria-hidden="true">✓ </span>
+              {t.stages.skipped}
             </span>
           );
         } else if (s.state === "reused") {
@@ -91,13 +107,17 @@ export function StageList({
             {status}
             {found ? (
               <small className="stage-detail">
-                {found.wordsFound > 0
-                  ? fill(t.stages.relistenFound, {
-                      gaps: found.gapsChecked,
-                      words: found.wordsFound,
-                      blocked: formatSeconds(found.blockedSeconds, lang),
-                    })
-                  : fill(t.stages.relistenQuiet, { gaps: found.gapsChecked })}
+                {found.soundless
+                  ? t.stages.relistenSoundless
+                  : found.wordsFound > 0
+                    ? fill(t.stages.relistenFound, {
+                        gaps: found.gapsChecked,
+                        words: found.wordsFound,
+                        blocked: formatSeconds(found.blockedSeconds, lang),
+                      })
+                    : found.gapsChecked === 0
+                      ? t.stages.relistenNone
+                      : fill(t.stages.relistenQuiet, { gaps: found.gapsChecked })}
               </small>
             ) : null}
           </li>
@@ -210,8 +230,20 @@ export function LineDetail({
   const latest = cue.versions[cue.versions.length - 1];
   const outOfTrack = cue.status === "dropped" || cue.status === "removed";
   const heading = useRef<HTMLHeadingElement>(null);
-  // Moving focus to the heading tells keyboard and screen-reader users where the details went.
-  useEffect(() => heading.current?.focus({ preventScroll: true }), [cue.id]);
+  // Moving focus to the heading tells keyboard and screen-reader users where the details went; the
+  // view follows it on purpose. On a wide screen the inspector scrolls on its own and starts each
+  // line at its top. Where it is stacked under the player and the timeline (phones, tablets, 200%
+  // zoom), the page scrolls to it, so "Back to the run" stays in view above the heading.
+  useEffect(() => {
+    const h = heading.current;
+    if (!h) return;
+    h.focus({ preventScroll: true });
+    const panel = h.closest<HTMLElement>(".ws-inspector");
+    if (!panel) return;
+    panel.scrollTop = 0;
+    const box = h.getBoundingClientRect();
+    if (box.top < 0 || box.bottom > window.innerHeight) panel.scrollIntoView({ block: "start" });
+  }, [cue.id]);
   return (
     <div className="line-detail">
       <div className="line-head">

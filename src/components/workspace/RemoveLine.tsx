@@ -5,16 +5,15 @@ import { fill } from "@/i18n";
 import { runErrorMessage } from "@/lib/client/api-errors";
 import { formatDuration } from "@/lib/format";
 import type { Cue } from "@/lib/pipeline/schemas";
+import type { RunListing } from "@/lib/store/projects";
 import { editErrorMessage, type EditFailureText } from "./edit-errors";
-import { postEdit } from "./edit-request";
-import { useElapsedSeconds } from "./use-elapsed";
-
-/** The edit route's code for a request that is still being made; retrying it must reuse its id. */
-const STILL_RUNNING = "running";
+import { postEdit, STILL_RUNNING } from "./edit-request";
+import { reviewStep, useElapsedSeconds } from "./use-elapsed";
 
 /**
  * "Remove this line", with a confirmation step. A removal makes a new result without the line: the
- * other lines keep their audio, and the final check runs again on what remains.
+ * other lines keep their audio, and the final check runs again on what remains. Escape, like
+ * "Keep it", closes the question.
  */
 export function RemoveLine({
   projectId,
@@ -29,7 +28,7 @@ export function RemoveLine({
   projectId: string;
   runId: string;
   cue: Cue;
-  onSaved: (runId: string) => Promise<void>;
+  onSaved: (runId: string, runs?: RunListing[]) => Promise<void>;
   onBusy: (busy: boolean) => void;
   locked: boolean;
   /** This removal's error; null when the latest request (edit or removal) was not a removal. */
@@ -47,15 +46,25 @@ export function RemoveLine({
   const wasConfirming = useRef(false);
   const questionId = useId();
   const elapsed = useElapsedSeconds(busy);
+  const step = reviewStep(elapsed);
   const errorNote = useRef<HTMLParagraphElement>(null);
+  const progressNote = useRef<HTMLParagraphElement>(null);
   useEffect(() => {
     if (wasConfirming.current && !confirming) openButton.current?.focus();
     wasConfirming.current = confirming;
   }, [confirming]);
-  // The message renders at the bottom of the inspector, often below its fold: bring it into view.
+  // The message and the progress render at the bottom of the inspector, often below its fold.
   useEffect(() => {
     if (error) errorNote.current?.scrollIntoView({ block: "nearest" });
   }, [error]);
+  useEffect(() => {
+    if (busy) progressNote.current?.scrollIntoView({ block: "nearest" });
+  }, [busy]);
+
+  function cancel() {
+    setConfirming(false);
+    if (error) setError(null);
+  }
 
   async function remove() {
     if (busy || locked) return;
@@ -81,7 +90,7 @@ export function RemoveLine({
         return;
       }
       try {
-        await onSaved(answer.runId);
+        await onSaved(answer.runId, answer.runs);
       } catch (e) {
         console.error("line removed, but the new result did not load", e);
         setError({ text: t.editor.failed });
@@ -95,14 +104,31 @@ export function RemoveLine({
   return (
     <div className="remove-line">
       {confirming ? (
-        <div className="remove-confirm" role="group" aria-labelledby={questionId}>
+        <div
+          className="remove-confirm"
+          role="group"
+          aria-labelledby={questionId}
+          onKeyDown={(event) => {
+            if (event.key !== "Escape" || event.nativeEvent.isComposing || locked) return;
+            event.preventDefault();
+            event.stopPropagation();
+            cancel();
+          }}
+        >
           <p id={questionId}>{r.confirm}</p>
           <div className="remove-actions">
-            <button type="button" className="button danger" disabled={locked} onClick={remove}>
+            {/* While the removal runs, this button keeps focus: marked disabled, not disabled. */}
+            <button
+              type="button"
+              className="button danger"
+              disabled={locked && !busy}
+              aria-disabled={busy || undefined}
+              onClick={remove}
+            >
               {busy ? (
                 <>
                   <span className="spinner" aria-hidden="true" />
-                  {fill(r.removing, { elapsed: formatDuration(elapsed, lang) })}
+                  {fill(r.removing[step], { elapsed: formatDuration(elapsed, lang) })}
                 </>
               ) : (
                 r.yes
@@ -113,14 +139,14 @@ export function RemoveLine({
               className="button ghost"
               disabled={locked}
               autoFocus
-              onClick={() => {
-                setConfirming(false);
-                if (error) setError(null);
-              }}
+              onClick={cancel}
             >
               {r.no}
             </button>
           </div>
+          <p className="label edit-progress" role="status" ref={progressNote}>
+            {busy ? r.progress[step] : null}
+          </p>
         </div>
       ) : (
         <button
