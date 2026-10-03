@@ -96,6 +96,10 @@ to Artifact Registry, and Cloud Run starts the service with:
 
 - the second-generation execution environment, 2 vCPU, 2 GiB, up to 10 requests per instance, a
   900-second request timeout, and 0 to 2 instances;
+- startup CPU boost, which gcloud also turns on by default for a new service: a starting instance gets
+  4 vCPU instead of 2 until 10 seconds after it has started, and the extra CPU is billed for that
+  time. No instance is kept warm, so after a quiet period the first visitor still waits while one
+  starts; the boost was already on when that first response was measured at about 5 seconds;
 - the bucket mounted at `/data`, with `DATA_DIR`, `DATA_BUCKET`, `GCP_PROJECT_ID` and
   `DAILY_BUDGET_USD` set (the daily API allowance, 5 US dollars unless you set it);
 - `GOOGLE_API_KEY` from Secret Manager;
@@ -121,7 +125,12 @@ a `showcase.json` at the top of the bucket:
 { "projectId": "tos-opening", "runs": { "ko": "<run id>", "en": "<run id>" } }
 ```
 
-A run ID is the folder name under `projects/tos-opening/runs/`.
+A run ID is the folder name under `projects/tos-opening/runs/`. A language whose run ID is missing,
+or names no finished Standard track, shows the newest Standard track instead.
+
+Every page reads this file, so copy the sample into the bucket before the pin. A pin that names a
+missing project or an upload, or that lacks `projectId` or `runs`, makes every page fail with an
+error naming `showcase.json` until the file is fixed or deleted.
 
 ## Check it
 

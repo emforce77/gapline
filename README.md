@@ -29,7 +29,7 @@ against blind and deaf moviegoers when films lack audio description and captions
 ([case 2022Da203507](https://www.scourt.go.kr/portal/news/NewsViewAction.work?gubun=6&seqnum=3044&type=0)).
 Making one Korean film accessible still takes about three months, about ten specialists and roughly
 ₩14 million (about US$10,000) for description and captions together
-([Barrier-Free Film Committee](https://barrierfreefilms.or.kr/board_hrgp25/682), [2019 interview](https://futurechosun.com/archives/43832)).
+([Barrier-Free Film Committee](https://barrierfreefilms.or.kr/board_hrgp25/682), [2019 interview](https://web.archive.org/web/20260511062907/https://futurechosun.com/archives/43832)).
 
 ## What Gapline does
 

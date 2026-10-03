@@ -15,6 +15,8 @@ builder="projects/$project/serviceAccounts/scene-ad-build@$project.iam.gservicea
 
 # The demo is public. --no-invoker-iam-check lets unauthenticated requests reach the service
 # without an allUsers invoker binding; the app itself checks each request's origin and project access.
+# --cpu-boost states what gcloud already turns on for a new service: the live service had it before
+# this line, so the line does not shorten the first request after a quiet period (min-instances 0).
 gcloud run deploy "$service" \
   --project "$project" --region "$region" --source . \
   --service-account "$account" \
@@ -24,7 +26,7 @@ gcloud run deploy "$service" \
   --add-volume-mount "volume=data,mount-path=/data" \
   --set-env-vars "DATA_DIR=/data,DATA_BUCKET=$bucket,GCP_PROJECT_ID=$project,DAILY_BUDGET_USD=${DAILY_BUDGET_USD:-5}" \
   --set-secrets "GOOGLE_API_KEY=scene-ad-gemini-key:latest" \
-  --cpu 2 --memory 2Gi --concurrency 10 --timeout 900 \
+  --cpu 2 --memory 2Gi --cpu-boost --concurrency 10 --timeout 900 \
   --min-instances 0 --max-instances 2 \
   --no-invoker-iam-check \
   --port 8080
