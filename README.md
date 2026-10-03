@@ -7,17 +7,15 @@ screen. One press of Generate runs every step: Gapline writes each line for one 
 dialogue, checks it against a published audio-description guideline, voices it and measures the voice,
 rewrites any line a final check sends back, and mixes the track. It works in Korean and English.
 
-[Live demo](https://scene-ad-958994530029.asia-northeast3.run.app) |
+[Live demo](https://scene-ad-117546381357.asia-northeast3.run.app) |
 [Submission video (Google Drive)](https://drive.google.com/file/d/1yuhGGyPOm_IhLdVcERYa43bwXbHBhTub/view) |
 [Demo video (English, MP4)](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-demo-en.mp4) |
 [Pitch deck (PDF)](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-pitch.pdf) |
 [Architecture](docs/ARCHITECTURE.md) | [Evaluation](docs/EVALUATION.md) | [Deploy your own](docs/DEPLOY.md)
 
-**Deployment status (29 September 2026):** the live prototype on Cloud Run calls the Gemini API
-directly. Sample playback and downloads work. New generation waits on paid-tier quota for the
-Gemini API key: on the free tier, Gemini 3.8 Flash often answers HTTP 503 ("high demand") and allows
-5 requests a minute. Gapline retries rejected requests with backoff and does not count them against
-the daily allowance. Details in [submission details](docs/SUBMISSION.md#delivery-status--29-september-2026).
+**Deployment status (3 October 2026):** the live prototype runs on Cloud Run and calls the Gemini API
+directly with paid-tier quota. Generating, editing and downloading work. A daily allowance of
+US$5 caps what visitors can spend. Details in [submission details](docs/SUBMISSION.md#delivery-status--3-october-2026).
 
 Built by **Grab Your Dream** for AI Builder Cup 2026, theme _Media, Content & Digital Experiences_.
 See [submission details](docs/SUBMISSION.md) for the prepared materials and remaining delivery steps.
@@ -53,7 +51,7 @@ Making one Korean film accessible still takes about three months, about ten spec
 
 ![The Gapline landing page](docs/images/landing.png)
 
-1. Open the [live demo](https://scene-ad-958994530029.asia-northeast3.run.app). It starts with seven
+1. Open the [live demo](https://scene-ad-117546381357.asia-northeast3.run.app). It starts with seven
    seconds of _Tears of Steel_ where nobody speaks. Play **Original sound**, then **With description**,
    and turn on **Hide the picture** to hear it the way a blind viewer would.
 2. Choose **Open the sample** for the full 65 seconds, with Korean and English tracks. Press play, turn

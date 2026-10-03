@@ -25,7 +25,7 @@ low-vision listeners or professional describers. Results and limitations are doc
 | Item | Link |
 | --- | --- |
 | Source repository | https://github.com/emforce77/gapline |
-| Live prototype | https://scene-ad-958994530029.asia-northeast3.run.app |
+| Live prototype | https://scene-ad-117546381357.asia-northeast3.run.app |
 | Submission video, English (Google Drive) | [Watch on Google Drive](https://drive.google.com/file/d/1yuhGGyPOm_IhLdVcERYa43bwXbHBhTub/view) |
 | Pitch deck in the Hack2skill template | [Download PDF](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-pitch.pdf) |
 | English demo, 2 min 56 s | [Download MP4](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-demo-en.mp4) |
@@ -34,34 +34,25 @@ low-vision listeners or professional describers. Results and limitations are doc
 The deck is built by `npm run pitch` from the organisers' template ([scripts/pitch](../scripts/pitch/MODULE.md));
 the film by `npm run demo` ([scripts/demo](../scripts/demo/MODULE.md)).
 
-## Delivery status — 29 September 2026
+## Delivery status — 3 October 2026
 
-- Cloud Run revision `scene-ad-00003-nmh` serves the live prototype, calling the Gemini API directly
-  with `GOOGLE_API_KEY` from Secret Manager. Its daily API allowance remains $5.
-- The Gemini API key in use is on the free tier. Measured on 29 September: a 429 answer names the
-  quota `GenerateRequestsPerMinutePerProjectPerModel-FreeTier` (5 requests a minute), Gemini 3.8
-  Flash answered 4 of 8 small requests with HTTP 503 ("high demand"), and the model's free daily
-  requests then ran out. Fresh generation needs paid-tier quota: set up billing for the key's
-  project in Google AI Studio, or add prepaid credits to project `majestic-voice-486204-q6` (a key
-  there answered 402, "prepayment credits are depleted") and store a key from it in
-  `scene-ad-gemini-key`.
-- Since revision `scene-ad-00003-nmh`, a request the API rejects with 429 or 503 is retried with
-  exponential backoff up to four times, and a rejected request no longer holds part of the daily
-  allowance (the API does not bill it). Two runs that failed earlier on 29 September still hold
-  theirs; the allowance renews at 00:00 UTC.
-- The film now runs under 3 minutes: English 176.57 seconds (2:56), Korean 176.83 seconds. The
-  `v0.2.0-preview` release MP4s were replaced on 29 September, and anonymous downloads match the local
-  films by SHA-256. The Google Drive link still plays the earlier 3:30 cut (210.53 seconds) until the
-  owner uploads the new English film as a new version of the same Drive file, which keeps the link.
-- The final 16-page deck at `runtime/pitch/gapline-pitch.pdf` matches the publicly downloadable
-  `v0.2.0-preview` PDF by SHA-256. The deck includes the public repository, Drive and prototype links.
+- On 3 October the live prototype moved to a new Cloud Run service at the address above (revision
+  `scene-ad-00001-9jd`). It calls the Gemini API directly with `GOOGLE_API_KEY` from Secret Manager,
+  on paid-tier quota. The daily API allowance is $5 and renews at 00:00 UTC.
+- Checked on the new service on 3 October: a 12-second uploaded clip ran through every stage in 37.6
+  seconds for $0.034, its four files downloaded, an edit was saved as a new version, and a second
+  browser session got 404 for the upload.
+- A request the API rejects with 429 or 503 is retried with exponential backoff up to four times, and
+  a rejected request does not hold part of the daily allowance (the API does not bill it).
+- The film runs under 3 minutes: English 176.57 seconds (2:56), Korean 176.83 seconds. The
+  `v0.2.0-preview` release MP4s and the Google Drive file play this cut.
+- The `v0.2.0-preview` pitch PDF still shows the earlier prototype address. Rebuild it with
+  `npm run pitch` and replace the release file to show the address above.
 - The film runs under 3 minutes, as the owner confirmed on 29 September. The template says
   "3 minutes" and the public FAQ says "under 3 minutes"; the build fails at 180 seconds or more
   ([the demo module](../scripts/demo/MODULE.md)).
-- Further Gemini generation checks are deferred at the owner's request because the daily quota
-  is exhausted. No additional generation or quota changes were made for this material update.
-- The Hack2skill dashboard requires the team's authenticated session. The competition entry has
-  not been submitted.
+- The Hack2skill dashboard requires the team's authenticated session; the prototype address entered
+  there must match the one above.
 
 Official requirements: [What to submit](https://aibuildercup.com/themes.html),
 [FAQ](https://aibuildercup.com/Faqs.html). Team dashboard:
