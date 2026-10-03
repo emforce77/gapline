@@ -18,9 +18,9 @@ import {
 } from "../../src/lib/api-contract";
 import { MODELS, GEMINI_ACCESS_LABEL } from "../../src/lib/models";
 import { MIN_GAP_SECONDS, SPEECH_GUARD_SECONDS } from "../../src/lib/pipeline/gaps";
-import { GUIDELINE_RULES } from "../../src/lib/pipeline/guidelines";
+import { GUIDELINE_RULES, KMCC_EN, NFLX_EN } from "../../src/lib/pipeline/guidelines";
 import { MIN_ROOM_SECONDS } from "../../src/lib/pipeline/cues";
-import { SPEC } from "../deck/data/deploy";
+import { deployFlag, SPEC } from "../deck/data/deploy";
 import { fitRule, newspaper } from "../deck/data/city";
 import { launchCall } from "../deck/data/recognizers";
 import { line, runId, seven } from "../deck/data/sample";
@@ -53,13 +53,6 @@ function sourceConstant(file: string, name: string): number {
   const m = text.match(new RegExp(`const ${name} = ([0-9.]+);`));
   if (!m) throw new Error(`${file} no longer defines ${name} as a number`);
   return Number(m[1]);
-}
-
-function deployFlag(name: string): string {
-  const text = readFileSync(join(REPO, "deploy/cloud-run.sh"), "utf8");
-  const m = text.match(new RegExp(`--${name}[ =]("[^"]*"|\\S+)`));
-  if (!m) throw new Error(`deploy/cloud-run.sh has no --${name}`);
-  return m[1].replace(/"/g, "");
 }
 
 function git(args: string[]): string {
@@ -105,6 +98,7 @@ const data = {
     rewritesAfterReview: reviewRounds - 1,
     ruleCount: rules.length,
     rules,
+    guides: { kmcc: KMCC_EN, netflix: NFLX_EN },
     maxSpeedUpPercent: Math.round((fitRule.maxRate - 1) * 100),
     shortenings: fitRule.shortenings,
     versions: {

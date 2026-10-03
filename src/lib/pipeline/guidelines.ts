@@ -36,8 +36,8 @@ export interface GuidelineRule {
  * How the English UI names the two guides. Judges outside Korea do not know the commission's acronym,
  * so the Korean guide says what it is first.
  */
-const KMCC_EN = "Korea's broadcast audio description guideline (KMCC)";
-const NFLX_EN = "Netflix Audio Description Style Guide";
+export const KMCC_EN = "Korea's broadcast audio description guideline (KMCC)";
+export const NFLX_EN = "Netflix Audio Description Style Guide";
 
 export const GUIDELINE_RULES: GuidelineRule[] = [
   {

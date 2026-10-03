@@ -72,7 +72,16 @@ FIXED_NOTES = {
 def data_notes(data: dict) -> dict[str, str]:
     """Notes composed from the exported facts, so a source line changes in one place."""
     audience = data["facts"]["audience"]
-    rules = {rule["title"]: rule["source"] for rule in data["product"]["rules"]}
+    # The notes on the zones and the rules name both guides in full, so this note cites their
+    # pages under the short names; the full names twice made it five lines and the page three columns.
+    guides = data["product"]["guides"]
+    short = {guides["kmcc"]: "KMCC guideline", guides["netflix"]: "Netflix AD Style Guide"}
+    rules = {}
+    for rule in data["product"]["rules"]:
+        source = rule["source"]
+        for name, short_name in short.items():
+            source = source.replace(name, short_name)
+        rules[rule["title"]] = source
     rejected = ". ".join(f"{title}: {rules[title]}" for title in data["reviewer"]["rejectedFor"])
     prices = " ".join(
         f"{p['who']}: ${p['low']:g}–${p['high']:g} a minute ({p['source']})."

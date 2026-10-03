@@ -75,8 +75,18 @@ demo video, the submission form's brief description.
   not the 1.252 the font's typo metrics give; widths matched PIL within 0.3% (2% margin kept).
 - [2026-09-29] LibreOffice writes the bare-host Cloud Run link with a trailing slash; the link check
   compares without it.
+- [2026-10-04] Rebuild stopped at "the notes do not fit two columns": the guideline sources grew
+  (f8fca25, 67a1e1c), so note 10 went from 2 to 5 lines; the greedy fill measured 276.5 + 283.0 +
+  45.5 pt against 301 pt columns. Note 10 now names the guides as "KMCC guideline" and "Netflix AD
+  Style Guide" (notes 8 and 9 give the full names), and a section carried into the second column
+  no longer repeats its heading: 276.5 + 294.3 pt.
+- [2026-10-04] Page 7 read "0`–8 instances": the deploy-flag parser took the first
+  `--min-instances` in deploy/cloud-run.sh, now inside a comment. One parser
+  (scripts/deck/data/deploy.ts) skips comment lines and reads `${VAR:-default}` as its default; the
+  slide says "up to 8 instances", since the live minimum (0) differs from the script default (1).
 
 ## Status
 
-Built 2026-09-29: 16 pages in the template's order, all checks passing. The cover names the team
+Built 2026-10-04 with snapshots of the current service (scene-ad-117546381357): 16 pages in the
+template's order, all checks passing; replaced the release asset of v0.2.0-preview. The cover names the team
 leader, Jeyoon Yeom (owner, 2026-09-29), and `npm run pitch -- --final` passes.

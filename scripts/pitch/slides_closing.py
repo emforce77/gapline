@@ -287,7 +287,8 @@ def build_notes_page(canvas: Canvas, title_element: object, notes: NoteBook) -> 
                 columns.append([])
                 if len(columns) > 2:
                     raise RuntimeError("the notes do not fit two columns")
-                heading = [p(r(section, NOTE_HEAD), space_after=1)]
+                # A section that carries on into the second column keeps its numbers, not its heading.
+                heading = [p(r(section, NOTE_HEAD), space_after=1)] if heading else []
             columns[-1] += heading + [note]
             heading_of = section
     for i, paras in enumerate(columns):

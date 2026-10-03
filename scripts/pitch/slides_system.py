@@ -93,7 +93,7 @@ def build_architecture(canvas: Canvas, data: dict, notes: NoteBook) -> None:
             p(
                 r(
                     f"2nd gen · {run['cpu']} vCPU · {run['memory'].replace('Gi', ' GiB')} · "
-                    f"{run['min']}–{run['max']} instances · {run['timeoutMinutes']:g}-min requests",
+                    f"up to {run['max']} instances · {run['timeoutMinutes']:g}-min requests",
                     FINE,
                 )
             ),
