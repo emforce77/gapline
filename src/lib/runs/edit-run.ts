@@ -11,7 +11,14 @@ import type { Cue, Gap, Language } from "../pipeline/schemas";
 import { synthesizeLine } from "../pipeline/voice";
 import { updateJson } from "../store/atomic";
 import { canSeeRun, readProject, RUN_EDITOR_FILE, runDir, type RunEditor } from "../store/projects";
-import { reserveRun, settleRun, withRunBudget, type BudgetScope } from "./budget";
+import {
+  newRunBudget,
+  reserveRun,
+  runChargeBound,
+  settleRun,
+  withRunBudget,
+  type BudgetScope,
+} from "./budget";
 import { writeEditedRun, type EditBase, type HumanEdit } from "./edit-track";
 
 const CUE_ID = z.string().regex(/^L\d+$/);
@@ -251,52 +258,64 @@ export async function editRun(
   const dir = runDir(projectId, runId);
   const ledgerFile = join(dir, "ledger.jsonl");
   let reservation: Awaited<ReturnType<typeof reserveRun>> | undefined;
+  let budget: ReturnType<typeof newRunBudget> | undefined;
   try {
     reservation = await reserveRun(scope);
-    await withRunBudget(reservation, async () => {
-      const started = Date.now();
-      await mkdir(join(dir, "voice"), { recursive: true });
-      // Before any result file: on the sample, the edit belongs to its editor from the start.
-      const editor: RunEditor = { ownerHash: owner };
-      await writeFile(join(dir, RUN_EDITOR_FILE), JSON.stringify(editor));
-      const cues = structuredClone(base.cues);
-      const at = new Date().toISOString();
-      const run = { projectId, project, base, baseRunId, first, runId, dir, ledgerFile, started };
-      if ("action" in input) {
-        removeLine(cues, input.cueId);
+    budget = newRunBudget(reservation);
+    await withRunBudget(
+      reservation,
+      async () => {
+        const started = Date.now();
+        await mkdir(join(dir, "voice"), { recursive: true });
+        // Before any result file: on the sample, the edit belongs to its editor from the start.
+        const editor: RunEditor = { ownerHash: owner };
+        await writeFile(join(dir, RUN_EDITOR_FILE), JSON.stringify(editor));
+        const cues = structuredClone(base.cues);
+        const at = new Date().toISOString();
+        const run = { projectId, project, base, baseRunId, first, runId, dir, ledgerFile, started };
+        if ("action" in input) {
+          removeLine(cues, input.cueId);
+          const humanEdit: HumanEdit = {
+            cueId: input.cueId,
+            action: "remove",
+            before: cue.versions.at(-1)!.text,
+            from: cue.start,
+            at,
+          };
+          // Nothing to accept: the words that stay were already in the track. The audit is recorded.
+          await writeEditedRun({ ...run, cues, audio, humanEdit }, () => {});
+          return;
+        }
+        const { edited, line } = await reviseLine(
+          cues,
+          base.gaps,
+          input,
+          first.language,
+          ledgerFile,
+        );
         const humanEdit: HumanEdit = {
           cueId: input.cueId,
-          action: "remove",
           before: cue.versions.at(-1)!.text,
+          after: input.text,
           from: cue.start,
+          to: input.start,
           at,
         };
-        // Nothing to accept: the words that stay were already in the track. The audit is recorded.
-        await writeEditedRun({ ...run, cues, audio, humanEdit }, () => {});
-        return;
-      }
-      const { edited, line } = await reviseLine(cues, base.gaps, input, first.language, ledgerFile);
-      const humanEdit: HumanEdit = {
-        cueId: input.cueId,
-        before: cue.versions.at(-1)!.text,
-        after: input.text,
-        from: cue.start,
-        to: input.start,
-        at,
-      };
-      await writeEditedRun(
-        { ...run, cues, audio, revoiced: { cueId: edited.id, line }, humanEdit },
-        (finalReview) => {
-          const verdict = finalReview.verdicts.find((v) => v.cueId === edited.id)!;
-          if (!verdict.pass)
-            throw new EditError(
-              "review",
-              verdict.violations.map((v) => v.reason).join(" ") + " " + verdict.fix,
-            );
-          edited.versions.at(-1)!.review = verdict;
-        },
-      );
-    });
+        await writeEditedRun(
+          { ...run, cues, audio, revoiced: { cueId: edited.id, line }, humanEdit },
+          (finalReview) => {
+            const verdict = finalReview.verdicts.find((v) => v.cueId === edited.id)!;
+            if (!verdict.pass)
+              throw new EditError(
+                "review",
+                verdict.violations.map((v) => v.reason).join(" ") + " " + verdict.fix,
+              );
+            edited.versions.at(-1)!.review = verdict;
+          },
+        );
+      },
+      budget,
+    );
     await updateJson<RequestState, void>(
       key,
       () => claim,
@@ -319,7 +338,10 @@ export async function editRun(
   } finally {
     if (reservation) {
       const cost = await readCallRecords(ledgerFile).then(summarizeCosts, () => null);
-      await settleRun(reservation, cost?.costStatus === "known" ? cost.costUsd : null);
+      await settleRun(
+        reservation,
+        cost?.costStatus === "known" ? cost.costUsd : runChargeBound(budget!),
+      );
     }
   }
 }

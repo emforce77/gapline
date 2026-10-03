@@ -10,7 +10,8 @@ export async function withFetch<T>(
   const saved = keys.map((k) => process.env[k]);
   globalThis.fetch = (async (url: string | URL | Request, init?: RequestInit) => {
     const address = String(url);
-    if (address.includes("metadata.google")) return Response.json({ access_token: "fixture" });
+    if (address.includes("metadata.google"))
+      return Response.json({ access_token: "fixture", expires_in: 3599 });
     return handler(address, init);
   }) as typeof fetch;
   process.env.GCP_PROJECT_ID = "fixture";

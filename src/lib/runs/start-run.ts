@@ -21,7 +21,15 @@ import {
   type Project,
   type RunOwner,
 } from "../store/projects";
-import { reserveRun, settleRun, withRunBudget, type BudgetScope, type Reservation } from "./budget";
+import {
+  newRunBudget,
+  reserveRun,
+  runChargeBound,
+  settleRun,
+  withRunBudget,
+  type BudgetScope,
+  type Reservation,
+} from "./budget";
 
 export function newRunId(language: Language, density: Density): string {
   const stamp = new Date()
@@ -65,6 +73,7 @@ export async function executeRun(
   emit?: (event: TimedRunEvent) => void,
 ): Promise<{ runId: string }> {
   const { project, runId, dir, key } = run;
+  const budget = newRunBudget(reservation);
   try {
     if (run.owner) {
       await mkdir(dir, { recursive: true });
@@ -76,36 +85,44 @@ export async function executeRun(
       };
       await writeFile(join(dir, RUN_OWNER_FILE), JSON.stringify(owner));
     }
-    const { summary } = await withRunBudget(reservation, () =>
-      runDescription({
-        runId,
-        runDir: dir,
-        clipFile: join(projectDir(project.id), "clip.mp4"),
-        clipSeconds: project.clipSeconds,
-        filmLanguageCode: project.filmLanguageCode,
-        language: run.language,
-        density: run.density,
-        writerModel: MODELS.flash,
-        reviewerModel: MODELS.flash,
-        cached: run.cached,
-        onAnalysis: async (part) => {
-          await saveAnalysisPart(project, key, part);
-          const complete = await readAnalysisParts(project, key);
-          if (complete.speech && complete.scene)
-            await writeAnalysis(project.id, { speech: complete.speech, scene: complete.scene });
-        },
-        emit,
-      }),
+    const { summary } = await withRunBudget(
+      reservation,
+      () =>
+        runDescription({
+          runId,
+          runDir: dir,
+          clipFile: join(projectDir(project.id), "clip.mp4"),
+          clipSeconds: project.clipSeconds,
+          filmLanguageCode: project.filmLanguageCode,
+          language: run.language,
+          density: run.density,
+          writerModel: MODELS.flash,
+          reviewerModel: MODELS.flash,
+          cached: run.cached,
+          onAnalysis: async (part) => {
+            await saveAnalysisPart(project, key, part);
+            const complete = await readAnalysisParts(project, key);
+            if (complete.speech && complete.scene)
+              await writeAnalysis(project.id, { speech: complete.speech, scene: complete.scene });
+          },
+          emit,
+        }),
+      budget,
     );
-    await settleRun(reservation, summary.costStatus === "unresolved" ? null : summary.costUsd);
+    await settleRun(
+      reservation,
+      summary.costStatus === "unresolved" ? runChargeBound(budget) : summary.costUsd,
+    );
     return { runId };
   } catch (error) {
+    // A run that stopped early (often before its ledger exists) is charged what its calls can
+    // have cost, not the whole reservation: nine early failures must not spend a day's allowance.
     const spent = await readCallRecords(join(dir, "ledger.jsonl")).then(
       (calls) => {
         const c = summarizeCosts(calls);
-        return c.costStatus === "unresolved" ? null : c.costUsd;
+        return c.costStatus === "unresolved" ? runChargeBound(budget) : c.costUsd;
       },
-      () => null,
+      () => runChargeBound(budget),
     );
     await settleRun(reservation, spent);
     throw error;

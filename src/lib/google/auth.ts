@@ -2,7 +2,13 @@ import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
 const run = promisify(execFile);
-const TOKEN_TTL_MS = 40 * 60 * 1000;
+/** A token is replaced this long before it expires, so no request carries an expiring one. */
+const TOKEN_MARGIN_MS = 5 * 60 * 1000;
+/**
+ * gcloud does not say how long the token it prints still lives (it can hand back one minted
+ * earlier), so a local token is asked for again after a few minutes.
+ */
+const LOCAL_TOKEN_TTL_MS = 5 * 60 * 1000;
 const METADATA_TOKEN_URL =
   "http://metadata.google.internal/computeMetadata/v1/instance/service-accounts/default/token";
 
@@ -21,24 +27,29 @@ export function gcpProjectId(): string {
  */
 export async function googleAccessToken(): Promise<string> {
   if (cached && cached.expires > Date.now()) return cached.token;
-  let token: string;
   if (process.env.K_SERVICE) {
     const response = await fetch(METADATA_TOKEN_URL, { headers: { "Metadata-Flavor": "Google" } });
     if (!response.ok) throw new Error(`Metadata token HTTP ${response.status}`);
-    token = ((await response.json()) as { access_token: string }).access_token;
-  } else {
-    const configuration = process.env.GCLOUD_CONFIGURATION;
-    if (!configuration) throw new Error("GCLOUD_CONFIGURATION is not set for local runs");
-    const { stdout } = await run("gcloud", [
-      "--configuration",
-      configuration,
-      "auth",
-      "print-access-token",
-    ]);
-    token = stdout.trim();
+    const body = (await response.json()) as { access_token: string; expires_in: number };
+    // The metadata server hands out its current token with whatever lifetime it has left. A fixed
+    // 40-minute cache sent expired tokens (Speech/TTS HTTP 401) for minutes on 2026-10-03.
+    if (!Number.isFinite(body.expires_in)) throw new Error("Metadata token has no expires_in");
+    cached = {
+      token: body.access_token,
+      expires: Date.now() + body.expires_in * 1000 - TOKEN_MARGIN_MS,
+    };
+    return body.access_token;
   }
-  cached = { token, expires: Date.now() + TOKEN_TTL_MS };
-  return token;
+  const configuration = process.env.GCLOUD_CONFIGURATION;
+  if (!configuration) throw new Error("GCLOUD_CONFIGURATION is not set for local runs");
+  const { stdout } = await run("gcloud", [
+    "--configuration",
+    configuration,
+    "auth",
+    "print-access-token",
+  ]);
+  cached = { token: stdout.trim(), expires: Date.now() + LOCAL_TOKEN_TTL_MS };
+  return cached.token;
 }
 
 export async function googleHeaders(): Promise<Record<string, string>> {

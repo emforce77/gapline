@@ -140,9 +140,31 @@ export async function settleRun(reservation: Reservation, costUsd: number | null
     },
   );
 }
-const running = new AsyncLocalStorage<{ limit: number; spent: number; pending: number }>();
-export function withRunBudget<T>(reservation: Reservation, work: () => Promise<T>): Promise<T> {
-  return running.run({ limit: reservation.amount, spent: 0, pending: 0 }, work);
+/** What one run's paid calls have used: settled calls at their cost, unknown ones at their bound. */
+export interface RunBudget {
+  limit: number;
+  spent: number;
+  /** Bounds of calls still in flight. */
+  pending: number;
+}
+const running = new AsyncLocalStorage<RunBudget>();
+export function newRunBudget(reservation: Reservation): RunBudget {
+  return { limit: reservation.amount, spent: 0, pending: 0 };
+}
+export function withRunBudget<T>(
+  reservation: Reservation,
+  work: () => Promise<T>,
+  budget: RunBudget = newRunBudget(reservation),
+): Promise<T> {
+  return running.run(budget, work);
+}
+/**
+ * The most a run can have been charged when its ledger cannot say exactly (a call without usage,
+ * a run that stopped before writing its ledger): every call so far at its cost or, if unknown, its
+ * bound, plus the calls still in flight at their bound. Never more than the reservation.
+ */
+export function runChargeBound(budget: RunBudget): number {
+  return Math.min(budget.limit, budget.spent + budget.pending);
 }
 /** Unknown charges consume the full bound; failed and retried requests count too. */
 export function reserveCall(maxUsd: number): (costUsd: number | null) => void {
