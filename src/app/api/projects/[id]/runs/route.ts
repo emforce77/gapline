@@ -3,7 +3,7 @@ import type { ApiErrorBody, RequestErrorCode, RunErrorCode } from "@/lib/api-con
 import { BudgetExhaustedError, reserveRun } from "@/lib/runs/budget";
 import { describeFailure } from "@/lib/runs/failure";
 import { executeRun, prepareRun } from "@/lib/runs/start-run";
-import { listActiveRuns, listActiveWork, listRuns } from "@/lib/store/projects";
+import { listActiveRuns, listRuns, listRunsAndWork } from "@/lib/store/run-index";
 import { accessibleProject, ownerHash, sameOrigin, sessionToken } from "@/lib/store/access";
 
 export const runtime = "nodejs";
@@ -41,9 +41,8 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
       { headers: { "Cache-Control": "private, no-store" } },
     );
   }
-  const viewer = ownerHash(existing);
-  const [runs, work] = await Promise.all([listRuns(project, viewer), listActiveWork(id, viewer)]);
-  return Response.json({ runs, ...work }, { headers: { "Cache-Control": "private, no-store" } });
+  const listed = await listRunsAndWork(project, ownerHash(existing));
+  return Response.json(listed, { headers: { "Cache-Control": "private, no-store" } });
 }
 
 /**

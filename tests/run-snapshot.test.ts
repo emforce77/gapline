@@ -4,7 +4,8 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { it } from "node:test";
 import { RUN_TIME_LIMIT_SECONDS } from "../src/lib/api-contract";
-import { listActiveRuns, listRuns, readRunSnapshot, runDir } from "../src/lib/store/projects";
+import { readRunSnapshot, runDir } from "../src/lib/store/projects";
+import { listActiveRuns, listRuns } from "../src/lib/store/run-index";
 
 it("polling survives startup and partial appends, and delivers the result before reporting done", async () => {
   const previous = process.env.DATA_DIR;

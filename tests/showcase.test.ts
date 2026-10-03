@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, rm, utimes, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
+import { listRuns } from "../src/lib/store/run-index";
 import {
   listProjects,
-  listRuns,
   projectDir,
   RUN_OWNER_FILE,
   runDir,

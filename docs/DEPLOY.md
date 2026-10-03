@@ -140,8 +140,21 @@ up for 60 seconds, and that a file is missing for 5 seconds, so one instance cou
 another's file as it was up to a minute before: a finished run still "running" and its stages going
 backwards, or a saved edit missing from the list. The script mounts the bucket with
 `metadata-cache-ttl-secs=0`, so every lookup of an existing file asks Cloud Storage, which is
-consistent. Each lookup is then a request to Cloud Storage; listings read their files several at a
-time to keep that short.
+consistent. Each lookup is then a request to Cloud Storage, so a project's run listing reads only the
+names in its `runs/` folder and one index file, `projects/<id>/runs-index.json`, however many runs it
+holds ([`src/lib/store/run-index.ts`](../src/lib/store/run-index.ts)). A run records itself there
+when it ends, and one started from the web also when it starts, through the Cloud Storage API with a
+generation precondition. A run the index does not know yet, such as every run from before the
+index, is read once by the next listing and added, so the first listing of a project after the index
+arrived reads all its runs (80 runs in a local test directory, 2026-10-03: 360 file calls once, then
+2 per listing). A run folder that only lacks files, such as an edit that stopped before writing its
+events or a run still being copied in, is read again by every listing until it has lacked them for
+15 minutes, and only then recorded as ended, so a copy that completes in that time is listed. On a
+copy of the live bucket from 2026-10-03, whose sample holds one such folder, a listing made 6 file
+calls for those 15 minutes and 2 after. Cloud Storage accepts about one write per second to one
+object; when a burst of runs ending at once loses index writes, those runs are logged as
+`RUN INDEX NOT UPDATED` and read directly by each listing until one records them, so pages are
+slower for that while and the lists stay right.
 
 gcloud takes the options without leading dashes, separated by semicolons (`gcloud run deploy --help`,
 585.0.0). Cloud Run refused `metadata-cache-negative-ttl-secs` on 2026-10-03 ("Unsupported or
@@ -173,8 +186,15 @@ it into the bucket:
 npm ci
 cp -n .env.example .env.local   # keeps an existing file; the sample steps need no key
 npm run samples              # downloads the film once and prepares runtime/projects/tos-opening
+rm -f runtime/projects/tos-opening/runs-index.json   # a local run index; the service builds its own
 gcloud storage cp -r runtime/projects/tos-opening "gs://$BUCKET/projects/"
+gcloud storage rm "gs://$BUCKET/projects/tos-opening/runs-index.json"
 ```
+
+The last command deletes the run index that a page opened during the copy may have written from
+half-copied runs; the next listing builds it again from all the runs. When no page listed the
+project meanwhile there is no index yet, and the command fails with nothing to delete. Do the same
+after copying runs into any project in the bucket, such as restoring it from a backup.
 
 Open the service URL that the deploy printed, open the sample and generate a track. The landing page
 shows the newest Standard track in the viewer's language. To choose which tracks it shows, put

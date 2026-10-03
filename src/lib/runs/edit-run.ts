@@ -19,6 +19,7 @@ import {
   runDir,
   type RunEditor,
 } from "../store/projects";
+import { indexRunEnded, indexRunStarted, logIndexFailure } from "../store/run-index";
 import {
   newRunBudget,
   reserveRun,
@@ -315,16 +316,23 @@ export async function editRun(
         await mkdir(join(dir, "voice"), { recursive: true });
         // Before any result file: on the sample, the edit belongs to its editor from the start.
         // The rest lets its editor find it again after a reload while it is being made.
-        const editor: RunEditor = {
-          ownerHash: owner,
-          startedAt: new Date(started).toISOString(),
+        const work = {
           baseRunId,
           cueId: input.cueId,
-          action: "action" in input ? "remove" : "rewrite",
+          action: "action" in input ? ("remove" as const) : ("rewrite" as const),
           language: first.language,
           density: first.density,
         };
-        await writeFile(join(dir, RUN_EDITOR_FILE), JSON.stringify(editor));
+        const startedAt = new Date(started).toISOString();
+        const editor: RunEditor = { ownerHash: owner, startedAt, ...work };
+        await Promise.all([
+          writeFile(join(dir, RUN_EDITOR_FILE), JSON.stringify(editor)),
+          indexRunStarted(projectId, runId, {
+            owner,
+            startedAt,
+            work: { kind: "edit", ...work },
+          }).catch(logIndexFailure(projectId, runId)),
+        ]);
         const cues = structuredClone(base.cues);
         const at = new Date().toISOString();
         const run = { projectId, project, base, baseRunId, first, runId, dir, ledgerFile, started };
@@ -371,6 +379,8 @@ export async function editRun(
       },
       budget,
     );
+    // Before the answer, which lists the new result (the edits route).
+    await indexRunEnded(projectId, runId, false).catch(logIndexFailure(projectId, runId));
     await record((state) => {
       state.state = "done";
       state.runId = runId;
@@ -393,6 +403,7 @@ export async function editRun(
         (markerError: unknown) =>
           console.error(`edit failure marker not written: run=${runId}`, markerError),
       );
+      await indexRunEnded(projectId, runId, true).catch(logIndexFailure(projectId, runId));
     }
     await record((state) => {
       state.state = "failed";

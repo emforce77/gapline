@@ -8,10 +8,9 @@ import type { Cue } from "../src/lib/pipeline/schemas";
 import { downloadName, runDownloadName, titleSlug } from "../src/lib/runs/download-name";
 import { editRun, EditError } from "../src/lib/runs/edit-run";
 import { canAccess, ownerHash } from "../src/lib/store/access";
+import { listActiveWork, listRuns, readRunIndex } from "../src/lib/store/run-index";
 import {
   canSeeRun,
-  listActiveWork,
-  listRuns,
   readRunSnapshot,
   RUN_EDITOR_FILE,
   RUN_OWNER_FILE,
@@ -248,10 +247,18 @@ describe("versions made on the shared sample", () => {
       failed.events.map((e) => e.type === "run_failed" && e.code),
       ["internal"],
     );
-    await finishedRun(SAMPLE.id, editId, { file: RUN_EDITOR_FILE, owner: B });
-    assert.ok(ids(await listRuns(SAMPLE, B)).includes(editId));
-    assert.ok(!ids(await listRuns(SAMPLE, A)).includes(editId));
-    assert.ok(!ids(await listRuns(SAMPLE, undefined)).includes(editId));
+    // The run index recorded its end as it failed: no listing reads it again.
+    const index = await readRunIndex(SAMPLE.id);
+    assert.ok(index.ended.includes(editId));
+    assert.equal(index.active[editId], undefined);
+    // A retry of the edit is a run of its own (edit-run.ts, attemptRunId). Once its result exists,
+    // its marker decides who sees it, though no code of the edit's recorded it in the index.
+    const retry = `${editId}-2`;
+    await finishedRun(SAMPLE.id, retry, { file: RUN_EDITOR_FILE, owner: B });
+    assert.ok(ids(await listRuns(SAMPLE, B)).includes(retry));
+    assert.ok(!ids(await listRuns(SAMPLE, A)).includes(retry));
+    assert.ok(!ids(await listRuns(SAMPLE, undefined)).includes(retry));
+    assert.ok(!ids(await listRuns(SAMPLE, B)).includes(editId));
   });
 
   it("names downloads by clip title, language, density and version", async () => {

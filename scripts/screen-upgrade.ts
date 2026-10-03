@@ -1,7 +1,8 @@
 import { appendFile, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { startRun } from "../src/lib/runs/start-run";
-import { listRuns, readProject, runDir } from "../src/lib/store/projects";
+import { readProject, runDir } from "../src/lib/store/projects";
+import { listRuns } from "../src/lib/store/run-index";
 import type { Language } from "../src/lib/pipeline/schemas";
 import { readCallRecords } from "../src/lib/llm/ledger";
 const root = "runtime/evaluation";

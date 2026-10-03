@@ -21,6 +21,7 @@ import type { SceneMap, SpeechSegment } from "../pipeline/schemas";
  *   projects/<id>/strip.jpg      one thumbnail per second, for the timeline
  *   projects/<id>/analysis-{speech,scene}.json  separately validated keyed components
  *   projects/<id>/analysis.json  combined analysis for display and legacy results
+ *   projects/<id>/runs-index.json  what a listing needs of each run (run-index.ts; never served)
  *   projects/<id>/runs/<runId>/  events, ledger, script and media of one run
  *   projects/<id>/runs/<runId>/owner.json  who started a live run from the web (never served)
  *   projects/<id>/runs/<runId>/editor.json who made an edit from the web (never served); a file of
@@ -60,6 +61,11 @@ export interface RunListing {
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,63}$/;
 
+/** Whether a folder name under runs/ is a run id; other names there are never runs. */
+export function isRunId(name: string): boolean {
+  return ID_PATTERN.test(name);
+}
+
 /** Project and run ids come from URLs; only this shape is ever joined into a path. */
 export function assertSafeId(id: string): string {
   if (!ID_PATTERN.test(id)) throw new Error(`Invalid id: ${id}`);
@@ -78,7 +84,7 @@ export function runDir(projectId: string, runId: string): string {
  * On Cloud Run every file call is a network round trip to the bucket, so listings read their
  * projects and runs this many at a time instead of one after another.
  */
-const READS_IN_FLIGHT = 8;
+export const READS_IN_FLIGHT = 8;
 
 async function exists(path: string): Promise<boolean> {
   try {
@@ -93,7 +99,7 @@ async function exists(path: string): Promise<boolean> {
  * The result of a read, or `missing` when the file (or its directory) is not there. Reading
  * straight away saves the separate existence check, which costs a round trip of its own.
  */
-async function unlessMissing<T, M>(read: Promise<T>, missing: M): Promise<T | M> {
+export async function unlessMissing<T, M>(read: Promise<T>, missing: M): Promise<T | M> {
   try {
     return await read;
   } catch (error) {
@@ -148,64 +154,6 @@ export async function writeAnalysis(
   analysis: { speech: SpeechSegment[]; scene: SceneMap },
 ): Promise<void> {
   await writeFile(join(projectDir(id), "analysis.json"), JSON.stringify(analysis, null, 2));
-}
-
-/**
- * Finished runs this viewer may see (runVisibleTo), newest first. Both the script and its final
- * event must be available. Pages everyone sees pass no viewer and get the public runs only.
- */
-export async function listRuns(
-  project: Pick<Project, "id" | "kind">,
-  viewerHash: string | undefined,
-): Promise<RunListing[]> {
-  const runIds = await unlessMissing(readdir(join(projectDir(project.id), "runs")), []);
-  const listings = await mapLimit(
-    runIds.filter((runId) => ID_PATTERN.test(runId)),
-    READS_IN_FLIGHT,
-    (runId) => listedRun(project, runId, viewerHash),
-  );
-  return listings
-    .filter((r): r is RunListing => r !== null)
-    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-}
-
-/** One run for listRuns, or null when it is unfinished or not this viewer's to see. */
-async function listedRun(
-  project: Pick<Project, "id" | "kind">,
-  runId: string,
-  viewerHash: string | undefined,
-): Promise<RunListing | null> {
-  const dir = runDir(project.id, runId);
-  const script = join(dir, "script.json");
-  // One call both finds the script and dates the listing.
-  const written = await unlessMissing(stat(script), null);
-  if (!written) return null;
-  if (!(await canSeeRun(project, runId, viewerHash))) return null;
-  // A reload must not put a run in finishedRunIds before its final event can be displayed.
-  const [snapshot, raw] = await Promise.all([
-    readSnapshot(dir, Date.now(), true),
-    readFile(script, "utf8"),
-  ]);
-  if (snapshot.status !== "done") return null;
-  const parsed = JSON.parse(raw);
-  const edit = parsed.humanEdits?.at(-1);
-  const started = snapshot.events.find((event) => event.type === "run_started");
-  if (!started) return null;
-  return {
-    runId,
-    language: started.language,
-    density: started.density,
-    summary: parsed.summary ?? null,
-    createdAt: written.mtime.toISOString(),
-    ...(edit
-      ? {
-          lastEdit: {
-            cueId: edit.cueId,
-            action: edit.action === "remove" ? ("remove" as const) : ("rewrite" as const),
-          },
-        }
-      : {}),
-  };
 }
 
 /** Written when a live run starts, so its starter can find it again after a reload. */
@@ -316,7 +264,7 @@ async function readEvents(file: string): Promise<TimedRunEvent[]> {
   return events;
 }
 
-function withinTimeLimit(since: Date | string, now: number): boolean {
+export function withinTimeLimit(since: Date | string, now: number): boolean {
   return now - new Date(since).getTime() < RUN_TIME_LIMIT_SECONDS * 1000;
 }
 
@@ -332,23 +280,40 @@ export async function readRunSnapshot(
   return readSnapshot(runDir(projectId, runId), now);
 }
 
-/** readRunSnapshot of a run directory; `scriptWritten` when the caller has just found script.json. */
+/** What the web wrote as a run started: owner.json (a generate run) or editor.json (an edit). */
+export interface RunMarkers {
+  owner?: RunOwner;
+  editor?: RunEditor;
+}
+
+/** A run's start marker; a run with owner.json is a generate run, whatever else it holds. */
+async function readRunMarkers(dir: string): Promise<RunMarkers> {
+  const owner = await unlessMissing(readFile(join(dir, RUN_OWNER_FILE), "utf8"), null);
+  if (owner !== null) return { owner: JSON.parse(owner) as RunOwner };
+  const editor = await unlessMissing(readFile(join(dir, RUN_EDITOR_FILE), "utf8"), null);
+  return editor === null ? {} : { editor: JSON.parse(editor) as RunEditor };
+}
+
+/** When a run made from the web started (edits made before 2026-10-03 do not say). */
+function markerStart(markers: RunMarkers): string | null {
+  return (markers.owner ?? markers.editor)?.startedAt ?? null;
+}
+
+/**
+ * readRunSnapshot of a run directory. `scriptWritten`: the caller has just looked for script.json.
+ * `start`: when the run started, if the caller already knows (null: it has no start marker);
+ * otherwise its markers are read, at most once and only when the status depends on them.
+ */
 async function readSnapshot(
   dir: string,
   now: number,
-  scriptWritten?: true,
+  scriptWritten?: boolean,
+  start?: string | null,
 ): Promise<{ events: TimedRunEvent[]; status: RunStatus }> {
   const eventsFile = join(dir, "events.jsonl");
-  // When a run made from the web started: its owner file (a generate run) or its editor file (an
-  // edit made since 2026-10-03). Read at most once, and only when the status depends on it.
-  let start: Promise<string | null> | undefined;
-  const readStart = () =>
-    (start ??= (async () => {
-      const owner = await unlessMissing(readFile(join(dir, RUN_OWNER_FILE), "utf8"), null);
-      if (owner !== null) return (JSON.parse(owner) as RunOwner).startedAt;
-      const editor = await unlessMissing(readFile(join(dir, RUN_EDITOR_FILE), "utf8"), null);
-      return editor === null ? null : ((JSON.parse(editor) as RunEditor).startedAt ?? null);
-    })());
+  let started: Promise<string | null> | undefined =
+    start === undefined ? undefined : Promise.resolve(start);
+  const readStart = () => (started ??= readRunMarkers(dir).then(markerStart));
   let events: TimedRunEvent[];
   try {
     events = await readEvents(eventsFile);
@@ -369,13 +334,30 @@ async function readSnapshot(
   return { events, status: withinTimeLimit(since, now) ? "running" : "interrupted" };
 }
 
-export async function runStatus(
-  projectId: string,
-  runId: string,
-  now = Date.now(),
-): Promise<RunStatus> {
-  return (await readRunSnapshot(projectId, runId, now)).status;
-}
+/** What a run's own files say about it, for the run index (run-index.ts). */
+export type RunInspection =
+  /** Listed: its script and its final event are both there. `owner`: who made it from the web. */
+  | { state: "finished"; listing: RunListing; owner: string | null }
+  /**
+   * Never listed, from what its files say: it failed, it ran out of time with an event log that
+   * has no final event, or its log has no start event.
+   */
+  | { state: "ended" }
+  /**
+   * Not listed for now, for want of a file: no event at all (an edit writes its events when it
+   * ends), or a final event whose script is missing, past the time limit; or nothing dates it. A
+   * copy still under way (`gcloud storage cp -r` puts a run's files there one by one, keeping or
+   * not their old dates) looks the same, so the run index records it as ended only once it has
+   * stayed this way for a whole run time limit (run-index.ts).
+   */
+  | { state: "stalled" }
+  /**
+   * Still being made, or `finishing`: its final event is written and its script is not there yet,
+   * which no listing shows as either finished or still being made.
+   */
+  | { state: "running"; finishing: boolean; markers: RunMarkers }
+  /** Nothing says yet when it started, and its id says it may be young: a run still setting up. */
+  | { state: "unknown" };
 
 /** A generate run's id starts with its UTC start (newRunId): 20261003t064307205-en-standard-… */
 const RUN_ID_STAMP = /^(\d{4})(\d{2})(\d{2})t(\d{2})(\d{2})(\d{2})(\d{3})-/;
@@ -391,79 +373,87 @@ function startedTooLongAgo(runId: string, now: number): boolean {
   return now - started > (RUN_TIME_LIMIT_SECONDS + RUN_ID_STAMP_SLACK_SECONDS) * 1000;
 }
 
-/** Unfinished generate runs and edits this viewer started, within the time limit, newest first. */
-export interface ActiveWork {
-  active: ActiveRun[];
-  edits: ActiveEdit[];
-}
-
 /**
- * The viewer's runs and edits that are still going, from one pass over the project's runs. A run
- * whose events already end in run_done is finished, even where its script.json is not yet visible.
- * Generate runs whose id dates them past the time limit are skipped unread, so the pass costs the
- * same however many finished runs the sample collects.
+ * Reads one run the way a listing used to read every run: the same status as readRunSnapshot, and
+ * for a finished run the same listing. `known`: whose the run is and when it started, from the run
+ * index, so its markers need not be read.
  */
-export async function listActiveWork(
+export async function inspectRun(
   projectId: string,
-  viewerHash: string | undefined,
-  now = Date.now(),
-): Promise<ActiveWork> {
-  if (!viewerHash) return { active: [], edits: [] };
-  const root = join(projectDir(projectId), "runs");
-  const runIds = await unlessMissing(readdir(root), []);
-  const unfinished = async (dir: string) => {
-    const { events, status } = await readSnapshot(dir, now);
-    return status === "running" && !events.some((e) => e.type === "run_done");
-  };
-  const found = await mapLimit(
-    runIds.filter((runId) => ID_PATTERN.test(runId) && !startedTooLongAgo(runId, now)),
-    READS_IN_FLIGHT,
-    async (runId): Promise<ActiveRun | ActiveEdit | null> => {
-      const dir = join(root, runId);
-      const raw = await unlessMissing(readFile(join(dir, RUN_OWNER_FILE), "utf8"), null);
-      if (raw !== null) {
-        const owner = JSON.parse(raw) as RunOwner;
-        if (owner.ownerHash !== viewerHash || !withinTimeLimit(owner.startedAt, now)) return null;
-        // The owner file is written just before the first event, so a very young run has none yet.
-        const eventsFile = join(dir, "events.jsonl");
-        const written = await exists(eventsFile);
-        if (!(await unfinished(dir))) return null;
-        return {
-          runId,
-          language: owner.language,
-          density: owner.density,
-          startedAt: owner.startedAt,
-          lastEventAt: written ? (await stat(eventsFile)).mtime.toISOString() : owner.startedAt,
-        };
-      }
-      const marker = await unlessMissing(readFile(join(dir, RUN_EDITOR_FILE), "utf8"), null);
-      if (marker === null) return null;
-      const editor = JSON.parse(marker) as RunEditor;
-      const { startedAt, baseRunId, cueId, action, language, density } = editor;
-      if (editor.ownerHash !== viewerHash || !startedAt || !withinTimeLimit(startedAt, now))
-        return null;
-      if (!baseRunId || !cueId || !action || !language || !density) return null;
-      if (!(await unfinished(dir))) return null;
-      return { runId, baseRunId, cueId, action, language, density, startedAt };
-    },
-  );
-  const newestFirst = (a: { startedAt: string }, b: { startedAt: string }) =>
-    b.startedAt.localeCompare(a.startedAt);
+  runId: string,
+  now: number,
+  known?: { owner: string; startedAt: string },
+): Promise<RunInspection> {
+  const dir = runDir(projectId, runId);
+  const script = join(dir, "script.json");
+  const [written, markers] = known
+    ? [undefined, undefined]
+    : await Promise.all([unlessMissing(stat(script), null), readRunMarkers(dir)]);
+  let snapshot: { events: TimedRunEvent[]; status: RunStatus };
+  try {
+    snapshot = await readSnapshot(
+      dir,
+      now,
+      written === undefined ? undefined : written !== null,
+      known ? known.startedAt : markerStart(markers!),
+    );
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+    // No event and no start time. A generate run's id dates it; an edit from before 2026-10-03
+    // that stopped early has only its marker, which dates it. A folder nothing dates (an older
+    // edit with only its ledger) is stalled from the start; the index dates it by when it saw it.
+    const marker = markers?.owner ? RUN_OWNER_FILE : markers?.editor ? RUN_EDITOR_FILE : null;
+    const since = marker ? (await stat(join(dir, marker))).mtime : null;
+    if (!since && !RUN_ID_STAMP.test(runId)) return { state: "stalled" };
+    const over = since ? !withinTimeLimit(since, now) : startedTooLongAgo(runId, now);
+    return over ? { state: "stalled" } : { state: "unknown" };
+  }
+  const { events, status } = snapshot;
+  const finalEvent = events.some((e) => e.type === "run_done");
+  if (status === "running")
+    return { state: "running", finishing: finalEvent, markers: markers ?? {} };
+  if (status === "failed") return { state: "ended" };
+  // Out of time. With an event log that lacks the final event the run never finished; with no event
+  // at all, or a final event without its script, its files may still be on their way.
+  if (status === "interrupted")
+    return events.length === 0 || finalEvent ? { state: "stalled" } : { state: "ended" };
+  const started = events.find((event) => event.type === "run_started");
+  if (!started) return { state: "ended" };
+  const [stats, raw] = await Promise.all([written ?? stat(script), readFile(script, "utf8")]);
+  const parsed = JSON.parse(raw);
+  const edit = parsed.humanEdits?.at(-1);
+  const markerOwner = markers?.owner ?? markers?.editor;
   return {
-    active: found
-      .filter((r): r is ActiveRun => r !== null && !("baseRunId" in r))
-      .sort(newestFirst),
-    edits: found.filter((r): r is ActiveEdit => r !== null && "baseRunId" in r).sort(newestFirst),
+    state: "finished",
+    owner: known
+      ? known.owner
+      : markerOwner
+        ? OwnerMarkerSchema.parse(markerOwner).ownerHash
+        : null,
+    listing: {
+      runId,
+      language: started.language,
+      density: started.density,
+      summary: parsed.summary ?? null,
+      createdAt: stats.mtime.toISOString(),
+      ...(edit
+        ? {
+            lastEdit: {
+              cueId: edit.cueId,
+              action: edit.action === "remove" ? ("remove" as const) : ("rewrite" as const),
+            },
+          }
+        : {}),
+    },
   };
 }
 
-/** Unfinished generate runs this viewer started, still within the time limit, newest first. */
-export async function listActiveRuns(
+export async function runStatus(
   projectId: string,
-  viewerHash: string | undefined,
+  runId: string,
   now = Date.now(),
-): Promise<ActiveRun[]> {
-  return (await listActiveWork(projectId, viewerHash, now)).active;
+): Promise<RunStatus> {
+  return (await readRunSnapshot(projectId, runId, now)).status;
 }
 
 export async function importFile(source: string, projectId: string, name: string): Promise<void> {

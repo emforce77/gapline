@@ -44,9 +44,11 @@ flowchart LR
   builds the `Dockerfile` as a dedicated build service account, and the image lands in Artifact
   Registry before Cloud Run rolls it out.
 - **Cloud Storage.** One regional bucket is mounted into the service at `/data` as a Cloud Storage
-  volume. Projects, saved analysis and runs are plain files there. The two records that must never be
-  written twice, the daily allowance and edit claims, go through the Cloud Storage API with
-  generation preconditions (`ifGenerationMatch`), because a mounted bucket has no file locks.
+  volume. Projects, saved analysis and runs are plain files there. The records that several
+  instances update at once, the daily allowance, edit claims and each project's run index
+  (`runs-index.json`, what the run listings read instead of every run's files), go through the Cloud
+  Storage API with generation preconditions (`ifGenerationMatch`), because a mounted bucket has no
+  file locks.
 - **Speech-to-Text v2, Chirp 3.** Gapline sends the soundtrack as 16 kHz mono FLAC in pieces of 55
   seconds that overlap by 5 seconds, because synchronous recognition takes about a minute of audio per
   request. Each overlap is split at its midpoint. Calls go to the `us` multi-region endpoint

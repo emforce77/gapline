@@ -21,6 +21,7 @@ import {
   type Project,
   type RunOwner,
 } from "../store/projects";
+import { indexRunEnded, indexRunStarted, logIndexFailure } from "../store/run-index";
 import {
   newRunBudget,
   reserveRun,
@@ -84,7 +85,15 @@ export async function executeRun(
         language: run.language,
         density: run.density,
       };
-      await writeFile(join(dir, RUN_OWNER_FILE), JSON.stringify(owner));
+      const { startedAt, language, density } = owner;
+      await Promise.all([
+        writeFile(join(dir, RUN_OWNER_FILE), JSON.stringify(owner)),
+        indexRunStarted(project.id, runId, {
+          owner: run.owner,
+          startedAt,
+          work: { kind: "run", language, density },
+        }).catch(logIndexFailure(project.id, runId)),
+      ]);
     }
     ({ summary } = await withRunBudget(
       reservation,
@@ -111,6 +120,7 @@ export async function executeRun(
       budget,
     ));
   } catch (error) {
+    await indexRunEnded(project.id, runId, true).catch(logIndexFailure(project.id, runId));
     // A run that stopped early (often before its ledger exists) is charged what its calls can
     // have cost, not the whole reservation: nine early failures must not spend a day's allowance.
     const spent = await readCallRecords(join(dir, "ledger.jsonl")).then(
@@ -123,8 +133,10 @@ export async function executeRun(
     await settleRun(reservation, spent);
     throw error;
   }
-  // The run has written its result and sent run_done. A settlement that fails now is logged, never
-  // turned into a failure of the run; the unsettled entry counts in full until the time limit.
+  // The run has written its result and sent run_done; the index now lists it for everyone who may
+  // see it. A settlement that fails now is logged, never turned into a failure of the run; the
+  // unsettled entry counts in full until the time limit.
+  await indexRunEnded(project.id, runId, false).catch(logIndexFailure(project.id, runId));
   await settleRun(
     reservation,
     summary.costStatus === "unresolved" ? runChargeBound(budget) : summary.costUsd,

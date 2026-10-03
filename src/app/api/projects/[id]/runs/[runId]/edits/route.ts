@@ -1,6 +1,7 @@
 import type { EditSaved } from "@/lib/api-contract";
 import { accessibleProject, ownerHash, sameOrigin, sessionToken } from "@/lib/store/access";
-import { assertSafeId, listRuns, type RunListing } from "@/lib/store/projects";
+import { assertSafeId, type RunListing } from "@/lib/store/projects";
+import { listRuns } from "@/lib/store/run-index";
 import { EditError, EditSchema, editRun } from "@/lib/runs/edit-run";
 import { BudgetExhaustedError } from "@/lib/runs/budget";
 import { describeFailure } from "@/lib/runs/failure";

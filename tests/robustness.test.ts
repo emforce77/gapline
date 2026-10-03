@@ -24,7 +24,8 @@ import {
 import { describeFailure } from "../src/lib/runs/failure";
 import { sameOrigin } from "../src/lib/store/access";
 import { validateAnalysis } from "../src/lib/store/analysis";
-import { listActiveRuns, runDir, runStatus, RUN_OWNER_FILE } from "../src/lib/store/projects";
+import { runDir, runStatus, RUN_OWNER_FILE } from "../src/lib/store/projects";
+import { listActiveRuns } from "../src/lib/store/run-index";
 
 async function withDataDir<T>(work: (dir: string) => Promise<T>): Promise<T> {
   const previous = { data: process.env.DATA_DIR, cap: process.env.DAILY_BUDGET_USD };

@@ -18,8 +18,8 @@ import { editRun, EditError } from "../src/lib/runs/edit-run";
 import { describeFailure } from "../src/lib/runs/failure";
 import { updateObjectJson, type JsonBucket } from "../src/lib/store/atomic";
 import { OWNER_COOKIE, ownerHash } from "../src/lib/store/access";
+import { listActiveWork } from "../src/lib/store/run-index";
 import {
-  listActiveWork,
   readFresh,
   readRunSnapshot,
   RUN_EDITOR_FILE,

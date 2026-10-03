@@ -6,7 +6,8 @@ import { orderRuns, originalRun } from "@/components/workspace/labels";
 import { Workspace } from "@/components/workspace/Workspace";
 import { asUiLang, dictionary, fill, UI_LANG_COOKIE, type UiLang } from "@/i18n";
 import { I18nProvider } from "@/i18n/client";
-import { listRuns, readAnalysis, readRunSnapshot, type Project } from "@/lib/store/projects";
+import { readAnalysis, readRunSnapshot, type Project } from "@/lib/store/projects";
+import { listRuns } from "@/lib/store/run-index";
 import { loadShowcases } from "@/lib/store/showcase";
 import { accessibleProject, accessibleRun, publicProject, viewerHash } from "@/lib/store/access";
 

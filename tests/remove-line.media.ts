@@ -13,6 +13,7 @@ import type { RunSummary, TimedRunEvent } from "../src/lib/pipeline/events";
 import type { Cue } from "../src/lib/pipeline/schemas";
 import { editRun } from "../src/lib/runs/edit-run";
 import { projectDir, runDir, writeProject, type Project } from "../src/lib/store/projects";
+import { listRuns, readRunIndex } from "../src/lib/store/run-index";
 
 const RATE = 24000;
 const CLIP_SECONDS = 5;
@@ -278,6 +279,16 @@ it("removes one line: other WAVs reused byte-for-byte, track and audit rebuilt, 
       ),
       /different edit/,
     );
+    // The run index holds the edit as its editor's finished result, with its listing.
+    const index = await readRunIndex(project.id);
+    assert.equal(index.active[removed.runId], undefined);
+    const indexed = index.finished[removed.runId];
+    assert.deepEqual(
+      [indexed.owner, indexed.language, indexed.density, indexed.lastEdit],
+      [OWNER, "en", "standard", { cueId: "L2", action: "remove" }],
+    );
+    assert.ok((await listRuns(project, OWNER)).some((r) => r.runId === removed.runId));
+    assert.ok(!(await listRuns(project, undefined)).some((r) => r.runId === removed.runId));
     await assert.rejects(
       editRun(project.id, removed.runId, { ...removal, requestId: "remove-again-01" }, OWNER),
       /Only a line in the track can be removed/,

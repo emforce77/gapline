@@ -5,13 +5,13 @@ import type { RunSummary } from "../pipeline/events";
 import type { Cue, SpeechSegment } from "../pipeline/schemas";
 import {
   dataDir,
-  listRuns,
   readProject,
   runDir,
   sampleProjectIds,
   type Project,
   type RunListing,
 } from "./projects";
+import { listRuns } from "./run-index";
 
 export interface Showcase {
   project: Project;
