@@ -70,7 +70,7 @@ export function SevenSeconds({
   const [ended, setEnded] = useState(false);
   const [failed, setFailed] = useState(false);
   const [time, setTime] = useState(windowStart);
-  const [hidden, setHidden] = useState(false);
+  const [hidden, setHidden] = useState(true);
   const trackIn = (lang: TrackLanguage) => tracks.find((tr) => tr.language === lang);
   // A refresh can drop the chosen narration (its result was unpinned); the first one stands in.
   const track = (chosen && trackIn(chosen)) ?? tracks[0];

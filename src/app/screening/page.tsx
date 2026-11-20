@@ -3,6 +3,8 @@ import { cookies } from "next/headers";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { asUiLang, dictionary, UI_LANG_COOKIE } from "@/i18n";
 import { screeningCopy } from "./copy";
+import { formatClock } from "@/lib/format";
+import { timingCase } from "./evidence";
 import s from "./screening.module.css";
 
 const media = "/screening-media";
@@ -43,6 +45,7 @@ export default async function Screening() {
               src={media + "/launch-review.mp4"}
             >
               <track
+                default
                 kind="captions"
                 srcLang={lang}
                 label={lang === "ko" ? "한국어" : "English"}
@@ -66,16 +69,16 @@ export default async function Screening() {
           <h2>{t.timing}</h2>
           <p>{t.timingBody}</p>
           <div className={s.frames}>
-            {(["brain", "eye"] as const).map((frame, i) => (
-              <figure key={frame}>
+            {timingCase.frames.map((frame) => (
+              <figure key={frame.file}>
                 <img
-                  src={media + (i === 0 ? "/brain.jpg" : "/eyepiece.jpg")}
+                  src={media + "/" + frame.file + ".jpg"}
                   alt=""
                   width="640"
                   height="268"
                 />
                 <figcaption>
-                  <b>{i === 0 ? "00:56.7" : "00:59.3"}</b> {t[frame]}
+                  <b>{formatClock(frame.seconds)}</b> {t[frame.caption]}
                 </figcaption>
               </figure>
             ))}
@@ -90,14 +93,14 @@ export default async function Screening() {
           />
           <Link
             className="button"
-            href="/p/tos-opening?run=edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f"
+            href={`/p/${timingCase.project}?run=${timingCase.editedRun}`}
           >
             {t.edit}
           </Link>
           <p>
             <Link
               className={s.link}
-              href="/p/tos-opening?run=20260928t064307205-en-standard-221ceb"
+              href={`/p/${timingCase.project}?run=${timingCase.originalRun}`}
             >
               {t.original}
             </Link>
@@ -117,6 +120,7 @@ export default async function Screening() {
             src={media + "/hanbid.mp4"}
           >
             <track
+              default
               kind="captions"
               srcLang={lang}
               label={lang === "ko" ? "한국어" : "English"}

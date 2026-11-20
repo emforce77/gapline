@@ -347,8 +347,8 @@ export const en = {
       "Finished, but no line fit this clip's silences, so the film has no description.",
     replayFinished: "Replay finished.",
     samplePrivate: "Versions you make on this sample are visible only to you, in this browser.",
-    replay: "Replay the run",
-    replaying: "Replaying at {speed}× speed",
+    replay: "Replay the recorded run",
+    replaying: "Recorded run · {speed}× speed",
     stopReplay: "Stop replay",
     noRun: "Press Generate to make a track in {language}.",
     noRunHint:
