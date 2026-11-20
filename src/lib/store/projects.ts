@@ -56,7 +56,7 @@ export interface RunListing {
   summary: RunSummary | null;
   createdAt: string;
   /** The editor's change that produced this run; absent for automatic runs. */
-  lastEdit?: { cueId: string; action: "rewrite" | "remove" };
+  lastEdit?: { cueId: string; action: "rewrite" | "remove" | "add" };
 }
 
 const ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,63}$/;
@@ -440,7 +440,7 @@ export async function inspectRun(
         ? {
             lastEdit: {
               cueId: edit.cueId,
-              action: edit.action === "remove" ? ("remove" as const) : ("rewrite" as const),
+              action: edit.action === "add" || edit.action === "remove" ? edit.action : "rewrite",
             },
           }
         : {}),

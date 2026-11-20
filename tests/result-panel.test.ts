@@ -17,7 +17,8 @@ import { en } from "../src/i18n/en";
 import { formatClock } from "../src/lib/format";
 import { ko } from "../src/i18n/ko";
 import { webVtt } from "../src/lib/srt";
-import type { RunSummary } from "../src/lib/pipeline/events";
+import { lineReviewReport } from "../src/lib/runs/review-report";
+import type { RunEvent, RunSummary } from "../src/lib/pipeline/events";
 import type { Cue, Gap, Verdict } from "../src/lib/pipeline/schemas";
 
 const cue = (id: string, start: number, status: Cue["status"], text = `${id} text`): Cue => ({
@@ -158,6 +159,99 @@ describe("readResult", () => {
       ROOMY,
     );
     assert.equal(reading.notes, false);
+  });
+});
+
+describe("downloadable line review report", () => {
+  function report(cues: Cue[], details: Partial<RunSummary>, lang: "en" | "ko" = "en") {
+    const started: Extract<RunEvent, { type: "run_started" }> = {
+      type: "run_started",
+      runId: "sample-run",
+      density: "standard",
+      language: "ko",
+      writerModel: "writer",
+      reviewerModel: "reviewer",
+      clipSeconds: 65,
+    };
+    return lineReviewReport(
+      "Test clip",
+      started,
+      {
+        type: "run_done",
+        summary: summary(details),
+        cues,
+        files: {
+          described: "described.mp4",
+          narration: "narration.wav",
+          vtt: "descriptions.vtt",
+          script: "script.json",
+        },
+      },
+      lang,
+    );
+  }
+
+  it("keeps the original rejection and clause distinct from the saved result verdict", () => {
+    const line = cue("L5", 47.2, "fits", "홀로그램 재생창이 뜬다.");
+    line.seconds = 1.744083;
+    line.windowEnd = 49.83;
+    line.versions[0].review = failing(line.id);
+    line.versions.push({ by: "revise", model: "writer", text: "전체 기억 재생." });
+    const text = report(
+      [line],
+      {
+        cuesShipped: 1,
+        cuesFitting: 1,
+        finalReview: {
+          verdicts: [{ cueId: line.id, pass: true, violations: [], fix: "" }],
+          missing: [{ at: 2, gapId: "g1", what: "블렌더 재단 제공." }],
+        },
+      },
+      "ko",
+    );
+    for (const phrase of [
+      "AI",
+      "합성 음성",
+      "저장된 검수 판정 · 반려",
+      "방미통위 가이드라인 p.8",
+      "이 결과에 저장된 판정 · 검수 통과",
+      "자리 · 2.63초",
+      "낭독 · 1.74초",
+      "전체 기억 재생.",
+      "2.00초 · 블렌더 재단 제공.",
+    ])
+      assert.ok(text.includes(phrase), phrase);
+  });
+
+  it("attributes new editor wording and keeps absent line verdicts explicit in an edited result", () => {
+    const added = cue("L9", 1, "fits", "표시등이 켜진다.");
+    added.versions[0].by = "human";
+    const older = cue("L2", 8, "fits");
+    const text = report([older, added], {
+      parentRunId: "earlier",
+      cuesShipped: 2,
+      cuesFitting: 2,
+      finalReview: {
+        verdicts: [{ cueId: added.id, pass: true, violations: [], fix: "" }],
+        missing: [],
+      },
+    });
+    assert.match(text, /Based on · earlier/);
+    assert.match(text, /carry forward findings/);
+    assert.ok(text.indexOf("Written by editor · 표시등이 켜진다.") < text.indexOf("Line 2"));
+    assert.ok(text.includes("Written by editor · 표시등이 켜진다."));
+    assert.match(text.split("Line 2")[1], /No final check recorded/);
+    assert.doesNotMatch(text.split("Line 2")[1], /Passed review/);
+  });
+
+  it("keeps a dropped take out of the spoken durations and discloses an absent final check", () => {
+    const dropped = cue("L2", 8, "dropped");
+    dropped.droppedReason = "too_long";
+    const text = report([dropped], { cuesShipped: 0, cuesFitting: 0 });
+    assert.match(text, /No narration in this track/);
+    assert.match(text, /No final check recorded/);
+    assert.match(text, /Dropped: too long/);
+    assert.doesNotMatch(text, /Spoken ·|None listed|0\/0/);
   });
 });
 

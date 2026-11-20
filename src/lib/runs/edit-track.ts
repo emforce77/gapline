@@ -1,9 +1,7 @@
 /**
- * Rebuilds an edited result from its changed cues. Text edits and removals share this path: every
+ * Rebuilds an edited result from its changed cues. Changes, additions, and removals share this path: every
  * line's WAV (the exact bytes of the parent unless the edit re-voiced that line), the narration stem,
- * the mix, the WebVTT track, and the run's records. What is reviewed differs. A text edit reviews the
- * editor's line, with the rest of the track as context; a removal audits what the whole track now
- * misses.
+ * the mix, the WebVTT track, and the run's records. A text edit reviews the editor's line in context. Adding or removing a line also audits coverage.
  */
 import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -18,7 +16,7 @@ import type { RunFiles, RunSummary, TimedRunEvent } from "../pipeline/events";
 import { LINE_SPACING_SECONDS } from "../pipeline/cues";
 import { unitBudget } from "../pipeline/length";
 import { reviewLines } from "../pipeline/review";
-import type { Cue, Gap, SceneMap, SpeechSegment, Verdict } from "../pipeline/schemas";
+import type { Cue, Gap, MissingItem, SceneMap, SpeechSegment, Verdict } from "../pipeline/schemas";
 import { projectDir, type Project } from "../store/projects";
 
 /** The parent run's script.json, as an edit reads it. */
@@ -34,6 +32,7 @@ export interface EditBase {
 /** What one edit did, as its result's script.json records it (humanEdits). */
 export type HumanEdit =
   | { cueId: string; before: string; after: string; from: number; to: number; at: string }
+  | { cueId: string; action: "add"; missing: MissingItem; after: string; to: number; at: string }
   | { cueId: string; action: "remove"; before: string; from: number; at: string };
 
 export type FinalReview = NonNullable<RunSummary["finalReview"]>;
@@ -169,8 +168,8 @@ export function withLineVerdict(parent: FinalReview | undefined, verdict: Verdic
 
 /**
  * Reviews the edit and writes the result. A text edit reviews the editor's line (reviewEditorLine),
- * which the caller may refuse (`acceptLine` throws to stop the edit before any file is written). A
- * removal audits the whole track for what it now misses; nothing is refused for it.
+ * which the caller may refuse (`acceptLine` throws to stop the edit before any file is written). An addition or removal audits the whole track for what it now misses. An addition must pass
+ * its own line verdict before it can be published.
  */
 export async function writeEditedRun(
   run: EditedRun,
@@ -190,7 +189,9 @@ export async function writeEditedRun(
     videoDataUrl: `data:video/mp4;base64,${video.toString("base64")}`,
   };
   let finalReview: FinalReview;
-  if (run.revoiced) {
+  // Restoring an unvoiced line changes coverage just as inserting a new line does.
+  const wasVoiced = base.cues.some((c) => c.id === run.revoiced?.cueId && c.status === "fits");
+  if (run.revoiced && wasVoiced) {
     const verdict = await reviewEditorLine({
       context,
       ledgerFile: run.ledgerFile,
@@ -215,6 +216,12 @@ export async function writeEditedRun(
         text: c.versions.at(-1)!.text,
       })),
     });
+    // Keep the whole track's new omissions, and only publish
+    // the editor's addition when the final audit accepts its own words and timing.
+    if (run.revoiced) {
+      const cueId = run.revoiced.cueId;
+      acceptLine(finalReview.verdicts.find((v) => v.cueId === cueId)!);
+    }
   }
 
   const lines = new Map<string, TrimmedLine>();
@@ -276,6 +283,7 @@ export async function writeEditedRun(
     parentRunId: run.baseRunId,
     // What the automatic run's fix stage did belongs to that run, not to an edit of it.
     finalFix: undefined,
+    cuesWritten: cues.length,
     cuesShipped: shipped.length,
     cuesDropped: cues.filter((c) => c.status === "dropped").length,
     cuesRemoved: cues.filter((c) => c.status === "removed").length,

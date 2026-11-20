@@ -27,7 +27,7 @@ import {
 import type { Density, Language, SceneMap, SpeechSegment } from "@/lib/pipeline/schemas";
 import type { Project, RunListing } from "@/lib/store/projects";
 import { runFinishedAnnouncement, stageAnnouncement } from "./announcements";
-import { EditLine } from "./CueEditor";
+import { AddLine, EditLine } from "./CueEditor";
 import { LineDetail, StageList } from "./Inspector";
 import { languageName, lineNumbers, sampleRunFigures } from "./labels";
 import { LinePicker } from "./LinePicker";
@@ -130,7 +130,7 @@ export function Workspace({
   const [error, setError] = useState<Alert | null>(
     missingRunId ? { message: t.live.notFound, ownFailure: false } : null,
   );
-  const [editing, setEditing] = useState(false);
+  const [editing, setEditing] = useState<"line" | "add" | null>(null);
   // Edits found after a reload that have since ended; the run list is not read again for them.
   const [settledEdits, setSettledEdits] = useState<string[]>([]);
   const [loadAttempt, setLoadAttempt] = useState(0);
@@ -388,7 +388,10 @@ export function Workspace({
       setSettledEdits((s) => [...s, edit.runId]);
       // Its reservation no longer holds this visitor busy.
       live.recheckStatus();
-      const line = fill(t.line.title, { n: numbers.get(edit.cueId) ?? "" });
+      const line =
+        edit.action === "add"
+          ? t.editor.newLine
+          : fill(t.line.title, { n: numbers.get(edit.cueId) ?? "" });
       setError({
         message: fill(code ? t.live.editStopped : t.live.editUnknown, { line }),
         ownFailure: false,
@@ -497,7 +500,7 @@ export function Workspace({
     if (marker?.offsetParent) marker.focus();
     else document.querySelector<HTMLElement>(".cue-picker select")?.focus();
   }
-  const busy = mode === "live" || editing || Boolean(pendingEdit);
+  const busy = mode === "live" || Boolean(editing) || Boolean(pendingEdit);
   // A run of this clip the viewer started elsewhere (another tab, before Back) is still going, or
   // today's allowance is spent: the server would refuse, and the notices say why.
   const blocked = live.active.length > 0 || live.status?.canStart === false;
@@ -625,7 +628,7 @@ export function Workspace({
               lineNumbers={numbers}
               currentTime={time}
               selectedCueId={selected}
-              disabled={editing}
+              disabled={Boolean(editing)}
               onSeek={(s) => player.current?.seek(s)}
               onSelect={select}
             />
@@ -649,6 +652,31 @@ export function Workspace({
               language={final.language}
               lineNumbers={numbers}
               onSelect={select}
+              onListen={(at) =>
+                player.current?.playTrack(
+                  Math.max(0, at - PLAY_LEAD_IN_SECONDS),
+                  "original",
+                  at + 3,
+                )
+              }
+              renderAdd={(index, slot) =>
+                final.cues.some((c) => c.status === "fits" && !c.audioFile) ? (
+                  <p className="label">{t.editor.legacy}</p>
+                ) : (
+                  <AddLine
+                    key={`${final.runId}-${index}`}
+                    projectId={project.id}
+                    runId={final.runId!}
+                    language={final.language}
+                    missingIndex={index}
+                    bounds={{ min: slot.start, max: slot.windowEnd }}
+                    busy={busy}
+                    unavailable={editRefusal}
+                    onBusy={(working) => setEditing(working ? "add" : null)}
+                    onSaved={(id, listed) => showSaved(id, slot.id, listed)}
+                  />
+                )
+              }
             />
           ) : null}
         </div>
@@ -669,7 +697,7 @@ export function Workspace({
               <button
                 type="button"
                 className="button ghost small back"
-                disabled={editing}
+                disabled={Boolean(editing)}
                 onClick={() => closeLine(selectedCue.id)}
               >
                 <span aria-hidden="true">←</span> {t.line.close}
@@ -680,7 +708,7 @@ export function Workspace({
                 language={cueLanguage}
                 evidence={sceneEvidence}
                 editor={
-                  final && mode === "idle" && !pendingEdit ? (
+                  final && mode === "idle" && !pendingEdit && editing !== "add" ? (
                     <EditLine
                       key={`${final.runId}-${selectedCue.id}`}
                       projectId={project.id}
@@ -690,7 +718,7 @@ export function Workspace({
                       gaps={final.gaps}
                       language={cueLanguage}
                       unavailable={editRefusal}
-                      onBusy={setEditing}
+                      onBusy={(working) => setEditing(working ? "line" : null)}
                       onSaved={(id: string, listed?: RunListing[]) =>
                         showSaved(id, selectedCue.id, listed)
                       }
@@ -698,7 +726,10 @@ export function Workspace({
                   ) : null
                 }
                 onPlay={() =>
-                  player.current?.seek(Math.max(0, selectedCue.start - PLAY_LEAD_IN_SECONDS), true)
+                  player.current?.playTrack(
+                    Math.max(0, selectedCue.start - PLAY_LEAD_IN_SECONDS),
+                    selectedCue.status === "fits" ? "described" : "original",
+                  )
                 }
               />
             </>
@@ -746,9 +777,12 @@ export function Workspace({
                 littleRoom={littleRoom}
                 busy={mode === "live"}
                 pendingEdit={
-                  pendingEdit && pendingLine !== undefined
+                  pendingEdit && (pendingLine !== undefined || pendingEdit.action === "add")
                     ? {
-                        line: fill(t.line.title, { n: pendingLine }),
+                        line:
+                          pendingEdit.action === "add"
+                            ? t.editor.newLine
+                            : fill(t.line.title, { n: pendingLine! }),
                         startedAt: pendingEdit.startedAt,
                       }
                     : null
@@ -761,6 +795,7 @@ export function Workspace({
                 <Downloads
                   base={media(`runs/${final.runId}`)}
                   files={final.files}
+                  reportUrl={`/api/projects/${project.id}/runs/${final.runId}?download=review&lang=${lang}`}
                   described={final.cues.some((c) => c.status === "fits")}
                 />
               ) : null}

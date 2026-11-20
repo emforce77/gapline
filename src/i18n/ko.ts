@@ -340,6 +340,7 @@ export const ko: Dictionary = {
     downloadNarration: "해설 음성 트랙 (WAV)",
     downloadVtt: "해설 텍스트 트랙 (WebVTT)",
     downloadScript: "대본·검수 기록 (JSON)",
+    downloadReport: "문장별 검수 보고서 (TXT)",
     notRecorded: "이전 결과에는 기록되지 않음",
     noDescription: "이 결과에는 해설 없음",
     selected: "{line} 선택됨",
@@ -356,6 +357,9 @@ export const ko: Dictionary = {
       "“{parent}”에서 이어진 결과입니다. {line}은 문장은 그대로 두고 시작 위치만 옮겨 다시 낭독했고, 나머지 문장은 그대로 재사용했습니다.",
     basedOn:
       "“{parent}”에서 이어진 결과입니다. 사람이 쓴 문장으로 {line} 한 줄만 다시 낭독했고, 나머지 문장은 그대로 재사용했습니다.",
+    added: "{line} 추가",
+    basedOnAdded:
+      "편집자가 “{parent}”에 {line}을 추가했습니다. 새 트랙에서 빠진 장면이 있는지 다시 점검했습니다.",
     basedOnRemoved:
       "“{parent}”에서 이어진 결과입니다. 편집자가 삭제한 문장: {line}. 나머지 문장은 그대로 재사용했고, 남은 해설로 최종 점검을 다시 했습니다.",
   },
@@ -462,5 +466,24 @@ export const ko: Dictionary = {
     time: "처리 시간",
   },
   editor: koEditor,
+  report: {
+    title: "갭라인 화면해설 검수 보고서",
+    origin: "갭라인은 AI로 해설을 자동 작성하고 검수합니다. 트랙에 포함된 낭독은 합성 음성입니다.",
+    edited:
+      "이 버전에는 이전 검수 결과가 이어질 수 있습니다. 문구나 시각만 고치면 해당 문장의 판정을 갱신합니다.",
+    noVoice: "이 트랙에는 낭독된 문장이 없습니다.",
+    editorWrote: "편집자가 작성",
+    run: "실행",
+    parent: "수정 전 실행",
+    duration: "영상 길이",
+    missing: "최종 검수에 남은 누락 장면",
+    noneListed: "이 결과에 기록된 누락 장면이 없습니다.",
+    notRecorded: "최종 검수 기록 없음",
+    lineNotes: "문장별 기록",
+    noLines: "작성된 해설 문장이 없습니다.",
+    final: "이 결과에 저장된 판정",
+    fitCount: "제한 시간에 맞는 낭독 문장",
+    versionCheck: "저장된 검수 판정",
+  },
   coverage: { title: "검수에서 찾은 누락" },
 };

@@ -19,7 +19,7 @@ const BUDGET_MESSAGE = {
 
 /**
  * One edit of a finished result, made as a new result that preserves it: new words or a new start for
- * one line (EditSchema's text form), or the removal of one line ({ cueId, action: "remove" }).
+ * one line (EditSchema's text form), an addition for a missing moment, or the removal of one line ({ cueId, action: "remove" }).
  * A saved edit answers 201 with EditSaved: the new run's id and the viewer's runs as this instance
  * reads them after the save, so the page never depends on a later list another instance may not
  * see yet. Errors carry a stable `error` code. `message` is kept for the current editor UI; for
@@ -49,7 +49,7 @@ export async function POST(
       {
         error: "invalid_edit",
         message:
-          'Send {cueId, text, start, requestId} to change a line, or {cueId, action: "remove", requestId} to remove it.',
+          'Send {cueId, text, start, requestId} to change a line, {action: "add", missingIndex, text, start, requestId} to add one, or {cueId, action: "remove", requestId} to remove it.',
       },
       { status: 400 },
     );

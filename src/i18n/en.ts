@@ -378,6 +378,7 @@ export const en = {
     downloadNarration: "Narration stem (WAV)",
     downloadVtt: "Text track (WebVTT)",
     downloadScript: "Script and review log (JSON)",
+    downloadReport: "Line review report (TXT)",
     notRecorded: "not recorded for this older result",
     noDescription: "no description in this result",
     selected: "{line} selected",
@@ -394,6 +395,9 @@ export const en = {
       "Edited from “{parent}”. {line} was written by a person and re-voiced; every other line is reused as it was.",
     basedOnMoved:
       "Edited from “{parent}”. {line} keeps its words and was moved to a new start, then re-voiced; every other line is reused as it was.",
+    added: "{line} added",
+    basedOnAdded:
+      "An editor added {line} to “{parent}”. Gapline checked the updated track for missing moments.",
     basedOnRemoved:
       "Edited from “{parent}”. An editor removed {line}; every other line is reused as it was, and the final check ran again on what remains.",
   },
@@ -505,6 +509,26 @@ export const en = {
     time: "processing time",
   },
   editor: enEditor,
+  report: {
+    title: "Gapline audio description review",
+    origin:
+      "Gapline uses AI for automatic writing and review. Any narration in the track uses a synthesized voice.",
+    edited:
+      "This version can carry forward findings from its parent. Wording and timing edits update the verdict on the edited line.",
+    noVoice: "No narration in this track.",
+    editorWrote: "Written by editor",
+    run: "Run",
+    parent: "Based on",
+    duration: "Clip duration",
+    missing: "Moments flagged as missing",
+    noneListed: "None listed in this result.",
+    notRecorded: "No final check recorded",
+    lineNotes: "Line records",
+    noLines: "No lines written.",
+    final: "Verdict saved with this result",
+    fitCount: "Voiced lines that fit their window",
+    versionCheck: "Recorded review",
+  },
   coverage: { title: "Moments the reviewer found missing" },
 } as const;
 

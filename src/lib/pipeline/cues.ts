@@ -1,4 +1,4 @@
-import type { Cue, DraftCue, Gap } from "./schemas";
+import type { Cue, DraftCue, Gap, MissingItem } from "./schemas";
 
 /** A line needs at least this much room. */
 export const MIN_ROOM_SECONDS = 1.0;
@@ -119,6 +119,36 @@ export function roomForMoment(
   const at = Math.min(Math.max(item.at, gap.start), gap.end);
   if (Math.abs(at - item.at) > MAX_MOMENT_DISTANCE_SECONDS) return null;
   return freeRoom(at, gap, voiced);
+}
+
+/** Start bounds for an existing line. Removed and dropped peers no longer use any time. */
+export function lineEditBounds(cue: Cue, cues: Cue[], gap: Gap) {
+  const peers = cues
+    .filter((c) => (c.status === "fits" || c.id === cue.id) && c.gapId === gap.id)
+    .sort((a, b) => a.start - b.start);
+  const index = peers.findIndex((c) => c.id === cue.id);
+  const previous = peers[index - 1];
+  return {
+    min: Math.max(
+      gap.start,
+      previous ? previous.start + (previous.seconds ?? Infinity) : gap.start,
+    ),
+    max: Math.min(gap.end, peers[index + 1]?.start ?? gap.end),
+  };
+}
+
+/** A proposed human line in the free room of one recorded omission. IDs stay unique even after removals. */
+export function missingLineSlot(item: MissingItem, cues: Cue[], gaps: Gap[]) {
+  const room = roomForMoment(
+    item,
+    gaps,
+    cues
+      .filter((c) => c.status === "fits")
+      .map((c) => ({ start: c.start, end: c.start + (c.seconds ?? Infinity) })),
+  );
+  if (!room) return null;
+  const lastId = cues.reduce((last, c) => Math.max(last, Number(c.id.slice(1))), 0);
+  return { id: `L${lastId + 1}`, gapId: item.gapId, start: room.start, windowEnd: room.end };
 }
 
 /** The version a line currently stands on. */

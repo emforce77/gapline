@@ -87,7 +87,7 @@ const RunIndexSchema = z.object({
           kind: z.literal("edit"),
           baseRunId: z.string(),
           cueId: z.string(),
-          action: z.enum(["rewrite", "remove"]),
+          action: z.enum(["rewrite", "remove", "add"]),
           language: LanguageSchema,
           density: DensitySchema,
         }),

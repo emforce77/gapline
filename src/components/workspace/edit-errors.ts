@@ -24,6 +24,8 @@ export interface EditFailureBody {
   message?: string;
   /** For `too_long`: how long the edited words ran once voiced and trimmed. */
   spokenSeconds?: number;
+  min?: number;
+  max?: number;
   /** For `review`: the reviewer's reasons, one per broken rule, in the line's language. */
   reasons?: string[];
   /** For `review`: the reviewer's suggestion, in the line's language. */
@@ -167,10 +169,16 @@ export function editErrorMessage(
       text: runErrorMessage({ code, resetAt: body?.resetAt, retryable: body?.retryable }, t, lang),
     };
   if (code && BUSY_CODES.includes(code)) return { text: errors.busy };
+  if (code === "no_room") return { text: t.editor.noRoom };
+  const measured = {
+    ...placement,
+    min: body?.min ?? placement.min,
+    max: body?.max ?? placement.max,
+  };
   if (!isEditorCode(code)) return { text: t.editor.failed };
   switch (code) {
     case "too_long":
-      return { text: tooLong(body, placement, t, lang), field: "text" };
+      return { text: tooLong(body, measured, t, lang), field: "text" };
     case "review": {
       const reviewer = reviewerReasons(body);
       const fix = body?.fix?.trim();
@@ -182,7 +190,7 @@ export function editErrorMessage(
       };
     }
     case "placement": {
-      const range = shownStartRange(placement.min, placement.max);
+      const range = shownStartRange(measured.min, measured.max);
       return {
         text: fill(errors.placement, {
           min: formatStart(range.first, lang),

@@ -4,6 +4,7 @@ import { useI18n } from "@/i18n/client";
 import { fill } from "@/i18n";
 import { runErrorMessage } from "@/lib/client/api-errors";
 import { formatDuration } from "@/lib/format";
+import { lineEditBounds } from "@/lib/pipeline/cues";
 import type { Cue, Gap, Language } from "@/lib/pipeline/schemas";
 import type { RunListing } from "@/lib/store/projects";
 import {
@@ -14,6 +15,7 @@ import {
   type EditFailureText,
 } from "./edit-errors";
 import { postEdit, STILL_RUNNING } from "./edit-request";
+import { FrameComparison } from "./FrameComparison";
 import { RemoveLine } from "./RemoveLine";
 import { editStep, useElapsedSeconds } from "./use-elapsed";
 import { NoteGloss } from "./VersionHistory";
@@ -87,7 +89,7 @@ export function EditLine(props: EditorProps) {
         ref={disclosure}
         onToggle={(event) => {
           const details = event.currentTarget;
-          if (!details.open) return;
+          if (event.target !== details || !details.open) return;
           // The form opens under the whole history, often below the inspector's fold.
           const form = details.querySelector<HTMLFormElement>(".cue-editor");
           form?.scrollIntoView({ block: "nearest" });
@@ -123,6 +125,11 @@ export function EditLine(props: EditorProps) {
         <CueEditor
           {...props}
           onBusy={onBusy}
+          bounds={lineEditBounds(
+            props.cue,
+            props.cues,
+            props.gaps.find((g) => g.id === props.cue.gapId)!,
+          )}
           locked={locked || unavailable !== null}
           error={failure?.action === "edit" ? failure.text : null}
           onError={(text) => setFailure(text && { action: "edit", text })}
@@ -145,26 +152,61 @@ export function EditLine(props: EditorProps) {
   );
 }
 
+/** For a recorded omission, start with blank words and the verified free interval. */
+export function AddLine(
+  props: Omit<EditorProps, "cue" | "cues" | "gaps"> & {
+    missingIndex: number;
+    bounds: { min: number; max: number };
+    busy: boolean;
+  },
+) {
+  const { t } = useI18n();
+  const [error, setError] = useState<EditFailureText | null>(null);
+  return (
+    <details
+      className="edit-line"
+      onToggle={(event) => {
+        if (event.currentTarget.open) event.currentTarget.querySelector("textarea")?.focus();
+      }}
+    >
+      <summary className="button small">{t.editor.add}</summary>
+      {props.unavailable ? (
+        <p className="label" role="note">
+          {props.unavailable}
+        </p>
+      ) : null}
+      <CueEditor
+        {...props}
+        locked={props.busy || Boolean(props.unavailable)}
+        error={error}
+        onError={setError}
+      />
+    </details>
+  );
+}
+
 function CueEditor({
   projectId,
   runId,
   cue,
-  cues,
-  gaps,
+  missingIndex,
+  bounds: { min, max },
   language,
   onSaved,
   onBusy,
   locked,
   error,
   onError: setError,
-}: EditorProps & {
-  locked: boolean;
-  error: EditFailureText | null;
-  onError: (error: EditFailureText | null) => void;
-}) {
+}: Omit<EditorProps, "cue" | "cues" | "gaps"> &
+  ({ cue: Cue; missingIndex?: never } | { cue?: never; missingIndex: number }) & {
+    bounds: { min: number; max: number };
+    locked: boolean;
+    error: EditFailureText | null;
+    onError: (error: EditFailureText | null) => void;
+  }) {
   const { t, lang } = useI18n();
-  const [text, setText] = useState(cue.versions.at(-1)!.text);
-  const [start, setStart] = useState(String(cue.start));
+  const [text, setText] = useState(cue?.versions.at(-1)?.text ?? "");
+  const [start, setStart] = useState(String(cue?.start ?? shownStartRange(min, max).first));
   const [busy, setBusy] = useState(false);
   const request = useRef<{ value: string; id: string } | null>(null);
   const elapsed = useElapsedSeconds(busy);
@@ -189,19 +231,11 @@ function CueEditor({
   useEffect(() => {
     if (busy) progressNote.current?.scrollIntoView({ block: "nearest" });
   }, [busy]);
-  const gap = gaps.find((g) => g.id === cue.gapId)!;
-  const peers = cues
-    .filter((c) => (c.status === "fits" || c.id === cue.id) && c.gapId === cue.gapId)
-    .sort((a, b) => a.start - b.start);
-  const index = peers.findIndex((c) => c.id === cue.id);
-  const previous = peers[index - 1];
-  const min = Math.max(gap.start, previous ? previous.start + previous.seconds! : 0);
-  const max = Math.min(gap.end, peers[index + 1]?.start ?? Infinity);
   // The server takes a start from `min` up to, not at, `max`: the form offers what it prints, and a
   // refusal names the same starts.
   const range = shownStartRange(min, max);
   // Any line but a removed one needs a change to be worth a request, by the server's rule.
-  const unchanged = changesNothing(cue, text, Number(start));
+  const unchanged = cue && changesNothing(cue, text, Number(start));
   const describedBy = (...parts: (string | false)[]) =>
     parts.filter(Boolean).join(" ") || undefined;
   return (
@@ -217,7 +251,7 @@ function CueEditor({
         setError(null);
         try {
           const answer = await postEdit(projectId, runId, {
-            cueId: cue.id,
+            ...(cue ? { cueId: cue.id } : { action: "add" as const, missingIndex }),
             text,
             start: Number(start),
             requestId: request.current.id,
@@ -251,7 +285,7 @@ function CueEditor({
         }
       }}
     >
-      {cue.status === "removed" ? (
+      {cue?.status === "removed" ? (
         <p className="label" id={ids.hint}>
           {t.editor.restoreHint}
         </p>
@@ -268,7 +302,10 @@ function CueEditor({
           readOnly={locked}
           aria-disabled={locked || undefined}
           aria-invalid={textBad || undefined}
-          aria-describedby={describedBy(cue.status === "removed" && ids.hint, textBad && ids.error)}
+          aria-describedby={describedBy(
+            cue?.status === "removed" && ids.hint,
+            textBad && ids.error,
+          )}
           onChange={(e) => setText(e.target.value)}
         />
       </label>
@@ -297,7 +334,20 @@ function CueEditor({
           end: formatStart(range.end, lang),
         })}
       </p>
-      <p className="label">{t.editor.hint}</p>
+      {cue ? (
+        <FrameComparison
+          projectId={projectId}
+          savedStart={cue.start}
+          draftStart={
+            start !== "" && Number(start) >= min && Number(start) <= range.last
+              ? Number(start)
+              : null
+          }
+          seconds={cue.seconds}
+          end={max}
+        />
+      ) : null}
+      <p className="label">{cue ? t.editor.hint : t.editor.addHint}</p>
       {/* While its request runs, the button keeps focus: it is marked disabled, not disabled. */}
       <button
         className="button primary"
@@ -310,8 +360,10 @@ function CueEditor({
             <span className="spinner" aria-hidden="true" />
             {fill(t.editor.saving[step], { elapsed: formatDuration(elapsed, lang) })}
           </>
-        ) : (
+        ) : cue ? (
           t.editor.save
+        ) : (
+          t.editor.saveAddition
         )}
       </button>
       <p className="label edit-progress" role="status" ref={progressNote}>

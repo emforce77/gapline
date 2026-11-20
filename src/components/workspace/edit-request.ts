@@ -12,6 +12,7 @@ export const STILL_RUNNING = "running";
 /** A line edit the edits route accepts: new words and start, or the line's removal. */
 export type EditRequestBody =
   | { cueId: string; text: string; start: number; requestId: string }
+  | { action: "add"; missingIndex: number; text: string; start: number; requestId: string }
   | { cueId: string; action: "remove"; requestId: string };
 
 /**

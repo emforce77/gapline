@@ -5,7 +5,7 @@ import { fill } from "@/i18n";
 import { useI18n } from "@/i18n/client";
 import { formatClock, formatDuration, formatSeconds, formatUsd } from "@/lib/format";
 import type { RunFiles, RunSummary } from "@/lib/pipeline/events";
-import { roomForMoment } from "@/lib/pipeline/cues";
+import { missingLineSlot } from "@/lib/pipeline/cues";
 import { MIN_GAP_SECONDS, SPEECH_GUARD_SECONDS } from "@/lib/pipeline/gaps";
 import type { Cue, Gap, Language, MissingItem } from "@/lib/pipeline/schemas";
 import { Gloss } from "./glosses";
@@ -57,6 +57,8 @@ export function QualityNote({
   language,
   lineNumbers,
   onSelect,
+  onListen,
+  renderAdd,
 }: {
   summary: RunSummary;
   gaps: Gap[];
@@ -64,17 +66,17 @@ export function QualityNote({
   language: Language | null;
   lineNumbers: Map<string, number>;
   onSelect: (cueId: string) => void;
+  onListen: (at: number) => void;
+  renderAdd: (
+    index: number,
+    slot: NonNullable<ReturnType<typeof missingLineSlot>>,
+  ) => React.ReactNode;
 }) {
   const { t, lang } = useI18n();
   const reading = readResult(summary, cues, gaps);
   if (reading.coverage === "enough" && !summary.qualityStatus) return null;
   const fixed = summary.finalFix ? summary.finalFix.rewritten + summary.finalFix.added : 0;
   const missing = summary.finalReview?.missing ?? [];
-  const voiced = cues
-    .filter((c) => c.status === "fits")
-    .map((c) => ({ start: c.start, end: c.start + (c.seconds ?? 0) }));
-  // The same rule the final check's fix used to place a line for the moment (cues.ts).
-  const noRoom = (m: MissingItem) => !roomForMoment(m, gaps, voiced);
   const heading =
     reading.coverage === "none"
       ? t.editor.noLines
@@ -132,14 +134,19 @@ export function QualityNote({
         <>
           <p>{t.editor.missingLead}</p>
           <ul>
-            {missing.map((m, i) => (
-              <li key={i}>
-                <span className="mono label">{formatClock(m.at)}</span>{" "}
-                <span lang={language ?? undefined}>{m.what}</span>
-                <Gloss text={m.what} pageLang={lang} textLang={language} />
-                {noRoom(m) ? <span className="label"> · {t.editor.noRoom}</span> : null}
-              </li>
-            ))}
+            {missing.map((m, i) => {
+              const slot = missingLineSlot(m, cues, gaps);
+              return (
+                <li key={i}>
+                  <button className="button ghost small" onClick={() => onListen(m.at)}>
+                    {fill(t.editor.listenMoment, { time: formatClock(m.at) })}
+                  </button>{" "}
+                  <span lang={language ?? undefined}>{m.what}</span>
+                  <Gloss text={m.what} pageLang={lang} textLang={language} />
+                  {slot ? renderAdd(i, slot) : <span className="label"> · {t.editor.noRoom}</span>}
+                </li>
+              );
+            })}
           </ul>
         </>
       ) : null}
@@ -198,10 +205,12 @@ const DESCRIBED_FILES = new Set<keyof RunFiles>(["described", "narration", "vtt"
 export function Downloads({
   base,
   files,
+  reportUrl,
   described,
 }: {
   base: string;
   files: RunFiles;
+  reportUrl: string;
   /** Whether any line is voiced in this result. */
   described: boolean;
 }) {
@@ -229,6 +238,10 @@ export function Downloads({
   return (
     <div className="downloads">
       <h2 className="inspector-heading">{t.workspace.downloads}</h2>
+      <a href={reportUrl}>
+        <span aria-hidden="true">↓ </span>
+        {t.workspace.downloadReport}
+      </a>
       {DOWNLOADS.map(([key, label]) =>
         !described && DESCRIBED_FILES.has(key) ? (
           <span key={key} className="download-missing">
@@ -254,11 +267,13 @@ export function EditSummary({ parent, note }: { parent: string; note: RunNote })
   const { t } = useI18n();
   const sentence =
     t.versions[
-      note.kind === "removed"
-        ? "basedOnRemoved"
-        : note.kind === "moved"
-          ? "basedOnMoved"
-          : "basedOn"
+      note.kind === "added"
+        ? "basedOnAdded"
+        : note.kind === "removed"
+          ? "basedOnRemoved"
+          : note.kind === "moved"
+            ? "basedOnMoved"
+            : "basedOn"
     ];
   return (
     <p className="edit-summary">

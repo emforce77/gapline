@@ -324,6 +324,29 @@ it("removes one line: other WAVs reused byte-for-byte, track and audit rebuilt, 
       kind: "restored",
       at: back.humanEdits[0].at,
     });
+
+    // The same recorded omission can instead be addressed with an entirely new line.
+    const add = {
+      action: "add" as const,
+      missingIndex: 0,
+      start: 1.8,
+      text: TITLE,
+      requestId: "add-title-0001",
+    };
+    const added = await editRun(project.id, removed.runId, add, OWNER);
+    const addedDir = runDir(project.id, added.runId);
+    const addition = JSON.parse(await readFile(join(addedDir, "script.json"), "utf8"));
+    assert.deepEqual(
+      [addition.summary.cuesWritten, addition.summary.cuesShipped, addition.summary.cuesRemoved],
+      [4, 3, 1],
+    );
+    assert.deepEqual(addition.summary.finalReview.missing, []);
+    assert.deepEqual(addition.humanEdits[0].missing, s.finalReview!.missing[0]);
+    assert.equal(noteFromScript(addition)?.kind, "added");
+    assert.equal(addition.cues.find((c: Cue) => c.id === "L4").versions.length, 1);
+    assert.ok((await readFile(join(addedDir, "descriptions.vtt"), "utf8")).includes(TITLE));
+    assert.deepEqual(await editRun(project.id, removed.runId, add, OWNER), added);
+    assert.deepEqual(counts, { review: 3, tts: 2 });
   } finally {
     globalThis.fetch = originalFetch;
     for (const key of Object.keys(process.env)) if (!(key in env)) delete process.env[key];

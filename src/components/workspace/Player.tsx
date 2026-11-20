@@ -28,6 +28,7 @@ import { narrationText, speechText, speechTrackLang, spokenDuration } from "./te
 
 export interface PlayerHandle {
   seek: (seconds: number, play?: boolean) => void;
+  playTrack: (seconds: number, track: "original" | "described", until?: number) => void;
 }
 
 /**
@@ -107,6 +108,7 @@ export const Player = forwardRef<
   const { t, lang } = useI18n();
   const video = useRef<HTMLVideoElement>(null);
   const [adOn, setAdOn] = useState(true);
+  const stopPreviewAt = useRef<number | null>(null);
   const [eyesClosed, setEyesClosed] = useState(false);
   const [time, setTime] = useState(0);
   // The spot the position slider reports during playback while focus is on it, unless a pointer
@@ -139,6 +141,7 @@ export const Player = forwardRef<
   const speechUrl = useTextUrl(speechVtt, "text/vtt");
 
   function togglePlay() {
+    stopPreviewAt.current = null;
     const el = video.current;
     if (!el) return;
     if (el.paused) startPlaying(el);
@@ -146,6 +149,7 @@ export const Player = forwardRef<
   }
 
   function seekTo(seconds: number) {
+    stopPreviewAt.current = null;
     const el = video.current;
     if (!el) return;
     const clamped = Math.min(Math.max(0, seconds), el.duration || 0);
@@ -155,7 +159,20 @@ export const Player = forwardRef<
   }
 
   useImperativeHandle(ref, () => ({
+    playTrack(seconds, track, until) {
+      stopPreviewAt.current = until ?? null;
+      const wantDescription = track === "described" && describable;
+      if (described !== wantDescription) {
+        resume.current = { time: seconds, playing: true };
+        setAdOn(wantDescription);
+        setKeySaid("");
+      } else if (video.current) {
+        video.current.currentTime = seconds;
+        startPlaying(video.current);
+      }
+    },
     seek(seconds, play) {
+      stopPreviewAt.current = null;
       const el = video.current;
       if (!el) return;
       el.currentTime = seconds;
@@ -197,6 +214,7 @@ export const Player = forwardRef<
       togglePlay();
     } else if (key === "d" && describable) {
       // describable here, so what plays (described) is adOn.
+      stopPreviewAt.current = null;
       setAdOn(!adOn);
       setKeySaid((said) => restated(said, adOn ? t.workspace.adOff : t.workspace.adOn));
     } else if (key === "e") {
@@ -209,6 +227,7 @@ export const Player = forwardRef<
 
   // A button press says its new state itself, so the shortcut's last words would now be stale.
   function chooseTrack(on: boolean) {
+    stopPreviewAt.current = null;
     setAdOn(on);
     setKeySaid("");
   }
@@ -274,6 +293,13 @@ export const Player = forwardRef<
             // A new source reports 0 before its metadata restores the position: not where the
             // film is, and a focused slider would say "0 seconds" between the two.
             if (resume.current) return;
+            if (
+              stopPreviewAt.current !== null &&
+              e.currentTarget.currentTime >= stopPreviewAt.current
+            ) {
+              stopPreviewAt.current = null;
+              e.currentTarget.pause();
+            }
             setTime(e.currentTarget.currentTime);
             onTime(e.currentTarget.currentTime);
           }}

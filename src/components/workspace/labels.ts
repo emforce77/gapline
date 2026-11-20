@@ -21,7 +21,7 @@ export function languageName(code: string, lang: UiLang): string {
 /** What an edited result changed, read from its script.json; `at` is when the edit was saved. */
 export interface RunNote {
   line: number;
-  kind: "changed" | "moved" | "restored" | "removed";
+  kind: "changed" | "moved" | "restored" | "removed" | "added";
   at?: string;
 }
 
@@ -33,7 +33,7 @@ interface EditedScript {
   cues: Cue[];
   humanEdits?: (
     | { cueId: string; after: string; before?: string; from?: number; to?: number; at?: string }
-    | { cueId: string; action: "remove"; at?: string }
+    | { cueId: string; action: "remove" | "add"; at?: string }
   )[];
 }
 
@@ -51,7 +51,7 @@ export function noteFromScript(script: EditedScript): RunNote | null {
   if (!cue) throw new Error(`Edited line ${edit.cueId} is missing from its script`);
   const line = lineNumbers(script.cues).get(cue.id)!;
   const at = edit.at === undefined ? {} : { at: edit.at };
-  if ("action" in edit) return { line, kind: "removed", ...at };
+  if ("action" in edit) return { line, kind: edit.action === "add" ? "added" : "removed", ...at };
   const index = cue.versions.findLastIndex((v) => v.by === "human" && v.text === edit.after);
   const replaced = cue.versions[index - 1];
   const room = cue.windowEnd - cue.start;

@@ -103,14 +103,17 @@ how long it takes to say, and when to stop trying.
 10. **Mix.** FFmpeg sets each line a little above the film around it (−26 to −16 LUFS) and lowers the
     film under it until the voice is 10 LU louder, with peaks under −1 dBTP. You get
     a described MP4 (audio tagged as audio description), a narration WAV,
-    a WebVTT text track and a JSON script with every version and verdict.
-11. **Edit (optional).** You can rewrite or move any line, bring back one the loop dropped, or remove
-    one. A rewritten line is voiced at normal speed and reviewed against the picture and the rest of
-    the track. If it runs long or breaks a rule, Gapline returns the reason and leaves your words as
-    they are. A removal voices
-    nothing: the other lines keep their audio byte for byte, and the final check runs again on what is
-    left, so anything only that line covered is listed as missing. Every edit makes a new version and
-    keeps the old one.
+    a WebVTT text track and a JSON script with the recorded line history. Under **Downloads**,
+    **Line review report (TXT)** gives the producer each line’s words, available time, measured
+    voice length, cited reasons for rejection and remaining omissions. The report identifies the
+    AI writing, review and synthesized voice. It also records edits by a person.
+11. **Edit (optional).** You can rewrite or move a line, restore one the loop dropped, or remove
+    one. From a flagged omission with room left, you can also write a new line. Gapline measures
+    the synthesized line against that room and checks the track for omissions again. A rewrite
+    changes just one line. Gapline voices it at normal speed and reviews it against the picture
+    and the other lines. If it runs long or breaks a rule, the editor receives the reason.
+    Removing a line reuses the other lines’ audio and runs the final check on the remaining track.
+    Each accepted edit produces a new version and keeps the original playable.
 
 Every model call returns JSON checked against a schema, and every call is logged with its cost. One bad
 answer does not end a run: output that does not match its schema is asked for once more, as is a

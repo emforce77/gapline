@@ -407,3 +407,53 @@
 .stage.skipped {
   color: var(--text);
 }
+
+.frame-comparison {
+  margin: 12px 0;
+  padding: 12px 0;
+  border-block: 1px solid var(--border);
+}
+
+.frame-comparison summary {
+  color: var(--text);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.comparison-frames {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.comparison-frames figure {
+  min-width: 0;
+  margin: 0;
+}
+
+.comparison-frames figcaption {
+  margin-bottom: 4px;
+  font-size: var(--step--1);
+  font-variant-numeric: tabular-nums;
+}
+
+.source-frame {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--surface-2);
+  border-radius: var(--radius-sm);
+}
+
+.source-frame > * {
+  grid-area: 1 / 1;
+}
+
+.source-frame video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}

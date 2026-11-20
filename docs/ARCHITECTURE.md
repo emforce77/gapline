@@ -131,7 +131,8 @@ flowchart TD
   fix --> refit["Review with one rewrite left, voice and fit, as above"]
   refit -->|"no second audit; findings updated"| mix
   mix --> out["MP4, WAV, WebVTT and JSON script"]
-  out -.->|"optional"| edit["Edit: change, restore or remove a line (see Editing a line)"]
+  out --> report["Download line review report from the saved result"]
+  out -.->|"optional"| edit["Edit: add, change, restore or remove a line (see Editing a line)"]
 ```
 
 1. **Hear and watch run at the same time.** Hearing is the first pass and then the re-listen of each
@@ -196,8 +197,8 @@ flowchart TD
    result reads _Final check passed_ when nothing is listed and _Final check · notes_ otherwise, and
    the screen marks each listed moment that has no free silence left.
    A clip with no silence at all skips writing, review, voicing and the final check: no line could
-   be placed. The mix still runs, so all four downloads exist; the result has no final-check status,
-   and the little-room notice says why there are no lines.
+   be placed. The mix still writes its four files. The workspace offers the script and report and
+   labels the media files as containing no description. The report states that no final check was recorded.
 8. **Mix.** Levels follow the film's EBU R128 momentary loudness. Each line sits 4 LU above the film's
    usual level over the line and the 3 s before it (−26 to −16 LUFS; over silence, its usual level over
    the whole clip, and −16 for a film with no sound). Under it the
@@ -207,6 +208,13 @@ flowchart TD
    (audio tagged with the narration language and as audio description; no text track, which the MP4
    muxer would switch on for every viewer), the narration WAV, a WebVTT text track and `script.json` with every version, verdict and
    measured length.
+
+   **Line review report (TXT)** is generated on download from the completed run snapshot. The
+   [run endpoint](../src/app/api/projects/%5Bid%5D/runs/%5BrunId%5D/route.ts) checks the viewer’s access
+   before the [renderer](../src/lib/runs/review-report.ts) reads the final cues and summary.
+   Report headings follow the interface language. Lines, reviewer quotes and missing moments
+   retain their recorded wording. A cited rule points to its guideline clause. Each report travels
+   with the run ID and any parent run ID. The same path serves existing saved runs.
 
 Every run writes two logs: `events.jsonl`, the append-only story of the run that the browser replays,
 and `ledger.jsonl`, one line per paid call with tokens, latency and cost, failed calls included. Both
@@ -231,7 +239,13 @@ flowchart TD
   bounds --> voice["Voice only this line, at normal speed"]
   voice --> fits{"Fits its room?"}
   fits -->|"no"| refuse["Refused: seconds needed and available"]
-  fits -->|"yes"| review{"Whole track reviewed again"}
+  fits -->|"restored line"| auditAdd
+  fits -->|"changed line already in track"| review{"Edited line reviewed against the picture and track"}
+  kind -->|"add a missing line"| slot["Find room and measure the new voice"]
+  slot -->|"too long"| refuse
+  slot -->|"fits"| auditAdd{"Recheck the whole track and its coverage"}
+  auditAdd -->|"line breaks a rule"| refuse2
+  auditAdd -->|"line passes"| rebuild
   review -->|"the new line breaks a rule"| refuse2["Refused: the reviewer's reason and fix"]
   review -->|"passes"| rebuild
   kind -->|"remove a line in the track"| audit["Final check again on the remaining lines"]
@@ -261,7 +275,10 @@ route, same request-ID rules). Nothing is voiced: the line keeps its history wit
 removed, the other lines' WAV files are reused byte for byte, the narration, mix and text
 track are rebuilt without it, and the final audit runs again on what remains, so anything only that line
 described is listed as missing. A removed line can be put back with an ordinary edit, its own words
-included. Both kinds of edit share [`src/lib/runs/edit-track.ts`](../src/lib/runs/edit-track.ts).
+included. Restoring a silent line runs the coverage check on the whole track again. To add a line, the editor chooses a saved missing moment with room in its gap and
+writes the narration. The server checks the start against the available slot, measures the new
+audio, and reviews the resulting track including that line. An accepted addition saves the latest
+coverage findings, which can still include the original omission. All edits share [`src/lib/runs/edit-track.ts`](../src/lib/runs/edit-track.ts).
 This is how the line over the opening's launch call was taken out of the sample's earlier, edited
 track ([evaluation](EVALUATION.md#edits-on-the-earlier-sample-track)).
 

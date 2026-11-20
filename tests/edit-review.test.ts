@@ -284,6 +284,43 @@ describe("what an edit reviews before it writes its result", () => {
     );
   });
 
+  it("checks the whole track after adding a line and requires the new line to pass", async () => {
+    const added = line("L6", 34, 1.2, "The title appears.", "human");
+    const run = await edit([...structuredClone(PARENT), added], {
+      cueId: added.id,
+      line: { pcm: silence(1.2), sampleRate: SAMPLE_RATE, seconds: 1.2 },
+    });
+    run.humanEdit = {
+      action: "add",
+      cueId: added.id,
+      after: added.versions[0].text,
+      to: 34,
+      at: "fixture",
+      missing: { gapId: "g1", at: 34, what: "the title" },
+    };
+    const failing = {
+      cueId: added.id,
+      pass: false,
+      violations: [{ rule: "unseen", quote: "title", reason: "Unreadable." }],
+      fix: "Describe the image.",
+    };
+    const verdicts = [
+      ...PARENT.map((c) => ({ cueId: c.id, pass: true, violations: [], fix: "" })),
+      failing,
+    ];
+    const bodies = await withGemini({ verdicts, missing: [] }, async () => {
+      await assert.rejects(
+        writeEditedRun(run, (v) => {
+          assert.deepEqual(v, failing);
+          throw new Error("new line refused");
+        }),
+        /new line refused/,
+      );
+    });
+    assert.equal(bodies.length, 1);
+    assert.match(prompt(bodies[0]), /FINAL OUTPUT AUDIT/);
+  });
+
   it("checks the whole remaining track after a removal, and refuses nothing", async () => {
     const cues = structuredClone(PARENT);
     Object.assign(cues[1], { status: "removed", audioFile: undefined, seconds: undefined });

@@ -117,7 +117,7 @@ export interface ActiveEdit {
   /** The result the edit was made from. */
   baseRunId: string;
   cueId: string;
-  action: "rewrite" | "remove";
+  action: "rewrite" | "remove" | "add";
   language: Language;
   density: Density;
   startedAt: string;

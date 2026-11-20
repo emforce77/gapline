@@ -11,6 +11,18 @@ export const enEditor = {
   start: "Start (seconds)",
   /** The same starts the field takes and a placement refusal names; {end} is where the room ends. */
   startRange: "Start between {first} and {last} s; the spoken line has to end by {end} s.",
+  frameCompare: {
+    open: "Compare frames at the two start times",
+    saved: "Saved start",
+    draft: "Proposed start",
+    time: "{s} s",
+    loading: "Loading frame…",
+    failed: "Frame unavailable. Close and reopen to retry.",
+    invalid: "Enter a start time within the range above.",
+    unvoiced: "This line has no saved recording.",
+    duration: "Saved recording: {s} s.",
+    room: "Room from the proposed start: {s} s.",
+  },
   save: "Review and re-voice",
   /** The button while an edit runs; the step is told from its usual timing (see use-elapsed.ts). */
   saving: {
@@ -56,6 +68,12 @@ export const enEditor = {
   checked: "Final check passed",
   autoFixed: "After the final check, Gapline fixed {lines} on its own.",
   lines: { one: "1\u00a0line", other: "{n}\u00a0lines" },
+  listenMoment: "Hear original at {time}",
+  add: "Add a line here",
+  newLine: "the new line",
+  saveAddition: "Voice and check this line",
+  addHint:
+    "Write what the picture shows. Gapline measures your recording against this interval and checks the updated track for omissions before saving a new version.",
   missingLead: "Moments that still have no line:",
   failingLead: "Lines it still flags:",
   takenOutLead: "Lines Gapline took out instead of fixing:",
@@ -137,6 +155,18 @@ export const koEditor: Dictionary["editor"] = {
   text: "해설 문장",
   start: "시작 시각(초)",
   startRange: "{first}초에서 {last}초 사이에 시작하고, 낭독은 {end}초까지 끝나야 합니다.",
+  frameCompare: {
+    open: "두 시작 시각의 화면 비교",
+    saved: "기존 시작",
+    draft: "바꿀 시작",
+    time: "{s}초",
+    loading: "화면을 불러오는 중…",
+    failed: "화면을 불러오지 못했습니다. 비교를 닫고 다시 열어 보세요.",
+    invalid: "위 범위에 맞는 시작 시각을 입력해 주세요.",
+    unvoiced: "이 문장은 저장된 낭독이 없습니다.",
+    duration: "기존 낭독 길이는 {s}초입니다.",
+    room: "바꿀 시각에서 낭독할 수 있는 시간은 {s}초입니다.",
+  },
   save: "다시 검수 · 다시 낭독",
   saving: {
     voicing: "낭독 중… {elapsed}",
@@ -177,6 +207,12 @@ export const koEditor: Dictionary["editor"] = {
   checked: "최종 점검 통과",
   autoFixed: "최종 점검 뒤 갭라인이 {lines}을 스스로 고쳤습니다.",
   lines: { one: "1문장", other: "{n}문장" },
+  listenMoment: "{time} 원음 듣기",
+  add: "여기에 한 줄 추가",
+  newLine: "새 문장",
+  saveAddition: "낭독하고 검수하기",
+  addHint:
+    "이 장면에서 보이는 내용을 적어 주세요. 낭독 길이가 빈 구간에 맞는지 재고 트랙 전체의 누락을 다시 검수한 뒤 새 버전으로 저장합니다.",
   missingLead: "아직 해설이 없는 순간:",
   failingLead: "여전히 지적된 문장:",
   takenOutLead: "고치지 못해 갭라인이 뺀 문장:",
