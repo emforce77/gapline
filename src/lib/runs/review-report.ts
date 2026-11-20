@@ -13,7 +13,7 @@ export function lineReviewReport(
 ): string {
   const t = dictionary(lang);
   const r = t.report;
-  const seconds = (n: number) => toRecordedSeconds(n).toFixed(2) + (lang === "ko" ? "초" : " s");
+  const seconds = (n: number) => fill(r.seconds, { s: toRecordedSeconds(n).toFixed(2) });
   const reviewLines = (label: string, review: Verdict) => {
     const rows = [`${label} · ${review.pass ? t.line.passed : t.line.rejected}`];
     for (const violation of review.violations) {

@@ -106,19 +106,18 @@ export const MAX_MOMENT_DISTANCE_SECONDS = 3;
 
 /**
  * The free room a line about a missing moment can use (freeRoom), with the moment clamped into the
- * silence it names; null when that silence is unknown, the moment lies further than
- * MAX_MOMENT_DISTANCE_SECONDS outside it, or there is no room.
+ * silence it names. A refusal identifies the reason shown beside this omission.
  */
 export function roomForMoment(
   item: { gapId: string; at: number },
   gaps: Gap[],
   voiced: { start: number; end: number }[],
-): { start: number; end: number } | null {
+): { start: number; end: number } | "unknownGap" | "tooFar" | "noRoom" {
   const gap = gaps.find((g) => g.id === item.gapId);
-  if (!gap) return null;
+  if (!gap) return "unknownGap";
   const at = Math.min(Math.max(item.at, gap.start), gap.end);
-  if (Math.abs(at - item.at) > MAX_MOMENT_DISTANCE_SECONDS) return null;
-  return freeRoom(at, gap, voiced);
+  if (Math.abs(at - item.at) > MAX_MOMENT_DISTANCE_SECONDS) return "tooFar";
+  return freeRoom(at, gap, voiced) ?? "noRoom";
 }
 
 /** Start bounds for an existing line. Removed and dropped peers no longer use any time. */
@@ -146,7 +145,7 @@ export function missingLineSlot(item: MissingItem, cues: Cue[], gaps: Gap[]) {
       .filter((c) => c.status === "fits")
       .map((c) => ({ start: c.start, end: c.start + (c.seconds ?? Infinity) })),
   );
-  if (!room) return null;
+  if (typeof room === "string") return room;
   const lastId = cues.reduce((last, c) => Math.max(last, Number(c.id.slice(1))), 0);
   return { id: `L${lastId + 1}`, gapId: item.gapId, start: room.start, windowEnd: room.end };
 }

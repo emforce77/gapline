@@ -3,11 +3,13 @@ import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from "node:fs/promis
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { after, before, describe, it } from "node:test";
+import nextHeaders from "next/headers";
+import { GET as getRun } from "../src/app/api/projects/[id]/runs/[runId]/route";
 import { encodeWav } from "../src/lib/media/narration-track";
 import type { Cue } from "../src/lib/pipeline/schemas";
 import { downloadName, runDownloadName, titleSlug } from "../src/lib/runs/download-name";
 import { editRun, EditError } from "../src/lib/runs/edit-run";
-import { canAccess, ownerHash } from "../src/lib/store/access";
+import { canAccess, OWNER_COOKIE, ownerHash } from "../src/lib/store/access";
 import { listActiveWork, listRuns, readRunIndex } from "../src/lib/store/run-index";
 import {
   canSeeRun,
@@ -78,7 +80,12 @@ async function finishedRun(
     );
   const events = [
     { type: "run_started", runId, language, density: "standard", t: 0 },
-    { type: "run_done", t: 1 },
+    {
+      type: "run_done",
+      t: 1,
+      cues: [cue],
+      summary: { clipSeconds: 10, cuesShipped: 1, cuesFitting: 1, overlapWithSpeechSeconds: 0 },
+    },
   ];
   await writeFile(
     join(dir, "events.jsonl"),
@@ -259,6 +266,31 @@ describe("versions made on the shared sample", () => {
     assert.ok(!ids(await listRuns(SAMPLE, A)).includes(retry));
     assert.ok(!ids(await listRuns(SAMPLE, undefined)).includes(retry));
     assert.ok(!ids(await listRuns(SAMPLE, B)).includes(editId));
+  });
+
+  it("downloads a finished review only for the upload owner", async (t) => {
+    let token = TOKEN_A;
+    t.mock.method(nextHeaders, "cookies", async () => ({
+      get: (name: string) => (name === OWNER_COOKIE ? { value: token } : undefined),
+    }));
+    const download = (runId: string) =>
+      getRun(new Request("https://gapline.example/run?download=review&lang=en"), {
+        params: Promise.resolve({ id: UPLOAD.id, runId }),
+      });
+    const runId = "20261003t121212121-ko-standard-cccccc";
+    const own = await download(runId);
+    assert.equal(own.status, 200);
+    assert.match(own.headers.get("content-disposition")!, /attachment;.*review-en\.txt/);
+    assert.equal(own.headers.get("cache-control"), "private, no-store");
+    assert.ok((await own.text()).includes(cue.versions[0].text));
+    token = TOKEN_B;
+    assert.equal((await download(runId)).status, 404);
+
+    token = TOKEN_A;
+    const pending = runDir(UPLOAD.id, "in-progress");
+    await mkdir(pending, { recursive: true });
+    await writeFile(join(pending, "events.jsonl"), JSON.stringify({ type: "run_started", t: 0 }));
+    assert.equal((await download("in-progress")).status, 404);
   });
 
   it("names downloads by clip title, language, density and version", async () => {

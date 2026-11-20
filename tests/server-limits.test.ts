@@ -331,7 +331,20 @@ describe("edits that fail, are retried, or are still being made", () => {
         { type: "run_started", runId: BASE, language: "en", density: "standard", t: 0 },
         { type: "run_done", t: 1 },
       ],
-      "script.json": { runId: BASE, cues: [cue], gaps: [{ id: "g1", start: 0, end: 5 }] },
+      "script.json": {
+        runId: BASE,
+        cues: [cue],
+        gaps: [{ id: "g1", start: 0, end: 5 }],
+        summary: {
+          finalReview: {
+            verdicts: [],
+            missing: [
+              { gapId: "g1", at: 3, what: "A door opens." },
+              { gapId: "g1", at: 10, what: "A title appears." },
+            ],
+          },
+        },
+      },
     });
     await writeFile(
       join(runDir(SAMPLE.id, BASE), "voice", "L1.wav"),
@@ -357,6 +370,24 @@ describe("edits that fail, are retried, or are still being made", () => {
       const error = await editRun(SAMPLE.id, runId, removal, ME).catch((e: unknown) => e);
       assert.ok(error instanceof EditError, runId);
       assert.deepEqual([error.code, error.status], ["not_found", 404]);
+    }
+  });
+
+  it("validates a proposed addition against the parent's omission and measured audio", async () => {
+    const add = {
+      action: "add" as const,
+      text: "A door opens.",
+      requestId: "add-slot-0001",
+      start: 1.5,
+    };
+    for (const [missingIndex, expected] of [
+      [0, "placement"],
+      [1, "no_room"],
+      [2, "missing_unavailable"],
+    ] as const) {
+      await assert.rejects(editRun(SAMPLE.id, BASE, { ...add, missingIndex }, ME), {
+        code: expected,
+      });
     }
   });
 

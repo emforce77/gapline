@@ -466,6 +466,7 @@ export const ko: Dictionary = {
   },
   editor: koEditor,
   report: {
+    seconds: "{s}초",
     title: "갭라인 화면해설 검수 보고서",
     origin: "갭라인은 AI로 해설을 자동 작성하고 검수합니다. 트랙에 포함된 낭독은 합성 음성입니다.",
     edited:

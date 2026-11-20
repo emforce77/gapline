@@ -439,7 +439,7 @@ export async function runDescription(
     for (const item of finalReview.missing) {
       const free = roomForMoment(item, gaps, taken);
       // One new line per stretch of free room: the first item found there claims it.
-      if (free && !addable.some((a) => a.gapId === item.gapId && a.end === free.end))
+      if (typeof free !== "string" && !addable.some((a) => a.gapId === item.gapId && a.end === free.end))
         addable.push({ ...item, at: free.start, end: free.end });
     }
     let finalFix: RunSummary["finalFix"];

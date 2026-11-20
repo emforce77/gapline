@@ -70,10 +70,10 @@ describe("placing a line next to a removed one", () => {
       start: 3.3,
       windowEnd: 6.7,
     });
-    assert.equal(missingLineSlot({ ...missing, at: 20 }, cues, gaps), null);
+    assert.equal(missingLineSlot({ ...missing, at: 20 }, cues, gaps), "tooFar");
     assert.equal(
       missingLineSlot(missing, [{ ...cues[0], seconds: undefined }, ...cues.slice(1)], gaps),
-      null,
+      "noRoom",
     );
   });
 

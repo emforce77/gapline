@@ -509,6 +509,7 @@ export const en = {
   },
   editor: enEditor,
   report: {
+    seconds: "{s} s",
     title: "Gapline audio description review",
     origin:
       "Gapline uses AI for automatic writing and review. Any narration in the track uses a synthesized voice.",

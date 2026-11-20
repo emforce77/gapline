@@ -321,6 +321,28 @@ describe("what an edit reviews before it writes its result", () => {
     assert.match(prompt(bodies[0]), /FINAL OUTPUT AUDIT/);
   });
 
+  it("checks the whole track when restoring a previously unvoiced line", async () => {
+    const run = await edit(structuredClone(PARENT), {
+      cueId: "L4",
+      line: { pcm: silence(2.2), sampleRate: SAMPLE_RATE, seconds: 2.2 },
+    });
+    run.base.cues = structuredClone(PARENT);
+    Object.assign(run.base.cues[1], { status: "removed", audioFile: undefined, seconds: undefined });
+    const verdicts = PARENT.map(({ id }) => ({ cueId: id, pass: true, violations: [], fix: "" }));
+    const bodies = await withGemini({ verdicts, missing: [] }, async () => {
+      await assert.rejects(
+        writeEditedRun(run, (verdict) => {
+          assert.deepEqual(verdict, verdicts[1]);
+          throw new Error("checked restored line");
+        }),
+        /checked restored line/,
+      );
+    });
+    assert.equal(bodies.length, 1);
+    assert.match(prompt(bodies[0]), /FINAL OUTPUT AUDIT/);
+    for (const { id } of PARENT) assert.ok(prompt(bodies[0]).includes(`- ${id} [`));
+  });
+
   it("checks the whole remaining track after a removal, and refuses nothing", async () => {
     const cues = structuredClone(PARENT);
     Object.assign(cues[1], { status: "removed", audioFile: undefined, seconds: undefined });

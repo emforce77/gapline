@@ -106,7 +106,7 @@ function editTarget(base: EditBase, input: EditInput) {
     const missing = base.summary.finalReview?.missing[input.missingIndex];
     if (!missing) throw new EditError("missing_unavailable", "This result has no such omission.");
     const slot = missingLineSlot(missing, base.cues, base.gaps);
-    if (!slot) throw new EditError("no_room", "No free silence remains for this moment.");
+    if (typeof slot === "string") throw new EditError("no_room", "No free silence remains for this moment.");
     // The server remeasures every WAV, so a more accurate boundary may refuse the proposed start.
     if (input.start < slot.start || input.start >= slot.windowEnd)
       throw new EditError("placement", "The start is outside the measured room.", 422, {

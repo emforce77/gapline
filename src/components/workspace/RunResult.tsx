@@ -5,7 +5,7 @@ import { fill } from "@/i18n";
 import { useI18n } from "@/i18n/client";
 import { formatClock, formatDuration, formatSeconds, formatUsd } from "@/lib/format";
 import type { RunFiles, RunSummary } from "@/lib/pipeline/events";
-import { missingLineSlot } from "@/lib/pipeline/cues";
+import { MAX_MOMENT_DISTANCE_SECONDS, missingLineSlot } from "@/lib/pipeline/cues";
 import { MIN_GAP_SECONDS, SPEECH_GUARD_SECONDS } from "@/lib/pipeline/gaps";
 import type { Cue, Gap, Language, MissingItem } from "@/lib/pipeline/schemas";
 import { Gloss } from "./glosses";
@@ -69,7 +69,7 @@ export function QualityNote({
   onListen: (at: number) => void;
   renderAdd: (
     index: number,
-    slot: NonNullable<ReturnType<typeof missingLineSlot>>,
+    slot: Exclude<ReturnType<typeof missingLineSlot>, string>,
   ) => React.ReactNode;
 }) {
   const { t, lang } = useI18n();
@@ -143,7 +143,14 @@ export function QualityNote({
                   </button>{" "}
                   <span lang={language ?? undefined}>{m.what}</span>
                   <Gloss text={m.what} pageLang={lang} textLang={language} />
-                  {slot ? renderAdd(i, slot) : <span className="label"> · {t.editor.noRoom}</span>}
+                  {typeof slot === "string" ? (
+                    <span className="label">
+                      {" · "}
+                      {slot === "tooFar"
+                        ? fill(t.editor.tooFar, { s: formatSeconds(MAX_MOMENT_DISTANCE_SECONDS, lang) })
+                        : t.editor[slot]}
+                    </span>
+                  ) : renderAdd(i, slot)}
                 </li>
               );
             })}

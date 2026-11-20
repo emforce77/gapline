@@ -196,11 +196,18 @@ describe("roomForMoment", () => {
     });
   });
 
-  it("gives no room to a moment far from the silence it names, or to an unknown silence", () => {
-    // The same run filed a moment at 29.8 s under the silence 39.17–41.51: 9 s off.
-    const g4 = { id: "g4", start: 39.17, end: 41.51 };
-    assert.equal(roomForMoment({ gapId: "g4", at: 29.8 }, [g4], []), null);
-    assert.equal(roomForMoment({ gapId: "g9", at: 40 }, [g4], []), null);
+  const g4 = { id: "g4", start: 39.17, end: 41.51 };
+
+  it("identifies a silence absent from this track", () => {
+    assert.equal(roomForMoment({ gapId: "g9", at: 40 }, [g4], []), "unknownGap");
+  });
+
+  it("identifies a moment too far from its named silence", () => {
+    assert.equal(roomForMoment({ gapId: "g4", at: 29.8 }, [g4], []), "tooFar");
+  });
+
+  it("reports a known, nearby silence already filled by a line", () => {
+    assert.equal(roomForMoment({ gapId: "g4", at: 40 }, [g4], [g4]), "noRoom");
   });
 });
 
