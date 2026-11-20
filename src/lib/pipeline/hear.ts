@@ -408,7 +408,12 @@ async function recognizeChunk(
       retryableStatus(response.status),
       response.status,
     );
-  const body = (await response.json()) as RecognizeResponse;
+  // fetch resolves at the headers; its deadline can still interrupt the response body.
+  const body = (await response.json().catch((error: unknown) => {
+    if (error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name))
+      throw new ServiceError("speech_failed", error.message, true);
+    throw error;
+  })) as RecognizeResponse;
   const { words, untimed, annotations } = timeChunkWords(body, from, from + length);
   if (annotations.length > 0)
     console.info(

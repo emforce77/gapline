@@ -144,4 +144,32 @@ describe("googleFetch", () => {
       [[true, 14]],
     );
   });
+
+  it("keeps a synthesis response body timeout retryable", async () => {
+    const ledgerFile = join(await mkdtemp(join(tmpdir(), "scene-auth-tts-")), "ledger.jsonl");
+    await assert.rejects(
+      onCloudRun(
+        () =>
+          new Response(
+            new ReadableStream({
+              pull(controller) {
+                controller.error(new DOMException("body was interrupted", "TimeoutError"));
+              },
+            }),
+          ),
+        () =>
+          synthesizeLine({
+            text: "A woman waits.",
+            language: "en",
+            speakingRate: 1,
+            ledgerFile,
+            label: "voice",
+          }),
+      ),
+      (error) => error instanceof ServiceError && error.code === "voice_failed" && error.retryable,
+    );
+    const calls = await readCallRecords(ledgerFile);
+    assert.equal(calls.length, 1);
+    assert.equal(calls[0].costKnown, false);
+  });
 });

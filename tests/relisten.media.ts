@@ -3,11 +3,13 @@ import { it } from "node:test";
 import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { ServiceError } from "../src/lib/errors";
 import { readCallRecords } from "../src/lib/llm/ledger";
 import { runFfmpeg } from "../src/lib/media/ffmpeg";
 import { analyzeClip, type StageRunner } from "../src/lib/pipeline/analyze";
 import type { RunEvent } from "../src/lib/pipeline/events";
 import { findGaps } from "../src/lib/pipeline/gaps";
+import { hearSpeech } from "../src/lib/pipeline/hear";
 import { RELISTEN_LEDGER_LABEL } from "../src/lib/pipeline/relisten";
 import type { AnalysisParts } from "../src/lib/store/analysis";
 import { withFetch } from "./with-fetch";
@@ -197,6 +199,33 @@ async function clipWith(dir: string, name: string, audio: string, seconds: numbe
   ]);
   return file;
 }
+
+it("keeps a speech response body timeout retryable and a malformed body distinct", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "scene-speech-read-"));
+  const clipFile = await clipWith(dir, "clip", "sine=frequency=220:duration=1", 1);
+  const ledgerFile = join(dir, "ledger.jsonl");
+  const hear = () => hearSpeech({ clipFile, clipSeconds: 1, languageCode: "en-US", ledgerFile });
+  for (const name of ["TimeoutError", "AbortError"]) {
+    const response = new Response(
+      new ReadableStream({
+        pull(controller) {
+          controller.error(new DOMException("body was interrupted", name));
+        },
+      }),
+    );
+    await assert.rejects(
+      withFetch(async () => response, hear),
+      (error) => error instanceof ServiceError && error.code === "speech_failed" && error.retryable,
+    );
+  }
+  await assert.rejects(
+    withFetch(async () => new Response("malformed JSON"), hear),
+    SyntaxError,
+  );
+  const calls = await readCallRecords(ledgerFile);
+  assert.equal(calls.length, 3);
+  assert.ok(calls.every((c) => c.ok === false && c.costKnown === false && c.boundUsd! > 0));
+});
 
 function hearOnly(clipFile: string, clipSeconds: number, ledgerFile: string) {
   const events: RunEvent[] = [];
