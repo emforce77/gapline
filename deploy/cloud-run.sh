@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
 # Deploys Gapline to Cloud Run (asia-northeast3) from source via Cloud Build.
 # Prerequisites (created once, see docs/DEPLOY.md): bucket, service account, secret.
-# Usage: GCP_PROJECT_ID=<project> DAILY_BUDGET_USD=<dollars> bash deploy/cloud-run.sh
+# See docs/DEPLOY.md for the candidate build and separate promotion commands.
 set -euo pipefail
+: "${CLOUDSDK_ACTIVE_CONFIG_NAME:?select the named personal gcloud configuration}"
 project="${GCP_PROJECT_ID:?set GCP_PROJECT_ID}"
-# --set-env-vars replaces every variable the service had, so the daily allowance is always stated:
-# a default below what was already spent today would refuse every run and edit until 00:00 UTC.
-# Read the live value first (docs/DEPLOY.md, "6. Deploy").
-budget="${DAILY_BUDGET_USD:?set DAILY_BUDGET_USD to the live daily allowance (docs/DEPLOY.md)}"
+identity="$(gcloud config get-value account)"
+case "$(tr '[:upper:]' '[:lower:]' <<< "$identity")" in
+  *@mazigle.ai|*@*.mazigle.ai) echo "Refusing to deploy from the company account." >&2; exit 1 ;;
+  *@*) ;;
+  *) echo "The selected gcloud configuration has no active account." >&2; exit 1 ;;
+esac
+tag="${TAG:-candidate}"
+promote="${PROMOTE:-0}"
+if [[ "$promote" != 0 && "$promote" != 1 ]]; then
+  echo "Set PROMOTE to 0 (deploy) or 1 (promote the existing tag)." >&2
+  exit 1
+fi
+
 region="${GCP_REGION:-asia-northeast3}"
 service="${SERVICE:-scene-ad}"
 number="$(gcloud projects describe "$project" --format='value(projectNumber)')"
@@ -33,25 +43,35 @@ builder="projects/$project/serviceAccounts/scene-ad-build@$project.iam.gservicea
 # running, events going backwards). Every file lookup is then a Cloud Storage request. Cloud Run
 # refuses metadata-cache-negative-ttl-secs (2026-10-03), so "missing" can still be cached for 5 s;
 # a saved edit's answer lists the new result itself, so the editor does not depend on it.
-gcloud run deploy "$service" \
-  --project "$project" --region "$region" --source . \
-  --service-account "$account" \
-  --build-service-account "$builder" \
-  --execution-environment gen2 \
-  --add-volume "name=data,type=cloud-storage,bucket=$bucket,mount-options=metadata-cache-ttl-secs=0" \
-  --add-volume-mount "volume=data,mount-path=/data" \
-  --set-env-vars "DATA_DIR=/data,DATA_BUCKET=$bucket,GCP_PROJECT_ID=$project,DAILY_BUDGET_USD=$budget,VISITOR_DAILY_BUDGET_USD=${VISITOR_DAILY_BUDGET_USD:-3}" \
-  --set-secrets "GOOGLE_API_KEY=scene-ad-gemini-key:latest" \
-  --cpu 2 --memory 2Gi --cpu-boost --concurrency 40 --timeout 900 \
-  --min-instances "${MIN_INSTANCES:-1}" --max-instances 8 \
-  --no-invoker-iam-check \
-  --port 8080
+if [[ "$promote" == 0 ]]; then
+  # --set-env-vars replaces all previous values, including the daily allowance.
+  budget="${DAILY_BUDGET_USD:?set DAILY_BUDGET_USD to the live daily allowance (docs/DEPLOY.md)}"
+  gcloud run deploy "$service" \
+    --no-traffic --tag "$tag" \
+    --project "$project" --region "$region" --source . \
+    --service-account "$account" \
+    --build-service-account "$builder" \
+    --execution-environment gen2 \
+    --add-volume "name=data,type=cloud-storage,bucket=$bucket,mount-options=metadata-cache-ttl-secs=0" \
+    --add-volume-mount "volume=data,mount-path=/data" \
+    --set-env-vars "DATA_DIR=/data,DATA_BUCKET=$bucket,GCP_PROJECT_ID=$project,DAILY_BUDGET_USD=$budget,VISITOR_DAILY_BUDGET_USD=${VISITOR_DAILY_BUDGET_USD:-3}" \
+    --set-secrets "GOOGLE_API_KEY=scene-ad-gemini-key:latest" \
+    --cpu 2 --memory 2Gi --cpu-boost --concurrency 40 --timeout 900 \
+    --min-instances "${MIN_INSTANCES:-0}" --max-instances 8 \
+    --no-invoker-iam-check \
+    --port 8080
+fi
 
 # Warm the new revision before a visitor does. Its startup probe only checks that the port is open:
 # the first request loads the page code, and the first listing of the sample reads its runs (a new
 # run index after an upgrade, about 12 s on 2026-10-03). Plain GETs, no model calls. The sample is
 # absent until it is added (docs/DEPLOY.md, "7. Add the sample"), so only the landing page must answer.
-url="$(gcloud run services describe "$service" --project "$project" --region "$region" --format='value(status.url)')"
+target="$(gcloud run services describe "$service" --project "$project" --region "$region" \
+    --format='json(status.traffic)' | jq -er --arg tag "$tag" '
+    .status.traffic[] | select(.tag == $tag and (.url | startswith("https://")) and .revisionName)
+    | [.url, .revisionName] | @tsv')"
+IFS=$'\t' read -r url revision <<< "$target"
+echo "Tag $tag on $revision: $url"
 sample="${SAMPLE_ID:-tos-opening}"
 # A hung revision must not stall the script (curl has no time limit of its own); the slowest first
 # request measured was the 12 s index rebuild above.
@@ -60,8 +80,30 @@ for path in / "/p/$sample"; do
   read -r code seconds < <(curl -sS --max-time "$warmup_timeout_seconds" -o /dev/null \
     -w '%{http_code} %{time_total}\n' "$url$path" || echo "000 0")
   echo "warm-up GET $path: HTTP $code in ${seconds}s"
-  if [[ "$path" == / && "$code" != 200 ]]; then
-    echo "The landing page did not answer 200 after the deploy; check the service logs." >&2
+  if [[ "$code" != 200 && ("$path" == / || "$promote" == 1 || "$code" != 404) ]]; then
+    echo "Warm-up failed for $path; check the tagged revision logs." >&2
     exit 1
   fi
 done
+
+if [[ "$promote" == 1 ]]; then
+  # Read the budget from the serving revision's own configuration. An env override at the
+  # operator's prompt must not let promotion check a different bucket than the one holding work.
+  traffic="$(gcloud run services describe "$service" --project "$project" --region "$region" \
+    --format='json(status.traffic)')"
+  jq -e --arg tag "$tag" --arg revision "$revision" 'any(.status.traffic[]; .tag == $tag and .revisionName == $revision)' <<< "$traffic" >/dev/null
+  serving="$(jq -er '[.status.traffic[] | select((.percent // 0) > 0) | .revisionName] | unique | .[]' <<< "$traffic")"
+  while IFS= read -r live_revision; do
+    live_bucket="$(gcloud run revisions describe "$live_revision" --project "$project" --region "$region" \
+      --format='json(spec.containers)' | jq -er '.spec.containers[0].env[] | select(.name == "DATA_BUCKET") | .value | select(length > 0)')"
+    gcloud storage cat "gs://$live_bucket/budget/demo-v2.json" | node --input-type=module -e '
+      import { readFileSync } from "node:fs";
+      const {entries} = JSON.parse(readFileSync(0, "utf8"));
+      const cutoff = Date.now() - 960_000;
+      const live = entries.filter(entry => entry.done !== true &&
+        (!Number.isFinite(Date.parse(entry.startedAt)) || Date.parse(entry.startedAt) > cutoff));
+      for (const entry of live) console.error("Unsettled reservation:", entry.id, entry.startedAt);
+      if (live.length) process.exit(1);'
+  done <<< "$serving"
+  gcloud run services update-traffic "$service" --project "$project" --region "$region" --to-tags "$tag=100"
+fi

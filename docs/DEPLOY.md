@@ -86,19 +86,26 @@ gcloud secrets add-iam-policy-binding scene-ad-gemini-key --project "$PROJECT_ID
 
 ## 6. Deploy
 
+The release script uses Bash, Node.js, jq and the Google Cloud CLI. Select the named personal gcloud
+configuration explicitly before running the deployment commands below. Company accounts are refused.
+Deployments to the existing service build a tagged candidate while its serving revision keeps the
+public traffic. On a brand new service, create the initial serving revision first: Cloud Run needs
+a revision to keep serving before it can deploy another with zero traffic.
+
 ```sh
-# The daily allowance the service has now; for a first deploy, choose one (in US dollars).
+export CLOUDSDK_ACTIVE_CONFIG_NAME=gapline   # use the name of your personal configuration
+# Check the daily allowance on the serving service.
 gcloud run services describe scene-ad --project "$PROJECT_ID" --region "$REGION" \
   --format='yaml(spec.template.spec.containers[0].env)' | grep -A1 'name: DAILY_BUDGET_USD'
-GCP_PROJECT_ID="$PROJECT_ID" DAILY_BUDGET_USD=<dollars> bash deploy/cloud-run.sh
+export GCP_PROJECT_ID="$PROJECT_ID" DAILY_BUDGET_USD=5   # match the live allowance
+bash deploy/cloud-run.sh
 ```
 
 `DAILY_BUDGET_USD` is required. The script sets the service's variables with `--set-env-vars`, which
 removes every variable the service had, so a value left out or set lower than what was already
 spent today would refuse every live track and edit until 00:00 UTC.
 
-The script runs `gcloud run deploy --source .` with the account of your active gcloud configuration
-(set `CLOUDSDK_ACTIVE_CONFIG_NAME` to pick another). Cloud Build builds the `Dockerfile`, the image goes
+The script runs `gcloud run deploy --source . --no-traffic --tag candidate` with the selected account. Cloud Build builds the `Dockerfile`, the image goes
 to Artifact Registry, and Cloud Run starts the service with:
 
 - the second-generation execution environment, 2 vCPU, 2 GiB, up to 40 requests per instance, a
@@ -113,12 +120,23 @@ to Artifact Registry, and Cloud Run starts the service with:
 - `GOOGLE_API_KEY` from Secret Manager;
 - public access, by turning off the invoker IAM check.
 
-After the deploy, the script requests the landing page and the sample's page once and prints each
+After the deploy, the script prints the tag URL, requests the landing and sample pages on that URL and prints each
 status and time (`warm-up GET /: HTTP 200 in 0.641236s`). The first request loads the page code and the
 first listing of the sample reads its runs, so the first visitor does not pay for either. It stops
 with an error when the landing page does not answer 200, or does not answer within 120 seconds. The
 sample's page answers 404 until you add the sample (step 7); set `SAMPLE_ID` when your sample has
-another ID.
+another ID. On the tagged URL, check sample playback and the planned upload, generate, download and
+privacy checks. With the same shell settings, promote the tested tag without rebuilding it:
+
+```sh
+PROMOTE=1 bash deploy/cloud-run.sh
+```
+
+Set `TAG` on both commands to use another tag name. Promotion rechecks both tagged pages and
+reads the budget ledger from each serving revision's configured bucket. If a recent generation
+or edit remains unsettled, the script prints its reservation ID and stops before changing traffic.
+It also stops on an unreadable ledger or a reservation whose start time is unknown. Run promotion
+again after the work finishes. Keep the previous serving revision name for rollback.
 
 Uploads, runs and edits are accepted only when the browser's `Origin` matches the request's `Host`
 and `X-Forwarded-Proto` (`requestOrigin` in `src/lib/store/access.ts`); `X-Forwarded-Host` is ignored,
@@ -144,8 +162,7 @@ service; this needs no build and leaves its variables as they are:
 gcloud run services update scene-ad --project "$PROJECT_ID" --region "$REGION" --min-instances 0
 ```
 
-The script keeps one instance at every deploy unless you also pass `MIN_INSTANCES=0` (with the same
-`DAILY_BUDGET_USD` as above).
+The script defaults to `MIN_INSTANCES=0`. Pass `MIN_INSTANCES=1` only for the planned warm window.
 
 ### Shared storage
 
@@ -253,5 +270,5 @@ one track, change one line, and download the five files (described MP4, narratio
 script JSON and line review TXT). Upload a clip in one browser and confirm that
 a second browser session cannot open it.
 
-A new revision replaces the running instances, and a generation runs inside its request. Deploy when
-no generation or edit is in progress.
+The tagged candidate receives public traffic only after promotion. Runs on the November serving
+revision execute inside their requests, so check for active work before moving traffic back as well.
