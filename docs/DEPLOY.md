@@ -102,7 +102,7 @@ The script runs `gcloud run deploy --source .` with the account of your active g
 to Artifact Registry, and Cloud Run starts the service with:
 
 - the second-generation execution environment, 2 vCPU, 2 GiB, up to 40 requests per instance, a
-  900-second request timeout, and 1 to 8 instances (see "Capacity and cost" below);
+  900-second request timeout and a revision maximum of 8 instances (see "Capacity and cost" below);
 - startup CPU boost, which gcloud also turns on by default for a new service: a starting instance gets
   4 vCPU instead of 2 until 10 seconds after it has started, and the extra CPU is billed for that
   time;
@@ -135,8 +135,8 @@ got Cloud Run's bare "Rate exceeded." page and pages whose scripts never loaded 
 the script allows 40 requests per instance and up to 8 instances. Instances are billed only while
 they run, so the higher ceiling costs nothing while traffic is low.
 
-One instance is kept running (`--min-instances 1`), so no visitor waits for one to start (about 5
-seconds after a quiet period). That costs about 1.2 US dollars a day at the idle rate for 2 vCPU and
+On 20 November the live revision could scale to zero and the service-wide cap was 3 instances.
+Keeping one instance warm (`--min-instances 1`) reduces the wait after a quiet period. That costs about 1.2 US dollars a day at the idle rate for 2 vCPU and
 2 GiB; check the Cloud Run pricing page for your region. To stop paying for it, change the running
 service; this needs no build and leaves its variables as they are:
 
@@ -231,10 +231,26 @@ Every page reads this file, so copy the sample into the bucket before the pin. A
 missing project or an upload, or that lacks `projectId` or `runs`, makes every page fail with an
 error naming `showcase.json` until the file is fixed or deleted.
 
+### Publish a curated sample run
+
+Start with a finished, team-owned run of the licensed sample in a local staging directory. Confirm
+the project, language, voices, captions, report and source rights. A production upload belongs to
+its browser owner. For a curated sample edit, include only its approved output and event files when
+copying the run directory. Omit `editor.json` (and `owner.json`, if present) from that staged
+public copy. Those markers ordinarily keep a web edit or generation private. Leave the markers on
+the original private run. Review its event log and script for material outside the approved sample.
+
+Copy the staged files into a new run directory under `projects/tos-opening/runs/` first. Rebuild
+the sample index as described above. Check playback and the review report from a fresh browser with
+no session. Save a copy of the current bucket `showcase.json`, then change only the intended
+language's run ID. Reopen the landing page and sample from a fresh browser. The deck and demo-film
+builders require an automatic run for their local pin.
+
 ## Check it
 
 A finished build does not show that generation works. After each deploy, play the sample, generate
-one track, change one line, and download the four files. Upload a clip in one browser and confirm that
+one track, change one line, and download the five files (described MP4, narration WAV, WebVTT,
+script JSON and line review TXT). Upload a clip in one browser and confirm that
 a second browser session cannot open it.
 
 A new revision replaces the running instances, and a generation runs inside its request. Deploy when

@@ -34,11 +34,16 @@ low-vision listeners or professional describers. Results and limitations are doc
 The deck is built by `npm run pitch` from the organisers' template ([scripts/pitch](../scripts/pitch/MODULE.md));
 the film by `npm run demo` ([scripts/demo](../scripts/demo/MODULE.md)).
 
-## Delivery status — 3 October 2026
+## Delivery status — 20 November 2026
 
-- On 3 October the live prototype moved to a new Cloud Run service at the address above (revision
-  `scene-ad-00001-9jd`). It calls the Gemini API directly with `GOOGLE_API_KEY` from Secret Manager,
-  on paid-tier quota. The daily API allowance is $5 and renews at 00:00 UTC.
+- Cloud Run revision `scene-ad-cup-f4dd0b5` serves all public traffic at the address above. It
+  calls the paid-tier Gemini API directly using a key from Secret Manager. The daily API allowance
+  is $5 and renews at 00:00 UTC.
+- On 20 November a 12-second upload completed in 276.41 seconds for $0.140. All five downloads
+  opened, including its English review report. Another browser received 404 for both the private
+  source and report. In a separate live edit, a producer added a Korean line to the sample.
+  The original stayed playable, the edited track produced five downloads and its private files
+  answered 404 in another browser.
 - Checked on the new service on 3 October: a 12-second uploaded clip ran through every stage in 37.6
   seconds for $0.034, its four files downloaded, an edit was saved as a new version, and a second
   browser session got 404 for the upload.
@@ -46,8 +51,7 @@ the film by `npm run demo` ([scripts/demo](../scripts/demo/MODULE.md)).
   a rejected request does not hold part of the daily allowance (the API does not bill it).
 - The film runs under 3 minutes: English 176.57 seconds (2:56), Korean 176.83 seconds. The
   `v0.2.0-preview` release MP4s and the Google Drive file play this cut.
-- The `v0.2.0-preview` pitch PDF still shows the earlier prototype address. Rebuild it with
-  `npm run pitch` and replace the release file to show the address above.
+- The published `v0.2.0-preview` pitch PDF links to the current prototype address.
 - The film runs under 3 minutes, as the owner confirmed on 29 September. The template says
   "3 minutes" and the public FAQ says "under 3 minutes"; the build fails at 180 seconds or more
   ([the demo module](../scripts/demo/MODULE.md)).

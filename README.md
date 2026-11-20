@@ -13,9 +13,10 @@ rewrites any line a final check sends back, and mixes the track. It works in Kor
 [Pitch deck (PDF)](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-pitch.pdf) |
 [Architecture](docs/ARCHITECTURE.md) | [Evaluation](docs/EVALUATION.md) | [Finalist screening plan (한국어)](docs/FINALIST.md) | [Deploy your own](docs/DEPLOY.md)
 
-**Deployment status (3 October 2026):** the live prototype runs on Cloud Run and calls the Gemini API
-directly with paid-tier quota. Generating, editing and downloading work. A daily allowance of
-US$5 caps what visitors can spend. Details in [submission details](docs/SUBMISSION.md#delivery-status--3-october-2026).
+**Deployment status (20 November 2026).** Cloud Run revision `scene-ad-cup-f4dd0b5` serves the public
+prototype. A live upload produced a described clip, narration, captions, script and review report.
+A Korean sample edit produced its own downloads, accessible to its editor's browser. Visitors share
+a daily API allowance of US$5. [Verification details](docs/SUBMISSION.md#delivery-status--20-november-2026).
 
 Built by **Grab Your Dream** for AI Builder Cup 2026, theme _Media, Content & Digital Experiences_.
 See [submission details](docs/SUBMISSION.md) for the prepared materials and remaining delivery steps.

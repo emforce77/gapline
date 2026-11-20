@@ -35,8 +35,8 @@ flowchart LR
 **Gemini access:** Gemini 3.8 Flash — via Gemini API (Google AI Studio), using `GOOGLE_API_KEY`.
 
 - **Cloud Run.** One service in `asia-northeast3`, second-generation execution environment, 2 vCPU,
-  2 GiB, up to 10 requests per instance, a 15-minute request timeout, 0 to 2 instances, startup CPU
-  boost. The container is Node.js 20 on Debian with the distribution's FFmpeg (libx264, AAC, FLAC,
+  2 GiB, up to 40 requests per instance, a 15-minute request timeout and startup CPU boost. On
+  20 November 2026 the serving revision allowed 0 to 8 instances, with a service-wide maximum of 3. The container is Node.js 20 on Debian with the distribution's FFmpeg (libx264, AAC, FLAC,
   `ebur128`). A run lives inside the request that started it and streams its events to the browser; a
   15-second heartbeat keeps the connection open. If the viewer disconnects, the run keeps going and
   its result is saved.

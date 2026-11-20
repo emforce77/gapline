@@ -12,19 +12,71 @@
 | 4. 납품 | 제작자가 원시 실행 기록을 읽어야 통과 근거와 남은 문제를 알 수 있었다. | 완료된 실행의 실제 판정·위반 조항·실측값과 누락을 한영 TXT로 생성한다. 오래된 데이터에서 기록이 빠진 항목은 명시한다. | 영상·음성·자막·JSON·검수 보고서를 열고 원본 결과와 대조할 수 있다. |
 | 5. 공개 운영 | 로컬에서 성공한 시연이 행사 링크에서도 되는지 확인해야 한다. | 소개 링크를 교정하고, 검증한 커밋으로 새 Cloud Run 리비전을 만든다. 새 리비전에서 샘플을 확인한 뒤 트래픽을 전환하고 짧은 실제 업로드와 편집을 실행한다. | 공개 주소에서 재생, 생성, 편집, 내려받기와 소유권을 확인한다. 진행 중인 생성은 보호하고 서비스의 기존 예산과 용량 설정을 유지한다. |
 
-우선순위는 실제 실패가 기록된 짧은 영상에서 출발했다. 이 경로에서는 모델이 무슨 말을 썼는지, 원본을 다시 들은 결과 무엇을 지켰는지, 사람이 어디를 고쳤는지를 같은 자료로 설명할 수 있다. 독립 워커와 장편 분할은 짧은 데모의 첫 청취나 잘못된 해설의 시점을 해결하지 못하므로 후속 수요에 맞춘다.
+우선순위는 실제 실패가 기록된 짧은 영상에서 출발했다. 이 경로에서는 모델이 무슨 말을 썼는지, 원본을 다시 들은 결과 무엇을 지켰는지, 사람이 어디를 고쳤는지를 같은 자료로 설명할 수 있다. 독립 워커의 중단 후 재개는 결선 전 별도 검증 항목이다. 장편 분할은 후속 수요에 맞춘다.
 
-## 무대에서 열 순서
+## 영어 무대 대본 초안
 
-| 시간 | 시연 | 확인할 것 |
+아래 4분은 리허설용 분량이다. 주최 측 발표·질의 시간, 지정 템플릿, 라이브 생성 의무와 심사 빌드는 확인 후 반영한다. 발표자는 홈과 비교 페이지, 저장된 실행, 원본 음성과 보고서를 미리 연다. 현장 생성이 필요하면 시작할 때 짧은 클립 한 건을 눌러 두고, 끝나기 전까지 저장본으로 진행한다. 관객 QR은 생성 버튼 없이 사례를 들을 수 있는 `/screening`으로 연결한다.
+
+| 시간 | 조작 | 영어 대사 |
 | --- | --- | --- |
-| 첫 20초 | 휴대폰 홈에서 원음 7초를 듣고 같은 구간을 해설로 듣는다. | 원음에 있던 대사가 두 버전에 모두 남고 화면의 준비 완료 문구는 해설에서 들린다. |
-| 다음 20초 | 홈의 비교 링크로 들어가 발사 장면의 두 녹음을 연속 재생한다. | 처음에는 한국어 제작사 크레딧이 발사 무전을 덮는다. 두 번째에는 다섯 단어가 들린다. 행사 전 같은 페이지에서 MP4를 내려받아 둔다. |
-| 다음 30초 | 비교 페이지에서 뇌와 기계 눈 두 프레임을 확인한 뒤 수정 전 영어 트랙을 연다. 해당 줄에서 원본 프레임을 비교하고, 비교 페이지의 수정본도 들어본다. | 현재 시작 56.7초, 비교 시점 59.3초. 남은 공간 1.33초에 기존 3.12초 녹음을 통째로 옮길 수 없다. 수정한 영어판에서는 그 시점에 보이는 뇌와 전극만 1.81초 동안 묘사한다. |
-| 제작자 시연 | 한국어 트랙의 최종 검수에서 누락 시각을 눌러 원음을 듣는다. 자리가 있는 항목에 한 줄을 작성한다. | 검수 반려 사유, 새 버전, 실제 음성과 보고서를 차례로 확인한다. 자리가 없는 항목도 열어 이유를 보여준다. |
-| 마무리 | 한국어 인터뷰 발췌본을 재생한 뒤 문장별 검수 보고서를 연다. | 대화가 많은 영상에서 45초 동안 확보한 자리는 2.46초다. 실제로 남은 누락 두 건을 설명한다. |
+| 0:00–0:30 | 그림을 숨긴 채 홈의 원음과 해설을 같은 구간에서 재생한다. “locked” 뒤를 들려준다. | “Listen for the pause after ‘locked.’ What changed on screen? Now hear the same moment with description. The display says the simulation is ready. The actors keep speaking at exactly the same time as before.” |
+| 0:30–1:20 | 비교 페이지에서 발사 장면을 두 번 듣는다. 두 번째 재생 때에는 말을 멈춘다. | “A producer has to decide where a narrator can speak. In this early cut, a voice reads a production credit over the launch controller. Our transcript had marked that spot as silence. Gapline sent just that slice back to the speech recognizer. Listen to the radio in the next cut.” |
+| 1:20–2:05 | 뇌와 전극이 보이는 장면에서 원래 해설을 듣고, 다음 프레임을 보인 뒤 수정본을 재생한다. | “The first draft introduces a man with a robotic eyepiece. Hold the picture there. You can see the brain and its electrodes. Now advance the picture. There’s the eyepiece. A producer changed the line to ‘Thin electrodes protrude from a brain.’ It gives the listener the reveal when the film does.” |
+| 2:05–2:45 | 한국어 트랙에서 ‘전체 기억 재생’의 검수 기록과 음성을 연다. | “Here the narrator described a hologram coming up. The review pointed to a guideline, and the rewrite reads the message on the display: ‘Full memory playback.’ Gapline recorded the new words, measured the voice against the silence, and mixed that take. The producer can hear it in place.” |
+| 2:45–3:30 | 보고서에서 검수 조항과 해결하지 못한 누락을 가리킨다. 한국어 인터뷰를 짧게 들려준다. | “In this interview, Hanbid keeps speaking. Gapline leaves that speech alone and lists what it couldn’t describe. A producer can listen at the flagged moment, decide what matters and edit the track. The report keeps that decision visible.” |
+| 3:30–4:00 | 라이브 결과가 준비됐으면 연다. 대기 중이면 저장본임을 밝히고 납품 파일을 보여준다. | “A producer can take the video to a screening, drop the narration and captions into an editor, and keep the script and review report with the cut. Our first delivery is a short Korean trailer. Next we want describers and blind and low-vision listeners to tell us where the track still gets in the way.” |
 
-관객 QR은 홈으로, 발표자 북마크는 비교 페이지와 한국어 샘플로 연결한다. 현장 노트북과 스피커에서 무전의 다섯 단어, 원래 대사, 한국어 해설이 객석에서도 구별되는지 확인한다. 생성 대기 중에는 저장된 실행 재생을 사용하고 관객에게도 저장된 실행이라고 소개한다.
+검증 결과가 바뀔 때만 해당 구간의 대사를 바꾼다.
+
+- 사진 포함 검수가 기계 눈을 실제로 지적하고 정상 줄을 오판하지 않았으면, 그 판정과 원본 프레임을 화면에 같이 띄운다. 사진 없는 검수도 잡았으면 “The final check flagged the reveal. Here are the frames the producer can inspect.”라고 한다. 사진을 넣은 경우에만 잡았으면 “Adding these frames made the check catch this early reveal in this run.”이라고 한다. 새 자동 실행에서 고친 음성까지 확인할 때만 그 전후를 들려준다.
+- 같은 모델·같은 대사표로 한 번 생성한 대조군에서 실제로 들리는 문제가 있으면, 인터뷰 대신 같은 구간의 두 음성을 재생하고 “Same scene, model and transcript. Listen for where the narrator starts speaking.”이라고 소개한다. 문제가 들리지 않으면 기존 인터뷰를 쓴다.
+- 태그 리비전에서 중단 후 같은 실행이 끝난 기록이 있으면 “We interrupted this run after review. It resumed from its saved work and finished the track.”이라는 말과 녹화를 함께 쓴다. 삭제 경로가 배포되고 공개 주소에서 확인되면 준비해 둔 발표자 소유 업로드에서 삭제 결과를 보여준다.
+- 라이브 생성이 거절되거나 네트워크가 끊기면 “This is a recording of an earlier run. You’ll hear the original soundtrack and its saved narration.”이라고 알리고 로컬 녹음·보고서를 연다. 현장에서 원래 무전과 대사, 해설이 객석에서 구별되는지 리허설한다.
+
+## 예상 질문과 답안
+
+각 영어 답변 아래의 한국어 메모는 발표자용이다. 제품 상태에 관한 답은 11월 20일 리비전을 기준으로 작성했다.
+
+1. **How is this different from ViddyScribe?** “ViddyScribe offers standard and extended description. Our focus is a producer working against a locked cut. In our launch scene you can hear the radio call that a first pass missed, and the producer can trace why that pause was taken off the table.”
+
+   메모: 상대도 원래 길이를 유지하는 표준 해설을 제공한다. 경쟁사가 항상 영상을 멈춘다고 소개하지 않는다. [ViddyScribe의 두 모드 설명](https://viddyscribe.com/)
+2. **Is this dubbing?** “Dubbing puts a new voice where an actor spoke. For description we have to find time when nobody is speaking, then use that time to tell the listener something the soundtrack leaves out.”
+
+   메모: 무전 위로 크레딧을 읽었던 장면을 예로 든다.
+3. **Why wouldn’t I just prompt Gemini?** “Gemini can draft the line. It can even write a perfectly accurate fact too early. Here you can hear the words, look at the picture at their start, and check the measured recording against the next line of dialogue.”
+
+   메모: 단순 생성 대조 음성은 같은 조건에서 저장해 확인한 경우만 제시한다.
+4. **Can I use it on a feature film?** “Our current delivery unit is a clip of up to ninety seconds. A feature would need continuity of names and choices across scenes, besides processing the longer soundtrack.”
+
+   메모: 장편 분할은 후속 개발이다.
+5. **What happens if the server dies?** “A completed run and its files are in Cloud Storage. On the November build, closing the browser lets an ongoing run continue, but losing the serving instance can interrupt it. We can play a completed run during the demo.”
+
+   메모: 브라우저 종료와 서버 종료를 구분한다. 워커 실검증 뒤에는 실제 중단 위치와 재개한 단계만 답한다.
+6. **Who has evaluated the descriptions?** “Our current evidence is the original footage, the generated audio and our review of those examples. Sessions with blind and low-vision listeners and professional describers, followed by a producer handoff, are our next step.”
+
+   메모: 청취자 효과, 작가 시간 절감, 고객 인수를 수치로 주장하지 않는다.
+7. **How much does a finished clip cost?** “The run records the model and speech charges. The amount depends on the material and on which lines need another take. We would quote a customer after agreeing on the clip and the human review it requires.”
+
+   메모: 고객 가격과 API 사용료를 구분한다. 금액 공개 범위는 발표자 확인 전까지 보류한다.
+8. **Who is legally required to provide this?** “The Korean case we cite concerned cinema operators. The Supreme Court upheld a discrimination finding over access to description, captions and the equipment to receive them, and sent the scope of the remedy back for review.”
+
+   메모: 모든 영상·광고에 적용되는 의무라고 확대하지 않는다. [대법원 2022다203507 보도자료](https://www.scourt.go.kr/portal/news/NewsViewAction.work?gubun=6&seqnum=3044&type=0)
+9. **Who can open an upload, and when is it deleted?** “Within the app, access to an upload and its results is tied to the browser that created it. We store the material in Cloud Storage. The November build has no scheduled expiration for uploads.”
+
+   메모: 소유자 삭제 기능과 저장소 보관 정책은 별개다. 각각 배포·적용을 확인한 뒤 지원 범위만 갱신한다.
+10. **What languages can you deliver?** “We support Korean and English. The writer budgets Korean lines in syllables and English lines in words. The final fit uses the duration of the actual voice in either language.”
+
+    메모: 추가 언어는 해당 언어 지침과 음성 길이 검증이 필요하다.
+11. **What if the reviewer gets it wrong?** “The editor shows the reason for a rejection and the guideline behind it. A producer can listen against the source, revise the line and compare the saved versions. The early eyepiece line is an example where that judgment mattered.”
+
+    메모: 검수 모델도 틀릴 수 있다. 사람의 편집과 확인이 필요한 사례로 답한다.
+12. **Where does Google Cloud come in?** “Chirp times the dialogue and listens again to candidate pauses. Text-to-Speech voices the accepted wording. The app runs on Cloud Run, stores the work in Cloud Storage, and calls Gemini directly for visual understanding, drafting and review.”
+
+    메모: Gemini API와 Cloud Run, 음성 API의 역할을 나누어 설명한다.
+13. **Why does it take minutes?** “We listen again to the candidate pauses, review the lines in the context of the film, synthesize them, then measure the audio and check the track. A rewrite can require another recording. While that runs, a completed track is available to audition.”
+
+    메모: 프레임 첨부가 실제 켜진 최종 점검에 한해서만 사진을 다시 본다고 설명한다.
 
 ## 샘플의 출처
 
@@ -36,9 +88,9 @@
 ## 이번 편집에서 확인한 결과
 
 - 영어 샘플에서는 “A man with a robotic eyepiece inspects a brain”을 “Thin electrodes protrude from a brain”으로 고쳤다. 시작은 56.70초, 합성 후 길이는 1.81초였다. 수정본의 다른 다섯 음성 파일은 원본과 바이트가 같았다. 원래 줄과 나란히 놓고 들을 수 있다.
-- 실제 영화 샘플의 한국어 편집에서 “시뮬레이션 준비 완료”는 화면 글자를 등장인물의 말로 오해할 수 있다는 이유로 반려됐다. 같은 시각에 “자막, 시뮬레이션 준비 완료”를 추가하자 전체 검수를 통과했다. 2.50초 자리에 1.59초 음성이 들어갔고 누락은 두 건에서 한 건으로 줄었다. 이 결과는 공개 샘플을 복사한 로컬 작업실에서 실제 합성·검수를 호출해 확인했다.
+- 11월 20일 공개 서비스에서 한국어 샘플의 이전 실행 `20260922t051536291-ko-standard-d88b71`을 열어 누락된 화면 글자에 “자막, 시뮬레이션 준비 완료.”를 추가했다. 편집본에서는 2.50초 자리에 2.02초 음성이 들어갔고 누락이 두 건에서 한 건으로 줄었다. 원본과 기존 음성 다섯 개는 보존됐다. 내려받기 다섯 종을 확인했고, 다른 브라우저로 편집본의 비공개 자료를 요청하자 404를 받았다.
 
-## 본선 전 파일럿
+## 결선 이후 제작자·작가·청취자 검증
 
 | 순서 | 실행 | 결과를 기록할 단위 |
 | --- | --- | --- |
