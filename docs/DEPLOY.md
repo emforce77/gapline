@@ -288,3 +288,34 @@ outstanding measurement cap. That cap remains visible after an interruption and 
 result is recorded. Charges absent from these ledgers require reconciliation with the provider. Check before
 each paid task, stop non-stage calls at $4 cumulative spend, and keep all calls including the final
 within $5. These are event-wide thresholds separate from Cloud Run's daily allowance.
+
+### Review the 30-day upload lifecycle
+
+The proposed rule makes objects whose names start with `projects/u-` eligible for deletion
+30 days after each object's creation. A later edit has its own creation time. Cloud Storage
+schedules eligible deletions asynchronously. The bucket's soft-delete period begins when an object
+is deleted. The UI currently states that access is restricted to the uploading browser. Only after
+a policy change is approved, applied and read back should the UI describe the verified retention
+period. [Cloud Storage lifecycle conditions and timing](https://cloud.google.com/storage/docs/lifecycle#conditions)
+
+From the repository root on the deployment host in Bash, use the team's named `gapline`
+configuration to preview the production bucket. The report lists eligible object versions,
+total bytes, distinct upload prefixes and held objects. It reads metadata only.
+
+```sh
+python3 deploy/upload-lifecycle.py
+```
+
+On 20 November at 14:59 KST, the preview found 1,939 eligible object versions under 104 upload
+prefixes, totaling 867,997,443 bytes. The bucket had zero lifecycle rules and a seven-day soft-delete
+period. Get separate, explicit owner approval for the current preview before applying. From the
+same directory in Bash, pass the reviewed digest in place of `APPROVED_PREVIEW_DIGEST`.
+
+```sh
+python3 deploy/upload-lifecycle.py --apply-approved APPROVED_PREVIEW_DIGEST
+```
+
+The apply step repeats the inventory. A change to eligible objects or bucket settings invalidates
+the digest. It appends the [upload rule](../deploy/upload-lifecycle-rule.json) to the existing list,
+patches only the lifecycle property with a metageneration precondition, and reads the rules back.
+A concurrent settings change can return HTTP 412. Preview the new state and get approval again.

@@ -1,0 +1,4 @@
+{
+  "action": { "type": "Delete" },
+  "condition": { "age": 30, "matchesPrefix": ["projects/u-"] }
+}
