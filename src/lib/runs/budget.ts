@@ -270,10 +270,10 @@ export function runChargeBound(budget: RunBudget): number {
   return Math.min(budget.limit, budget.spent + budget.pending);
 }
 /** Unknown charges consume the full bound; failed and retried requests count too. */
-export function reserveCall(maxUsd: number): (costUsd: number | null) => void {
+export function reserveCall(maxUsd: number) {
   attemptSignal.getStore()?.throwIfAborted();
   const state = running.getStore();
-  if (!state) return () => {};
+  if (!state) return Object.assign((_costUsd: number | null) => {}, { boundUsd: maxUsd });
   maxUsd = Math.min(maxUsd, state.callCapUsd ?? maxUsd);
   if (state.spent + state.pending + maxUsd > state.limit + CAP_EPSILON)
     throw new BudgetExhaustedError(
@@ -282,10 +282,11 @@ export function reserveCall(maxUsd: number): (costUsd: number | null) => void {
     );
   state.pending += maxUsd;
   let done = false;
-  return (cost) => {
+  const settle = (cost: number | null) => {
     if (done) return;
     done = true;
     state.pending -= maxUsd;
     state.spent += cost ?? maxUsd;
   };
+  return Object.assign(settle, { boundUsd: maxUsd });
 }

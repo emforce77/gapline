@@ -1,5 +1,9 @@
+import { beginRun, cancelDispatch, executeAttempt } from "../src/lib/runs/attempt";
+import { prepareRun } from "../src/lib/runs/start-run";
+import { reserveRun } from "../src/lib/runs/budget";
+import { projectDir, writeProject, readRunSnapshot } from "../src/lib/store/projects";
 import assert from "node:assert/strict";
-import { appendFile, mkdtemp, writeFile, rm, chmod } from "node:fs/promises";
+import { appendFile, readFile, mkdtemp, writeFile, rm, chmod } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { it } from "node:test";
@@ -120,4 +124,44 @@ it("uses metadata and requires a bucket when only CLOUD_RUN_JOB is present", asy
     }
     dropGoogleToken();
   }
+});
+
+it("settles a cancelled dispatch at zero and ignores an execution arriving afterwards", async (t) => {
+  const saved = process.env.DATA_DIR;
+  const dir = await mkdtemp(join(tmpdir(), "gapline-dispatch-"));
+  t.after(async () => {
+    if (saved === undefined) delete process.env.DATA_DIR;
+    else process.env.DATA_DIR = saved;
+    await rm(dir, { recursive: true, force: true });
+  });
+  process.env.DATA_DIR = dir;
+  const id = "sample-dispatch";
+  await writeProject({
+    id,
+    title: id,
+    kind: "sample",
+    clipSeconds: 12,
+    filmLanguageCode: "en-US",
+    createdAt: new Date().toISOString(),
+    attribution: "fixture",
+    license: "fixture",
+    stripStepSeconds: 1,
+  });
+  await writeFile(join(projectDir(id), "clip.mp4"), "clip");
+  const run = await prepareRun({ projectId: id, density: "standard", language: "en" });
+  const job = await beginRun(run, await reserveRun());
+  assert.equal(await cancelDispatch(id, job.runId), true);
+  await executeAttempt(id, job.runId, { execution: "late", attempt: 0 });
+  assert.equal(await cancelDispatch(id, job.runId), false);
+  const { events } = await readRunSnapshot(id, job.runId);
+  assert.deepEqual(
+    events.map((e) => e.type),
+    ["run_started", "run_failed"],
+  );
+  assert.deepEqual(
+    JSON.parse(await readFile(join(dir, "budget/demo-v2.json"), "utf8")).entries.map(
+      (e: { done: boolean; cost: number }) => [e.done, e.cost],
+    ),
+    [[true, 0]],
+  );
 });

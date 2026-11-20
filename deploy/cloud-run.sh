@@ -83,7 +83,7 @@ if [[ "$promote" == 0 && "$executor" == job ]]; then
   [[ "$image" =~ @sha256:[0-9a-f]{64}$ ]] || { echo "Revision has no immutable image digest" >&2; exit 1; }
   # Cloud Run Jobs run in the second-generation environment. The jobs deploy CLI has no gen selector.
   gcloud run jobs deploy "$job" --project "$project" --region "$region" --image "$image" \
-    --service-account "$account" --tasks 1 --max-retries 0 --task-timeout 900s --cpu 2 --memory 2Gi \
+    --service-account "$account" --tasks 1 --max-retries 2 --task-timeout 900s --cpu 2 --memory 2Gi \
     --add-volume "name=data,type=cloud-storage,bucket=$bucket,mount-options=metadata-cache-ttl-secs=0" \
     --add-volume-mount "volume=data,mount-path=/data" --set-env-vars "$run_env" \
     --set-secrets "GOOGLE_API_KEY=scene-ad-gemini-key:latest" --command node --args job/run-job.cjs

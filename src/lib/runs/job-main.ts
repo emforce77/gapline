@@ -1,5 +1,5 @@
 import { assertSafeId } from "../store/projects";
-import { executeAttempt } from "./attempt";
+import { executeAttempt, TerminalRunFailure } from "./attempt";
 import { executorConfig } from "./executor-config";
 
 async function main() {
@@ -15,9 +15,18 @@ async function main() {
   assertSafeId(runId);
   const stop = new AbortController();
   process.once("SIGTERM", () => stop.abort(new Error("Task is stopping")));
-  await executeAttempt(projectId, runId, { signal: stop.signal });
+  const execution = process.env.CLOUD_RUN_EXECUTION;
+  const attempt = Number(process.env.CLOUD_RUN_TASK_ATTEMPT);
+  if (!execution || !Number.isSafeInteger(attempt) || attempt < 0)
+    throw new Error("Missing Cloud Run task identity");
+  await executeAttempt(projectId, runId, {
+    signal: stop.signal,
+    execution,
+    attempt,
+    maxRetries: 2,
+  });
 }
 main().catch((error) => {
   console.error(error);
-  process.exitCode = 1;
+  process.exitCode = error instanceof TerminalRunFailure ? 0 : 1;
 });

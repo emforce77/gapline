@@ -1,4 +1,3 @@
-import { reserveCall } from "../runs/budget";
 import type { RelistenReport } from "./events";
 import { assessRoom, findGaps, MIN_GAP_SECONDS } from "./gaps";
 import {
@@ -12,6 +11,7 @@ import {
   SLICE_PADDING_SECONDS,
   SLICES_IN_FLIGHT,
   speechCostUsd,
+  speechPassBudget,
   wordsInSlice,
   type RecognizedChunk,
   type Slice,
@@ -90,15 +90,17 @@ export async function relistenGaps(input: {
   const started = Date.now();
   const outcomes: SpeechOutcomes = [];
   const recognize = noteOutcomes(input.recognize, outcomes);
+  const pass = speechPassBudget();
   const failed = (error: unknown) =>
     recordSpeechCall(input.ledgerFile, {
       label: RELISTEN_LEDGER_LABEL,
+      boundUsd: pass.boundUsd,
       started,
       ok: false,
       error,
       outcomes,
     });
-  const settleCall = reserveCall(speechCostUsd(slices.reduce((s, x) => s + x.to - x.from, 0)));
+  const settleCall = pass.reserve(speechCostUsd(slices.reduce((s, x) => s + x.to - x.from, 0)));
   let chunks: RecognizedChunk[];
   try {
     chunks = await mapLimit(slices, SLICES_IN_FLIGHT, (slice) =>
@@ -111,13 +113,14 @@ export async function relistenGaps(input: {
     throw error;
   }
   const sliceSeconds = chunks.reduce((s, c) => s + c.billedSeconds, 0);
-  settleCall(sliceSeconds > 0 ? speechCostUsd(sliceSeconds) : null);
+  settleCall(settledSpeechCost(outcomes));
   let placed: Awaited<ReturnType<typeof placeLongSpans>>;
   try {
     placed = await placeLongSpans(
       slices.flatMap((slice, i) => wordsInSlice(slice, chunks[i].words)),
       recognize,
       input.clipSeconds,
+      pass.reserve,
     );
   } catch (error) {
     await failed(error);
@@ -125,8 +128,10 @@ export async function relistenGaps(input: {
   }
   await recordSpeechCall(input.ledgerFile, {
     label: RELISTEN_LEDGER_LABEL,
+    boundUsd: pass.boundUsd,
     started,
     ok: true,
+    outcomes,
     billedSeconds: sliceSeconds + placed.billedSeconds,
     untimedWords: chunks.reduce((s, c) => s + c.untimed, 0),
   });

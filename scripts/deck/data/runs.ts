@@ -87,6 +87,11 @@ export function readRunEvents(runId: string, projectId: string = pin.projectId) 
     .forEach((text, i) => {
       if (!text.trim()) return;
       const raw = JSON.parse(text) as { type?: unknown };
+      if (raw.type === "run_started") {
+        stages.length = 0;
+        reviews.length = 0;
+        relisten.length = 0;
+      }
       if (raw.type === "stage") stages.push(parseJsonLine(path, i + 1, raw, StageEventSchema));
       if (raw.type === "cue_reviewed")
         reviews.push(parseJsonLine(path, i + 1, raw, CueReviewedEventSchema));

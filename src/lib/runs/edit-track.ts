@@ -7,7 +7,12 @@ import { writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { readCallRecords, summarizeCosts } from "../llm/ledger";
 import { watchingVideoFor } from "../media/proxies";
-import { buildNarrationTrack, encodeWav, type TrimmedLine } from "../media/narration-track";
+import {
+  wavLine,
+  buildNarrationTrack,
+  encodeWav,
+  type TrimmedLine,
+} from "../media/narration-track";
 import { describedVtt, mixDescribedFilm } from "../media/mix";
 import { parseWav } from "../media/wav";
 import { MODELS } from "../models";
@@ -64,21 +69,6 @@ const FILES: RunFiles = {
   vtt: "descriptions.vtt",
   script: "script.json",
 };
-
-/** The PCM samples of a mono 16-bit WAV, without copying its header. */
-function wavLine(wav: Buffer): TrimmedLine {
-  const info = parseWav(wav);
-  return {
-    sampleRate: info.sampleRate,
-    seconds: info.seconds,
-    pcm: new Int16Array(
-      wav.buffer.slice(
-        wav.byteOffset + info.dataOffset,
-        wav.byteOffset + info.dataOffset + info.dataLength,
-      ),
-    ),
-  };
-}
 
 /**
  * Each shipped line may speak until LINE_SPACING_SECONDS before the next shipped line in its gap

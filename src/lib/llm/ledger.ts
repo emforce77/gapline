@@ -12,6 +12,8 @@ export interface CallRecord {
   promptTokensDetails?: { modality: string; tokenCount: number }[];
   completionTokens: number;
   costUsd: number;
+  /** Reserved upper bound of this call (all requests in a speech pass). Optional on old ledgers. */
+  boundUsd?: number;
   /** False when usage is incomplete; costUsd contributes only the known subtotal. */
   costKnown?: boolean;
   /**

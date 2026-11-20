@@ -98,8 +98,22 @@ export CLOUDSDK_ACTIVE_CONFIG_NAME=gapline   # use the name of your personal con
 gcloud run services describe scene-ad --project "$PROJECT_ID" --region "$REGION" \
   --format='yaml(spec.template.spec.containers[0].env)' | grep -A1 'name: DAILY_BUDGET_USD'
 export GCP_PROJECT_ID="$PROJECT_ID" DAILY_BUDGET_USD=5   # match the live allowance
+export RUN_EXECUTOR=job
 bash deploy/cloud-run.sh
 ```
+
+In job mode the tagged revision launches its own worker. The script deploys the worker
+from that revision's immutable image digest, mounts the same data bucket and grants the service
+account permission to execute that job with project and run ID overrides. Each build names a new
+job, including a rebuild of the same commit. Use `RUN_EXECUTOR=inline` for local runs or for a
+tagged revision that runs generation within the web process.
+
+The worker records checkpoints after analysis, script review, voicing and the final revision.
+Cloud Run can retry twice within the original run deadline. Terminal events and the original
+reservation carry across retries. For the staged recovery check, set
+`GAPLINE_FAULT=exit-after:reviewed` only on the candidate job, then remove it before promotion.
+The local worker accepts `--self-test`; Cloud Run supports the same argument as an execution
+override. Validate the tagged job, its identity and the recovered result before switching traffic.
 
 `DAILY_BUDGET_USD` is required. The script sets the service's variables with `--set-env-vars`, which
 removes every variable the service had, so a value left out or set lower than what was already

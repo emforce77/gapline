@@ -46,6 +46,12 @@ function monoSamples(wav: Buffer): { samples: Int16Array; sampleRate: number } {
   return { samples, sampleRate: info.sampleRate };
 }
 
+/** A persisted, already-trimmed mono take. Its edges must survive a resume unchanged. */
+export function wavLine(wav: Buffer): TrimmedLine {
+  const { samples, sampleRate } = monoSamples(wav);
+  return { pcm: samples, sampleRate, seconds: samples.length / sampleRate };
+}
+
 /** One-pole high-pass at HIGH_PASS_HZ, rounded back to 16-bit samples. */
 function highPass(samples: Int16Array, sampleRate: number): Int16Array {
   const k = 1 / (1 + (2 * Math.PI * HIGH_PASS_HZ) / sampleRate);

@@ -264,6 +264,7 @@ export async function callStructuredOnce<T>(
       thinkingTokens: usage?.thoughtsTokenCount ?? 0,
       cachedTokens: usage?.cachedContentTokenCount ?? 0,
       costUsd: cost ?? 0,
+      boundUsd: settleCall.boundUsd,
       costKnown: cost !== null,
       costSource: rejected ? "not_billed" : cost === null ? "unknown" : "token_estimate",
       attempt,

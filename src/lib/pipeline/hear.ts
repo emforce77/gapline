@@ -187,16 +187,15 @@ export function noteOutcomes(recognize: SpanRecognizer, outcomes: SpeechOutcomes
  */
 export function settledSpeechCost(outcomes: SpeechOutcomes): number | null {
   let billedSeconds = 0;
-  let answered = 0;
   for (const outcome of outcomes) {
     if (outcome.status === "rejected") {
       if (!refusedUnbilled(outcome.reason)) return null;
       continue;
     }
-    answered += 1;
+    if (!Number.isFinite(outcome.value.billedSeconds) || outcome.value.billedSeconds <= 0)
+      return null;
     billedSeconds += outcome.value.billedSeconds;
   }
-  if (answered > 0 && billedSeconds === 0) return null;
   return speechCostUsd(billedSeconds);
 }
 
@@ -310,6 +309,7 @@ export async function placeLongSpans(
   words: Word[],
   recognize: SpanRecognizer,
   clipSeconds: number,
+  reserve = reserveCall,
 ): Promise<{ words: Word[]; billedSeconds: number; requests: number }> {
   const tooLong = (w: Word) => w.end - w.start > UNPLACED_MAX_SECONDS;
   let placed = words.filter((w) => !tooLong(w));
@@ -324,7 +324,7 @@ export async function placeLongSpans(
         { ...padSlice(middle, w.end, clipSeconds), continues: true },
       ];
     });
-    const settleCall = reserveCall(speechCostUsd(halves.reduce((s, h) => s + h.to - h.from, 0)));
+    const settleCall = reserve(speechCostUsd(halves.reduce((s, h) => s + h.to - h.from, 0)));
     const outcomes: SpeechOutcomes = [];
     const heardOnce = noteOutcomes(recognize, outcomes);
     let chunks: RecognizedChunk[];
@@ -336,7 +336,7 @@ export async function placeLongSpans(
       throw error;
     }
     const billed = chunks.reduce((s, c) => s + c.billedSeconds, 0);
-    settleCall(billed > 0 ? speechCostUsd(billed) : null);
+    settleCall(settledSpeechCost(outcomes));
     billedSeconds += billed;
     requests += halves.length;
     const heard = halves.map((h, i) => wordsInSlice(h, chunks[i].words));
@@ -427,18 +427,30 @@ export function speechCostUsd(billedSeconds: number): number {
   return (billedSeconds / 60) * STT_USD_PER_MINUTE;
 }
 
+/** One ledger row covers the original batch and any later batches used to place long spans. */
+export function speechPassBudget() {
+  const pass = {
+    boundUsd: 0,
+    reserve(maxUsd: number) {
+      const settle = reserveCall(maxUsd);
+      pass.boundUsd += settle.boundUsd;
+      return settle;
+    },
+  };
+  return pass;
+}
+
 /**
  * One ledger row per recognition pass. A failed pass is charged what its requests can have cost
  * (settledSpeechCost): nothing when the service refused them unbilled, else usually unknown.
  */
 export async function recordSpeechCall(
   ledgerFile: string,
-  call: { label: string; started: number } & (
-    | { ok: true; billedSeconds: number; untimedWords: number }
-    | { ok: false; error: unknown; outcomes: SpeechOutcomes }
+  call: { label: string; started: number; boundUsd: number; outcomes: SpeechOutcomes } & (
+    { ok: true; billedSeconds: number; untimedWords: number } | { ok: false; error: unknown }
   ),
 ): Promise<void> {
-  const failedCost = call.ok ? null : settledSpeechCost(call.outcomes);
+  const knownCost = settledSpeechCost(call.outcomes);
   await appendCallRecord(ledgerFile, {
     at: new Date(call.started).toISOString(),
     label: call.label,
@@ -446,9 +458,10 @@ export async function recordSpeechCall(
     provider: "Google Cloud",
     promptTokens: 0,
     completionTokens: 0,
-    costUsd: call.ok ? speechCostUsd(call.billedSeconds) : (failedCost ?? 0),
-    costKnown: call.ok ? call.billedSeconds > 0 : failedCost !== null,
-    ...(failedCost === 0 ? { costSource: "not_billed" as const } : {}),
+    boundUsd: call.boundUsd,
+    costUsd: call.ok ? speechCostUsd(call.billedSeconds) : (knownCost ?? 0),
+    costKnown: knownCost !== null,
+    ...(!call.ok && knownCost === 0 ? { costSource: "not_billed" as const } : {}),
     latencyMs: Date.now() - call.started,
     firstTokenMs: null,
     finishReason: "",
@@ -479,7 +492,8 @@ export async function hearSpeech(input: {
     starts.push(t);
     if (t + CHUNK_SECONDS >= input.clipSeconds) break;
   }
-  const settleCall = reserveCall(
+  const pass = speechPassBudget();
+  const settleCall = pass.reserve(
     speechCostUsd(input.clipSeconds + starts.length * OVERLAP_SECONDS),
   );
   const results = await Promise.allSettled(
@@ -490,6 +504,7 @@ export async function hearSpeech(input: {
     settleCall(settledSpeechCost(results));
     await recordSpeechCall(input.ledgerFile, {
       label: "hear",
+      boundUsd: pass.boundUsd,
       started,
       ok: false,
       error: failed.reason,
@@ -499,7 +514,7 @@ export async function hearSpeech(input: {
   }
   const chunks = results.map((r) => (r as PromiseFulfilledResult<RecognizedChunk>).value);
   const chunkSeconds = chunks.reduce((sum, c) => sum + c.billedSeconds, 0);
-  settleCall(chunkSeconds > 0 ? speechCostUsd(chunkSeconds) : null);
+  settleCall(settledSpeechCost(results));
   // Each overlap belongs to the earlier chunk up to its midpoint, the later chunk after it.
   // A timed word goes by its start; an unplaced span keeps whatever part lies in the chunk's share.
   const words: Word[] = [];
@@ -517,10 +532,11 @@ export async function hearSpeech(input: {
 
   let placed: Awaited<ReturnType<typeof placeLongSpans>>;
   try {
-    placed = await placeLongSpans(words, recognize, input.clipSeconds);
+    placed = await placeLongSpans(words, recognize, input.clipSeconds, pass.reserve);
   } catch (error) {
     await recordSpeechCall(input.ledgerFile, {
       label: "hear",
+      boundUsd: pass.boundUsd,
       started,
       ok: false,
       error,
@@ -535,8 +551,10 @@ export async function hearSpeech(input: {
     );
   await recordSpeechCall(input.ledgerFile, {
     label: "hear",
+    boundUsd: pass.boundUsd,
     started,
     ok: true,
+    outcomes,
     billedSeconds: chunkSeconds + placed.billedSeconds,
     untimedWords: untimed,
   });

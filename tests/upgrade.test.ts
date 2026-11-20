@@ -159,6 +159,7 @@ it("sends native Gemini media/schema options and streams only answer parts throu
       assert.deepEqual(result.data, { ok: true });
       assert.deepEqual(deltas, ['{"ok":', "true}"]);
       assert.equal(result.record.promptTokens, 100);
+      assert.ok(result.record.boundUsd && result.record.boundUsd >= result.record.costUsd);
       assert.deepEqual(result.record.promptTokensDetails, usage.promptTokensDetails);
       assert.equal(result.record.completionTokens, 100);
       assert.equal(result.record.costKnown, true);

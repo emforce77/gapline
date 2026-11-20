@@ -111,7 +111,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       await cancelDispatch(id, job.runId);
     }
   } else {
-    void executeAttempt(id, job.runId).catch((error) =>
+    void executeAttempt(id, job.runId, { execution: "inline" }).catch((error) =>
       console.error(`Run failed: ${job.runId}`, error),
     );
   }

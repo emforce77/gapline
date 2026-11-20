@@ -1,3 +1,4 @@
+import { restoreVoices, savedVoices, type RunCheckpoint } from "./checkpoint";
 import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { readCallRecords } from "../llm/ledger";
@@ -55,6 +56,9 @@ export interface RunOptions {
   /** Persist writing progress for HTTP clients reading the job's event log. */
   streamFromLog?: boolean;
   reportFailure?: boolean;
+  resume?: RunCheckpoint;
+  onCheckpoint?: (checkpoint: RunCheckpoint) => Promise<void>;
+  analysisReused?: RunSummary["analysisReused"];
   clipFile: string;
   clipSeconds: number;
   /** Spoken language of the film, for the recognizer (BCP-47, e.g. en-US). */
@@ -86,6 +90,14 @@ export async function runDescription(
   await mkdir(join(options.runDir, "voice"), { recursive: true });
 
   const log = new BufferedAppend(eventsFile);
+  const checkpoint = options.onCheckpoint
+    ? async (state: RunCheckpoint) => {
+        await log.flush();
+        await options.onCheckpoint!(state);
+      }
+    : undefined;
+  const resume = options.resume;
+  const track = resume && resume.boundary !== "analyzed" ? resume : undefined;
   const emit = async (event: RunEvent) => {
     const timed = { ...event, t: round((Date.now() - started) / 1000) } as TimedRunEvent;
     if (event.type !== "writer_delta") log.add(`${JSON.stringify(timed)}\n`);
@@ -116,37 +128,49 @@ export async function runDescription(
   try {
     // The small watching copy is needed by watch, write and review: kept beside the clip, encoded
     // in the background when this is the clip's first run.
-    const videoDataUrlPromise = watchingVideoFor(options.clipFile).then(
-      (video) => `data:video/mp4;base64,${video.toString("base64")}`,
-    );
-    // Its failure is raised where it is awaited; this only keeps it from counting as unhandled
-    // while hearing runs, or in a run with no silence, which never needs it.
-    videoDataUrlPromise.catch(() => {});
+    let video: Promise<string> | undefined;
+    function watchingCopy() {
+      if (!video) {
+        video = watchingVideoFor(options.clipFile).then(
+          (bytes) => `data:video/mp4;base64,${bytes.toString("base64")}`,
+        );
+        // An analysis with no free room can finish without ever needing the picture.
+        video.catch(() => {});
+      }
+      return video;
+    }
 
     // 1. Hear (with a re-listen of each silence) and watch are independent: run them together.
-    const { speech, scene } = await analyzeClip({
-      clipFile: options.clipFile,
-      clipSeconds: options.clipSeconds,
-      filmLanguageCode: options.filmLanguageCode,
-      watchModel: options.reviewerModel,
-      ledgerFile,
-      videoDataUrl: videoDataUrlPromise,
-      cached: options.cached,
-      onAnalysis: options.onAnalysis,
-      stage,
-      emit,
-    });
-    // Saved analyses are keyed by ANALYSIS_VERSION, so a reused one went through the re-listen too.
-    await emit({ type: "speech", segments: speech, relistened: true });
-    await emit({ type: "scene", map: scene });
+    const analysis = resume
+      ? (track ?? options.cached)
+      : await analyzeClip({
+          clipFile: options.clipFile,
+          clipSeconds: options.clipSeconds,
+          filmLanguageCode: options.filmLanguageCode,
+          watchModel: options.reviewerModel,
+          ledgerFile,
+          videoDataUrl: watchingCopy(),
+          cached: options.cached,
+          onAnalysis: options.onAnalysis,
+          stage,
+          emit,
+        });
+    if (!analysis?.scene || !analysis.speech) throw new Error("Checkpoint analysis is missing");
+    const { speech, scene } = analysis;
+    if (!resume) {
+      await emit({ type: "speech", segments: speech, relistened: true });
+      await emit({ type: "scene", map: scene });
+      await checkpoint?.({ boundary: "analyzed" });
+    }
 
-    // 2. Gaps: where narration may speak.
-    const gaps = await stage("gaps", async () =>
-      findGaps({ speech, sounds: scene.sounds }, options.clipSeconds),
-    );
-    await emit({ type: "gaps", gaps });
+    const gaps =
+      track?.gaps ??
+      (await stage("gaps", async () =>
+        findGaps({ speech, sounds: scene.sounds }, options.clipSeconds),
+      ));
+    if (!track) await emit({ type: "gaps", gaps });
     const room = assessRoom(gaps, options.clipSeconds);
-    if (room.little)
+    if (!track && room.little)
       await emit({
         type: "little_room",
         gapSeconds: room.gapSeconds,
@@ -181,7 +205,10 @@ export async function runDescription(
         shipped,
         finalReview,
         finalFix,
-        analysisReused: { speech: !!options.cached?.speech, scene: !!options.cached?.scene },
+        analysisReused: options.analysisReused ?? {
+          speech: !!options.cached?.speech,
+          scene: !!options.cached?.scene,
+        },
         clipSeconds: options.clipSeconds,
         gaps,
         room,
@@ -203,39 +230,51 @@ export async function runDescription(
 
     // 3. Write. On a clip's first run the watching copy may still be encoding: that wait is part of
     //    writing, so the stage list shows it.
-    let context!: ClipContext;
-    const drafts = await stage("write", async () => {
-      context = {
-        language: options.language,
-        density: options.density,
-        clipSeconds: options.clipSeconds,
-        speech,
-        scene,
-        gaps,
-        videoDataUrl: await videoDataUrlPromise,
-      };
-      return writeScript({
-        context,
-        model: options.writerModel,
-        ledgerFile,
-        onDelta: (text) => {
-          const delta = {
-            type: "writer_delta" as const,
-            text,
-            t: round((Date.now() - started) / 1000),
-          };
-          if (options.streamFromLog) log.add(JSON.stringify(delta) + "\n");
-          options.emit?.(delta);
-        },
-      });
+    if (track?.boundary === "fixed")
+      return await finish(
+        track.cues,
+        restoreVoices(track.audio),
+        track.finalReview,
+        track.finalFix,
+      );
+    const clipContext = async (): Promise<ClipContext> => ({
+      language: options.language,
+      density: options.density,
+      clipSeconds: options.clipSeconds,
+      speech,
+      scene,
+      gaps,
+      videoDataUrl: await watchingCopy(),
     });
-    const { placed, dropped } = placeCues(drafts, gaps);
-    const cues = [...placed, ...dropped].sort((a, b) => a.start - b.start);
-    for (const cue of cues) {
-      latest(cue).model = options.writerModel;
-      await emit({ type: "cue_written", cue });
-      if (cue.status === "dropped")
-        await emit({ type: "cue_dropped", cueId: cue.id, reason: cue.droppedReason! });
+    let context!: ClipContext;
+    const cues: Cue[] = track?.cues ?? [];
+    if (track) context = await clipContext();
+    else {
+      const drafts = await stage("write", async () => {
+        context = await clipContext();
+        return writeScript({
+          context,
+          model: options.writerModel,
+          ledgerFile,
+          onDelta: (text) => {
+            const delta = {
+              type: "writer_delta" as const,
+              text,
+              t: round((Date.now() - started) / 1000),
+            };
+            if (options.streamFromLog) log.add(JSON.stringify(delta) + "\n");
+            options.emit?.(delta);
+          },
+        });
+      });
+      const { placed, dropped } = placeCues(drafts, gaps);
+      cues.push(...[...placed, ...dropped].sort((a, b) => a.start - b.start));
+      for (const cue of cues) {
+        latest(cue).model = options.writerModel;
+        await emit({ type: "cue_written", cue });
+        if (cue.status === "dropped")
+          await emit({ type: "cue_dropped", cueId: cue.id, reason: cue.droppedReason! });
+      }
     }
     const active = () => cues.filter((c) => c.status !== "dropped");
 
@@ -398,20 +437,36 @@ export async function runDescription(
         reviewRound++;
       }
     };
-    await stage("review", () => review(active(), 1, true));
+    if (!track) {
+      await stage("review", () => review(active(), 1, true));
+      await checkpoint?.({ boundary: "reviewed", speech, scene, gaps, cues });
+    }
 
     // 5. Voice every approved line; speed up slightly or shorten when the measured audio overruns.
-    const lines = await stage("voice", () =>
-      voiceToFit({
-        active,
-        context,
-        language: options.language,
-        writerModel: options.writerModel,
-        ledgerFile,
-        emit,
-        reviewShortened: (shortened) => review(shortened, MAX_REVIEW_ROUNDS - 1, false),
-      }),
-    );
+    const lines =
+      track?.boundary === "voiced"
+        ? restoreVoices(track.audio)
+        : await stage("voice", () =>
+            voiceToFit({
+              active,
+              context,
+              language: options.language,
+              writerModel: options.writerModel,
+              ledgerFile,
+              emit,
+              reviewShortened: (shortened) => review(shortened, MAX_REVIEW_ROUNDS - 1, false),
+            }),
+          );
+
+    if (track?.boundary !== "voiced")
+      await checkpoint?.({
+        boundary: "voiced",
+        speech,
+        scene,
+        gaps,
+        cues,
+        audio: savedVoices(lines),
+      });
 
     // 6. Audit exactly what will be heard, once. What the audit finds is fixed without asking anyone:
     //    a failing line is rewritten from its fix, and a missing moment gets a new line where its gap
@@ -604,6 +659,16 @@ export async function runDescription(
       });
     }
 
+    await checkpoint?.({
+      boundary: "fixed",
+      speech,
+      scene,
+      gaps,
+      cues,
+      audio: savedVoices(lines),
+      finalReview,
+      finalFix,
+    });
     return await finish(cues, lines, finalReview, finalFix);
   } catch (error) {
     // The viewer gets a stable code; the details stay in the server log, keyed by the run id.

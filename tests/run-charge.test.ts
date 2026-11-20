@@ -22,7 +22,7 @@ import {
   type SpeechOutcomes,
 } from "../src/lib/pipeline/hear";
 import { relistenGaps } from "../src/lib/pipeline/relisten";
-import { synthesizeLine } from "../src/lib/pipeline/voice";
+import { synthesizeLine, TTS_USD_PER_CHARACTER } from "../src/lib/pipeline/voice";
 import { executeRun, prepareRun } from "../src/lib/runs/start-run";
 import { projectDir, writeProject } from "../src/lib/store/projects";
 import { withFetch } from "./with-fetch";
@@ -127,6 +127,7 @@ describe("what a run is charged when its ledger cannot say", () => {
       [record.ok, record.costUsd, record.costKnown, record.costSource],
       [false, 0, true, "not_billed"],
     );
+    assert.equal(record.boundUsd, "A woman waits on the bridge.".length * TTS_USD_PER_CHARACTER);
     // Before 2026-10-03 its bound stayed charged, and the run's ledger became "unresolved".
     assert.equal(runChargeBound(budget), 0);
   });
@@ -158,6 +159,7 @@ describe("what a refused speech request is charged", () => {
       [failed(new ServiceError("speech_failed", "unreachable", true))],
       [failed(new Error("ffmpeg exited 1"))],
       [answered(0), failed(refused(403))],
+      [answered(12), answered(0)],
     ];
     for (const outcomes of unknown) assert.equal(settledSpeechCost(outcomes), null);
   });
@@ -188,6 +190,7 @@ describe("what a refused speech request is charged", () => {
       [record.ok, record.costUsd, record.costKnown, record.costSource],
       [false, 0, true, "not_billed"],
     );
+    assert.ok(record.boundUsd && record.boundUsd > 0 && record.boundUsd < speechCostUsd(40));
     // Before 2026-10-03 the whole reservation of a failed recognition stayed charged.
     assert.equal(runChargeBound(budget), 0);
   });
