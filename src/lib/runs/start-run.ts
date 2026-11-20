@@ -21,6 +21,7 @@ import {
   type Project,
   type RunOwner,
 } from "../store/projects";
+import { beginUploadWork } from "../store/upload-work";
 import { indexRunEnded, indexRunStarted, logIndexFailure } from "../store/run-index";
 import {
   newRunBudget,
@@ -156,7 +157,12 @@ export async function startRun(input: {
   scriptBudget?: { limit: number; callCapUsd: number };
   emit?: (event: TimedRunEvent) => void;
 }): Promise<{ runId: string }> {
-  const prepared = await prepareRun(input);
-  const reservation = await reserveRun(input.budgetScope, undefined, input.scriptBudget?.limit);
-  return executeRun(prepared, reservation, input.emit, input.scriptBudget?.callCapUsd);
+  const release = await beginUploadWork(input.projectId);
+  try {
+    const prepared = await prepareRun(input);
+    const reservation = await reserveRun(input.budgetScope, undefined, input.scriptBudget?.limit);
+    return await executeRun(prepared, reservation, input.emit, input.scriptBudget?.callCapUsd);
+  } finally {
+    await release();
+  }
 }

@@ -4,6 +4,7 @@ import { BudgetExhaustedError, reserveRun } from "@/lib/runs/budget";
 import { describeFailure } from "@/lib/runs/failure";
 import { executeRun, prepareRun } from "@/lib/runs/start-run";
 import { listActiveRuns, listRuns, listRunsAndWork } from "@/lib/store/run-index";
+import { beginUploadWork, UploadGone } from "@/lib/store/upload-work";
 import { accessibleProject, ownerHash, sameOrigin, sessionToken } from "@/lib/store/access";
 
 export const runtime = "nodejs";
@@ -74,10 +75,14 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
   }
   let prepared;
   let reservation;
+  let release: (() => Promise<void>) | undefined;
   try {
+    release = await beginUploadWork(id);
     prepared = await prepareRun({ projectId: id, ...parsed.data, owner });
     reservation = await reserveRun("demo", owner);
   } catch (error) {
+    await release?.();
+    if (error instanceof UploadGone) return fail(404, { error: "not_found" });
     const failure = describeFailure(error);
     if (error instanceof BudgetExhaustedError) {
       console.warn(`run refused: project=${id} code=${failure.code}`);
@@ -124,7 +129,8 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
             `data: ${JSON.stringify({ type: "run_failed", t: 0, error: failure.code, ...failure })}\n\n`,
           );
         })
-        .finally(() => {
+        .finally(async () => {
+          await release?.();
           clearInterval(heartbeat);
           if (!closed) controller.close();
           closed = true;

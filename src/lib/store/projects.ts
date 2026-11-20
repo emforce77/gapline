@@ -11,6 +11,7 @@ import {
 } from "../api-contract";
 import type { RunSummary, TimedRunEvent } from "../pipeline/events";
 import { mapLimit } from "../pipeline/map-limit";
+import { readJson } from "./atomic";
 import type { SceneMap, SpeechSegment } from "../pipeline/schemas";
 
 /**
@@ -110,6 +111,13 @@ export async function unlessMissing<T, M>(read: Promise<T>, missing: M): Promise
 }
 
 export async function readProject(id: string): Promise<Project> {
+  // The mount can retain another instance's deleted metadata. Check the object itself for uploads,
+  // since this lookup also authorizes every download of a private source or result.
+  if (process.env.DATA_BUCKET && id.startsWith(UPLOAD_ID_PREFIX)) {
+    const state = await readJson<unknown>(`projects/${assertSafeId(id)}/project.json`, () => null);
+    if (state === null) throw Object.assign(new Error("Upload not found"), { code: "ENOENT" });
+    return ProjectSchema.parse(state);
+  }
   const raw = await readFile(join(projectDir(id), "project.json"), "utf8");
   return ProjectSchema.parse(JSON.parse(raw));
 }

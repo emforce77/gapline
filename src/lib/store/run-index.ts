@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { ActiveEdit, ActiveRun } from "../api-contract";
 import { mapLimit } from "../pipeline/map-limit";
 import { readJson, updateJson } from "./atomic";
+import { beginUploadWork, UploadGone } from "./upload-work";
 import {
   assertSafeId,
   inspectRun,
@@ -302,9 +303,17 @@ async function loadRunView(
   if (changes.length > 0) {
     // The listing is right without the write; a failed one only means the next listing reads
     // these runs again (and a stalled run's clock starts later).
-    await saveChanges(projectId, changes).catch((error: unknown) =>
-      console.error(`RUN INDEX NOT UPDATED: project=${projectId} listing`, error),
-    );
+    let release: (() => Promise<void>) | undefined;
+    try {
+      // A listing can finish its backfill while the owner is removing an upload.
+      release = await beginUploadWork(projectId);
+      await saveChanges(projectId, changes);
+    } catch (error) {
+      if (!(error instanceof UploadGone))
+        console.error(`RUN INDEX NOT UPDATED: project=${projectId} listing`, error);
+    } finally {
+      await release?.();
+    }
     applyChanges(index, changes);
   }
   return {

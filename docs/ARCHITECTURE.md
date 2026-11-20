@@ -299,6 +299,11 @@ track ([evaluation](EVALUATION.md#edits-on-the-earlier-sample-track)).
   the token's SHA-256 hash. Every route that reads or changes a project checks it, and changes must come
   from the site's own pages. The media route serves only the clip, poster, thumbnail strip, each run's
   four outputs and its per-line WAVs.
+- **Deleting an upload.** The owner confirms deletion in the workspace header. The server checks
+  for active runs and edits, then conditionally marks the upload's metadata to prevent a new writer
+  starting during deletion. It removes the clip, results and supporting files under the upload's
+  project prefix. It removes the ownership record last so a partial deletion can be retried.
+  The separate budget ledger retains its accounting entries.
 - **What a visitor makes on a sample is theirs alone.** A run or edit started from the web records the
   same cookie hash (`owner.json`, `editor.json`). On a sample, every listing, run read, media file and
   edit shows such a run only to that browser, and to anyone else it is not found, like a run that does

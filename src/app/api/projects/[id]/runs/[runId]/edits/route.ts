@@ -1,4 +1,5 @@
 import type { EditSaved } from "@/lib/api-contract";
+import { beginUploadWork, UploadGone } from "@/lib/store/upload-work";
 import { accessibleProject, ownerHash, sameOrigin, sessionToken } from "@/lib/store/access";
 import { assertSafeId, type RunListing } from "@/lib/store/projects";
 import { listRuns } from "@/lib/store/run-index";
@@ -54,10 +55,15 @@ export async function POST(
       { status: 400 },
     );
   const owner = ownerHash((await sessionToken(true))!);
-  let runId: string;
+  let release: (() => Promise<void>) | undefined;
   try {
+    release = await beginUploadWork(id);
+    let runId: string;
     ({ runId } = await editRun(id, baseRunId, parsed.data, owner));
+    const saved: EditSaved<RunListing> = { runId, runs: await listRuns(project, owner) };
+    return Response.json(saved, { status: 201 });
   } catch (e) {
+    if (e instanceof UploadGone) return Response.json({ error: "not_found" }, { status: 404 });
     if (e instanceof EditError)
       return Response.json(
         { error: e.code, message: e.message, ...e.detail },
@@ -86,7 +92,7 @@ export async function POST(
       },
       { status: 502 },
     );
+  } finally {
+    await release?.();
   }
-  const saved: EditSaved<RunListing> = { runId, runs: await listRuns(project, owner) };
-  return Response.json(saved, { status: 201 });
 }
