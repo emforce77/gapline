@@ -78,6 +78,19 @@
 
     메모: 프레임 첨부가 실제 켜진 최종 점검에 한해서만 사진을 다시 본다고 설명한다.
 
+## 현장에 가져갈 파일
+
+`runtime/finalist-offline/gapline-offline.zip`을 노트북에 복사하고 압축을 푼다. 동봉한
+`README.txt`에는 Windows PowerShell과 macOS·Linux 터미널별 서버 실행법이 있다. Python 3과
+H.264/AAC를 재생하는 브라우저가 필요하다. 노트북의 127.0.0.1에서 원음·해설 비교, 영어 편집 전후,
+발사 무전, 인터뷰와 한영 완성본을 재생하고 검수 TXT와 제출용 PDF를 연다. 생성과 편집 시연은
+공개 앱에서 한다. PDF는 현재 공개된 제출본이므로 결선 양식이 확인되면 교체한다. 관객 인쇄물에는
+같은 폴더의 `screening-qr.png`를 쓴다. 노트북의 재생은 오프라인으로 가능하고 QR을 스캔한
+관객의 휴대폰은 인터넷 연결이 필요하다.
+
+이 서버의 저장소 루트에서 bash로 다시 만들 때는 `uv run --env-file .env.local scripts/demo/build-offline-kit.py`를 실행한다.
+[생성 스크립트](../scripts/demo/build-offline-kit.py)가 공개 샘플 핀의 지정된 MP4와 발췌본을 사용하고 공개 서비스에서 검수 보고서와 릴리스 PDF를 읽는다.
+
 ## 샘플의 출처
 
 - 발사 비교 영상은 같은 원본의 2~9초를 두 번 연결했다. 옛 실행은 `20260922t051536291-ko-standard-d88b71`, 재청취 뒤 실행은 `20260923t064439178-ko-standard-837b9f`다. 두 믹스의 저장 음량을 사용했다. 작품은 Blender Foundation의 *Tears of Steel*, CC BY 3.0이다.
