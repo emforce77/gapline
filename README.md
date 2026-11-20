@@ -11,7 +11,7 @@ rewrites any line a final check sends back, and mixes the track. It works in Kor
 [Submission video (Google Drive)](https://drive.google.com/file/d/1yuhGGyPOm_IhLdVcERYa43bwXbHBhTub/view) |
 [Demo video (English, MP4)](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-demo-en.mp4) |
 [Pitch deck (PDF)](https://github.com/emforce77/gapline/releases/download/v0.2.0-preview/gapline-pitch.pdf) |
-[Architecture](docs/ARCHITECTURE.md) | [Evaluation](docs/EVALUATION.md) | [Deploy your own](docs/DEPLOY.md)
+[Architecture](docs/ARCHITECTURE.md) | [Evaluation](docs/EVALUATION.md) | [Finalist screening plan (한국어)](docs/FINALIST.md) | [Deploy your own](docs/DEPLOY.md)
 
 **Deployment status (3 October 2026):** the live prototype runs on Cloud Run and calls the Gemini API
 directly with paid-tier quota. Generating, editing and downloading work. A daily allowance of
@@ -52,9 +52,9 @@ cost at roughly ₩14 million (about US$10,000) for description and captions tog
 
 ![The Gapline landing page](docs/images/landing.png)
 
-1. Open the [live demo](https://scene-ad-117546381357.asia-northeast3.run.app). It starts with seven
-   seconds of _Tears of Steel_ where nobody speaks. Play **Original sound**, then **With description**,
-   and turn on **Eyes closed** to hear it the way a blind viewer would.
+1. Open the [live demo](https://scene-ad-117546381357.asia-northeast3.run.app). In the opening comparison, play **Play original**,
+   then **Play described**. The same seven seconds contain a technician’s dialogue followed by a status
+   message on a display. **Hide picture** lets you compare what each soundtrack tells you.
 2. Choose **Open the sample** for the full 65 seconds, with Korean and English tracks. Press play, turn
    on **Eyes closed**, and switch **Description off** and on to compare. The Korean track came from
    one automatic run: seven lines, each inside its silence, one of them rewritten by Gapline after the
@@ -65,6 +65,8 @@ cost at roughly ₩14 million (about US$10,000) for description and captions tog
    minutes for most short clips and up to about 9 minutes for a clip with many pauses to describe
    (56 live runs on the current code, 2026-10-03). New tracks share a daily allowance on the public
    demo; when it runs out, the sample keeps playing.
+
+See the [listening comparison](https://scene-ad-117546381357.asia-northeast3.run.app/screening) for the saved launch-call mixes, the earlier and revised English line, and a Korean interview with just one usable pause. The launch comparison downloads as a 14-second MP4 for the stage.
 
 ## How the AI works
 

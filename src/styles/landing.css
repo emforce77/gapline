@@ -33,9 +33,14 @@
 .hero {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.08fr);
-  gap: 56px;
-  align-items: center;
+  grid-template-areas: "copy demo" "actions demo";
+  gap: 0 56px;
+  align-items: end;
   padding: 40px 0 72px;
+}
+
+.hero-copy {
+  grid-area: copy;
 }
 
 .eyebrow {
@@ -63,6 +68,8 @@
 }
 
 .hero-actions {
+  grid-area: actions;
+  align-self: start;
   display: flex;
   gap: 12px;
   margin-top: 32px;
@@ -75,6 +82,7 @@
 }
 
 .hero-demo {
+  grid-area: demo;
   padding: 22px;
   border: 1px solid var(--border);
   border-radius: var(--radius);
@@ -91,6 +99,13 @@
   margin: 0 0 16px;
   font-size: var(--step-0);
   color: var(--muted);
+}
+
+.screening-link {
+  display: inline-block;
+  margin-top: 16px;
+  font-size: var(--step--1);
+  text-underline-offset: 3px;
 }
 
 .seven-frame {
@@ -158,13 +173,13 @@
   color: var(--danger);
 }
 
-/* The whole window is one room to speak; the lines sit inside it. */
+/* The same time scale shows original dialogue and the added narration. */
 .seven-window {
   position: relative;
   height: 14px;
-  border: 1px dashed var(--room-edge);
+  border: 1px solid var(--border-strong);
   border-radius: 4px;
-  background: var(--room);
+  background: var(--surface-2);
 }
 
 .seven-scale {
@@ -175,6 +190,7 @@
   color: var(--muted);
 }
 
+.seven-dialogue,
 .seven-line {
   position: absolute;
   top: 2px;
@@ -182,6 +198,10 @@
   border-radius: 2px;
   background: var(--accent-soft);
   transition: background 200ms ease;
+}
+
+.seven-dialogue {
+  background: var(--dialogue);
 }
 
 .seven-line.on {
@@ -198,6 +218,7 @@
 }
 
 .seven-controls {
+  margin-bottom: 12px;
   display: flex;
   gap: 10px;
 }
@@ -406,8 +427,12 @@
     grid-template-columns: 1fr;
   }
   .hero {
-    gap: 32px;
+    grid-template-areas: "copy" "demo" "actions";
+    gap: 24px;
     padding-top: 16px;
+  }
+  .hero-actions {
+    margin-top: 0;
   }
   .rejection-copy {
     position: static;

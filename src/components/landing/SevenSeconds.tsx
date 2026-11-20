@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import type { SpeechSegment } from "@/lib/pipeline/schemas";
 import { formatClock } from "@/lib/format";
 import { PlayIcon } from "../PlayIcon";
 
@@ -34,12 +35,14 @@ export function SevenSeconds({
   tracks,
   windowStart,
   windowEnd,
+  speech,
   labels,
 }: {
   originalUrl: string;
   tracks: NarrationTrack[];
   windowStart: number;
   windowEnd: number;
+  speech: SpeechSegment[];
   labels: {
     original: string;
     described: string;
@@ -47,8 +50,6 @@ export function SevenSeconds({
     hidePicture: string;
     idle: string;
     soundtrack: string;
-    waiting: string;
-    quiet: string;
     loading: string;
     paused: string;
     ended: string;
@@ -120,7 +121,9 @@ export function SevenSeconds({
       // A pause or a new source interrupts a pending play; that was the visitor's own choice.
       if (error instanceof DOMException && error.name === "AbortError") return;
       setLoading(false);
-      throw error;
+      setPlaying(false);
+      setFailed(true);
+      console.error("seven seconds: playback failed", error);
     });
     // play() unpauses at once; its play event follows a task later.
     setPlaying(!el.paused);
@@ -157,15 +160,43 @@ export function SevenSeconds({
     setLoading(true);
   }
 
+  const dialogue = speech.find((s) => time >= s.start && time < s.end);
   const spoken =
     version === "described" ? track.lines.find((l) => time >= l.start && time <= l.end) : undefined;
-  // Only promise a next description while one is still ahead in the window.
-  const lineAhead = track.lines.some((l) => l.start > time);
   const progress = Math.min(1, Math.max(0, (time - windowStart) / (windowEnd - windowStart)));
-  const pct = (s: number) => `${((s - windowStart) / (windowEnd - windowStart)) * 100}%`;
+  const percent = (seconds: number) => (seconds * 100) / (windowEnd - windowStart);
+  function spanStyle(start: number, end: number) {
+    const left = Math.max(start, windowStart);
+    return {
+      left: `${percent(left - windowStart)}%`,
+      width: `${percent(Math.min(end, windowEnd) - left)}%`,
+    };
+  }
 
   return (
     <div className="seven">
+      <div className="seven-controls">
+        {(["original", "described"] as Version[]).map((v) => {
+          const active = version === v && (playing || loading);
+          return (
+            // A play/pause button: its label carries the state ("Pause" while playing), so it has no
+            // aria-pressed, which would read "Pause, pressed" as if playback were paused.
+            <button
+              key={v}
+              type="button"
+              className={`button${v === "described" ? " primary" : ""}`}
+              onClick={() => press(v)}
+            >
+              {active && loading ? (
+                <span className="spinner" aria-hidden="true" />
+              ) : (
+                <PlayIcon pause={active} />
+              )}
+              {active ? `${labels.pause}` : v === "original" ? labels.original : labels.described}
+            </button>
+          );
+        })}
+      </div>
       <div className={`seven-frame${hidden ? " hidden" : ""}`}>
         <video
           ref={video}
@@ -213,8 +244,10 @@ export function SevenSeconds({
           <span className="idle">{labels.ended}</span>
         ) : version === null ? (
           <span className="idle">{labels.idle}</span>
-        ) : version === "original" ? (
-          <span className="idle">{labels.soundtrack}</span>
+        ) : !playing ? (
+          <span className="idle">{labels.paused}</span>
+        ) : dialogue ? (
+          <span lang="en">{dialogue.text}</span>
         ) : spoken ? (
           <>
             <span className="narration" lang={track.language}>
@@ -222,21 +255,22 @@ export function SevenSeconds({
             </span>
             {spoken.gloss ? <span className="gloss">{spoken.gloss}</span> : null}
           </>
-        ) : !playing ? (
-          <span className="idle">{labels.paused}</span>
         ) : (
-          <span className="idle">{lineAhead ? labels.waiting : labels.quiet}</span>
+          <span className="idle">{labels.soundtrack}</span>
         )}
       </div>
       <p className="sr-only" aria-live="polite">
         {slowLoading ? labels.loading : failed ? labels.failed : ended ? labels.ended : ""}
       </p>
       <div className="seven-window" aria-hidden="true">
+        {speech.map((s, i) => (
+          <span key={i} className="seven-dialogue" style={spanStyle(s.start, s.end)} />
+        ))}
         {track.lines.map((l) => (
           <span
             key={l.start}
             className={`seven-line${version === "described" ? " on" : ""}`}
-            style={{ left: pct(l.start), width: pct(windowStart + (l.end - l.start)) }}
+            style={spanStyle(l.start, l.end)}
           />
         ))}
         <span className="seven-head" style={{ left: `${progress * 100}%` }} />
@@ -244,28 +278,6 @@ export function SevenSeconds({
       <div className="seven-scale mono" aria-hidden="true">
         <span>{formatClock(windowStart)}</span>
         <span>{formatClock(windowEnd)}</span>
-      </div>
-      <div className="seven-controls">
-        {(["original", "described"] as Version[]).map((v) => {
-          const active = version === v && (playing || loading);
-          return (
-            // A play/pause button: its label carries the state ("Pause" while playing), so it has no
-            // aria-pressed, which would read "Pause, pressed" as if playback were paused.
-            <button
-              key={v}
-              type="button"
-              className={`button${v === "described" ? " primary" : ""}`}
-              onClick={() => press(v)}
-            >
-              {active && loading ? (
-                <span className="spinner" aria-hidden="true" />
-              ) : (
-                <PlayIcon pause={active} />
-              )}
-              {active ? `${labels.pause}` : v === "original" ? labels.original : labels.described}
-            </button>
-          );
-        })}
       </div>
       <div className="seven-options">
         {tracks.length > 1 ? (

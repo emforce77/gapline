@@ -16,13 +16,11 @@ import { loadShowcases, type Showcase } from "@/lib/store/showcase";
 
 export const dynamic = "force-dynamic";
 
-/**
- * The seven seconds of the story: the transcript is silent from "…locked." (ends 53.72 s) until
- * "This is pretty freaky." (starts 60.88 s). The window keeps a few frames clear of both lines and
- * plays exactly 7.0 s. Its start must stay after 53.72 s, or `before` below picks the line ahead of it.
+/** Include "Robot's memory synced and locked" and the voiced display text in both tracks.
+ * The next description starts at 56.7 s and identifies the man before his eyepiece is visible.
  */
-const SEVEN_START_SECONDS = 53.8;
-const SEVEN_END_SECONDS = 60.8;
+const SEVEN_START_SECONDS = 49.5;
+const SEVEN_END_SECONDS = 56.5;
 
 /** Where the footer's citations lead; the link text comes from the catalog. */
 const FOOTER_URLS = {
@@ -123,9 +121,10 @@ export default async function LandingPage() {
     (r) => r.lastEdit?.cueId === story?.id && r.lastEdit?.action === "rewrite",
   );
   const edit = fix?.summary ?? null;
-  const sevenSpeech = analysis?.speech ?? [];
-  const before = sevenSpeech.filter((s) => s.end <= SEVEN_START_SECONDS).at(-1);
-  const after = sevenSpeech.find((s) => s.start >= SEVEN_END_SECONDS);
+  const comparison = project?.id === "tos-opening" && tracks.length > 0;
+  const sevenSpeech = (analysis?.speech ?? []).filter(
+    (s) => s.start < SEVEN_END_SECONDS && s.end > SEVEN_START_SECONDS,
+  );
   const sum = (spans: { start: number; end: number }[]) =>
     spans.reduce((total, s) => total + s.end - s.start, 0);
   // Dialogue as heard: the re-listen overlaps the first pass, so overlapping spans count once.
@@ -147,23 +146,13 @@ export default async function LandingPage() {
             <p className="eyebrow">{t.landing.eyebrow}</p>
             <h1>{t.landing.title}</h1>
             <p className="lede">{t.landing.lede}</p>
-            <div className="hero-actions">
-              {project ? (
-                <Link className="button primary" href={`/p/${project.id}`}>
-                  {t.landing.ctaSample}
-                </Link>
-              ) : null}
-              <a className="button" href="#try-your-clip">
-                {t.landing.ctaUpload}
-              </a>
-            </div>
           </div>
-          {project && tracks.length ? (
+          {comparison ? (
             <div className="hero-demo" id="seven">
               <p className="label">
                 {fill(t.landing.seven.label, {
-                  from: Math.round(SEVEN_START_SECONDS),
-                  to: Math.round(SEVEN_END_SECONDS),
+                  from: SEVEN_START_SECONDS,
+                  to: SEVEN_END_SECONDS,
                 })}
               </p>
               <h2>{t.landing.seven.title}</h2>
@@ -173,10 +162,25 @@ export default async function LandingPage() {
                 tracks={tracks}
                 windowStart={SEVEN_START_SECONDS}
                 windowEnd={SEVEN_END_SECONDS}
+                speech={sevenSpeech}
                 labels={t.landing.seven}
               />
+              <Link className="screening-link" href="/screening">
+                {t.landing.screeningLink}
+                <span aria-hidden="true"> →</span>
+              </Link>
             </div>
           ) : null}
+          <div className="hero-actions">
+            {project ? (
+              <Link className="button primary" href={`/p/${project.id}`}>
+                {t.landing.ctaSample}
+              </Link>
+            ) : null}
+            <a className="button" href="#try-your-clip">
+              {t.landing.ctaUpload}
+            </a>
+          </div>
         </section>
 
         {project && featured && analysis ? (
@@ -191,7 +195,9 @@ export default async function LandingPage() {
               gaps={gaps}
               cues={featured.cues}
               highlight={
-                before && after ? { start: before.end, end: after.start, href: "#seven" } : null
+                comparison
+                  ? { start: SEVEN_START_SECONDS, end: SEVEN_END_SECONDS, href: "#seven" }
+                  : null
               }
               labels={{
                 picture: t.landing.timelineRows.picture,

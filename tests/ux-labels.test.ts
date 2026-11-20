@@ -320,11 +320,11 @@ describe("interface copy", () => {
     assert.match(ko.landing.why[1].text, /2019년 보도 기준/);
   });
 
-  it("names the landing's seven seconds by the window its player plays (53.8–60.8 s)", () => {
-    // page.tsx fills the label with the window's rounded ends, so it cannot drift from the player.
-    const window = { from: Math.round(53.8), to: Math.round(60.8) };
-    assert.equal(fill(en.landing.seven.label, window), "Tears of Steel, 54–61 s");
-    assert.equal(fill(ko.landing.seven.label, window), "Tears of Steel, 54–61초");
+  it("names the landing's seven seconds by the window its player plays (49.5–56.5 s)", () => {
+    // page.tsx fills the label with the window's exact boundaries, so it cannot drift from the player.
+    const window = { from: 49.5, to: 56.5 };
+    assert.equal(fill(en.landing.seven.label, window), "Tears of Steel, 49.5–56.5 s");
+    assert.equal(fill(ko.landing.seven.label, window), "Tears of Steel, 49.5–56.5초");
   });
 
   it("names the final check the same way in the stage list and the editor", () => {
