@@ -223,16 +223,19 @@ export async function callStructuredOnce<T>(
     const { totalTokens } = z
       .object({ totalTokens: z.number().int().nonnegative() })
       .parse(await counted.json());
+    // countTokens can omit the output schema. Allow even one token per UTF-8 byte of it.
+    const inputBound =
+      totalTokens + Buffer.byteLength(JSON.stringify(request.generationConfig.responseFormat));
     const estimate = estimateGeminiCost(
       {
-        promptTokenCount: totalTokens,
+        promptTokenCount: inputBound,
         candidatesTokenCount: outputTokens,
-        totalTokenCount: totalTokens + outputTokens,
+        totalTokenCount: inputBound + outputTokens,
       },
       call.model,
       started,
     );
-    if (totalTokens > 60_000 || estimate === null || estimate > callCap)
+    if (inputBound > 60_000 || estimate === null || estimate > callCap)
       throw new Error(`Prompt of ${totalTokens} tokens exceeds the measured request allowance`);
   }
   const settleCall = reserveCall(1.1 * priceMultiplier(started));

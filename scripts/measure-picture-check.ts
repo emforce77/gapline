@@ -8,6 +8,7 @@ import { readCallRecords } from "../src/lib/llm/ledger";
 import { MODELS } from "../src/lib/models";
 import { watchingVideoFor } from "../src/lib/media/proxies";
 import { extractLineStills } from "../src/lib/pipeline/line-stills";
+import type { Verdict } from "../src/lib/pipeline/schemas";
 import { reviewLines } from "../src/lib/pipeline/review";
 import type { EditBase } from "../src/lib/runs/edit-track";
 import { newRunBudget, withRunBudget, type Reservation } from "../src/lib/runs/budget";
@@ -52,6 +53,59 @@ async function writeOnce(file: string, contents: string) {
     if ((err as NodeJS.ErrnoException).code !== "EEXIST") throw err;
     return false;
   }
+}
+
+/** Summarize only the measured comparisons; a partial set cannot clear an untested case. */
+async function report() {
+  const results = [];
+  for (const test of cases) {
+    const label = test.run + (test.photos ? "-photos" : "-video");
+    const file = join(dir, label + ".json");
+    let body: string;
+    try {
+      body = await readFile(file, "utf8");
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException).code === "ENOENT") continue;
+      throw err;
+    }
+    const result: {
+      comparison: { cueId: string; expected: { label: string }; measured: Verdict }[];
+    } = JSON.parse(body);
+    const falsePositives = test.photos
+      ? result.comparison
+          .filter(
+            (row) =>
+              row.expected.label === "accept" &&
+              row.measured.violations.some((v) => v.rule === "spoiler" || v.rule === "unseen"),
+          )
+          .map((row) => row.cueId)
+      : [];
+    const l6 = result.comparison.find((row) => row.cueId === "L6")?.measured;
+    results.push({ label, file, ...test, falsePositives, l6 });
+  }
+  const first = results.find((r) => r.run === opening && r.photos);
+  const caught = first?.l6?.violations.some((v) => v.rule === "spoiler");
+  const verdict =
+    (first && !caught) || results.some((r) => r.falsePositives.length)
+      ? "no-go"
+      : results.length === cases.length
+        ? "go"
+        : "incomplete";
+  const calls = await readCallRecords(ledger);
+  const summary = {
+    at: new Date().toISOString(),
+    verdict,
+    completed: results.length,
+    planned: cases.length,
+    chargedOrBoundUsd: calls.reduce(
+      (sum, c) => sum + (c.costKnown === false ? callCap : c.costUsd),
+      0,
+    ),
+    results,
+  };
+  const file = join(dir, summary.at.replaceAll(":", "-") + ".json");
+  await writeFile(file, JSON.stringify(summary, null, 2));
+  console.log(verdict, `${results.length}/${cases.length}`, file);
 }
 
 async function main() {
@@ -119,7 +173,7 @@ async function main() {
         console.log(
           `Stopped before ${label}: $${spent} spent, $${callCap} required, $${limit} limit`,
         );
-        return;
+        break;
       }
       const { script, rows: caseRows, clip, frames } = prepared.get(test.run)!;
       const video = await watchingVideoFor(clip);
@@ -195,6 +249,7 @@ async function main() {
       if (calls.some((c) => c.promptTokens > 60_000))
         throw new Error("Prompt exceeded 60,000 tokens");
     }
+    await report();
   } finally {
     await lock.close();
     await unlink(lockFile);

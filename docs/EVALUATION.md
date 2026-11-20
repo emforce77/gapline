@@ -296,3 +296,22 @@ less than a second after the previous one (median 3). Writing every event on its
 (median 38), 19–47 of them that close (median 26). Only a stage's start and the run's start and end
 are written before the run goes on; a refused write keeps its lines for the next one. The runs above, the replay and one run stopped by
 the daily allowance cost $4.61 together.
+
+### Finalist picture check preparation (20 November 2026)
+
+For the opening run ending in `221ceb`, the last spoken line introduces the man with the
+mechanical eye. At 57.20 s the brain and electrodes are in focus. At 59.72 s the eyepiece is
+visible. The producer's revised line describes electrodes, visible in both of its pictures
+(57.20 s and 58.41 s). In the team scene (`1c9aa1`, L3), the outstretched arm at 37.30 s and
+39.35 s provides a second timing question. These are observations of the source film.
+
+The measurement script extracted 30 JPEGs for the 15 voiced lines across the two original runs
+and the edited opening. A counting-only request for the opening's six lines and twelve JPEGs
+returned 22,152 input tokens (text 2,929, image 12,852, video 4,290, audio 2,081). The request body
+was 9,844,301 bytes. The reviewer has yet to issue a verdict on these pictures. The measurement
+uses a fixed set of reference labels and records the video-only control, false positives, timing
+and costs for each completed comparison. The normal pipeline still uses the existing video review.
+
+From the repository root, `node --env-file=.env.local --import tsx scripts/measure-picture-check.ts
+--frames-only` prepares the pictures and a label sheet under `runtime/measure/picture-check/`.
+The paid comparison uses `--cap-usd 0.60` after the labels have been confirmed.
