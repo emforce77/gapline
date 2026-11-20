@@ -272,3 +272,17 @@ a second browser session cannot open it.
 
 The tagged candidate receives public traffic only after promotion. Runs on the November serving
 revision execute inside their requests, so check for active work before moving traffic back as well.
+
+### Finalist API spend, 20 November to the final
+
+From the repository root on the deployment host, run `python3 scripts/finalist-spend.py` in Bash.
+This read-only report uses the named `gapline` account and the deployed demo ledger, including
+visitor generations and edits. Local run and edit costs come from their settled reservations.
+The picture-check and one-shot measurement scripts have independent per-call ledgers. The report
+reads those separately and deduplicates copied reservations and measurement records. It uses UTC
+budget dates. Add `--local-dir /path/to/data` for another known local generation directory.
+
+Settled amounts can include estimated or conservatively charged usage. Pending reservations appear
+separately. Charges absent from these ledgers require reconciliation with the provider. Check before
+each paid task, stop non-stage calls at $4 cumulative spend, and keep all calls including the final
+within $5. These are event-wide thresholds separate from Cloud Run's daily allowance.
