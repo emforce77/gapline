@@ -12,7 +12,8 @@ case "$1 $2 $3" in
   "projects describe "*) echo 123 ;;
   "run deploy "*) ;;
   "run services describe") echo '{"status":{"traffic":[{"revisionName":"old","percent":100},{"revisionName":"next","tag":"candidate","url":"https://tag.invalid"}]}}' ;;
-  "run revisions describe") echo '{"spec":{"containers":[{"env":[{"name":"DATA_BUCKET","value":"serving"}]}]}}' ;;
+  "run jobs deploy"|"run jobs add-iam-policy-binding") ;;
+  "run revisions describe") case "$*" in *status.imageDigest*) echo "registry.example/gapline@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"; exit ;; esac; echo '{"spec":{"containers":[{"env":[{"name":"DATA_BUCKET","value":"serving"}]}]}}' ;;
   "storage cat gs://serving/budget/demo-v2.json") echo "$BUDGET" ;;
   "run services update-traffic") ;;
   *) exit 1 ;;
@@ -72,6 +73,7 @@ for (const [name, mode, budget, account, expected] of [
           BUDGET: budget,
           PROMOTE: mode,
           TAG: "candidate",
+          RUN_EXECUTOR: "job",
         },
       });
       const calls = readFileSync(log, "utf8");
@@ -79,7 +81,12 @@ for (const [name, mode, budget, account, expected] of [
       assert.equal(result.status === 0, allowed, result.stderr);
       assert.equal(calls.includes("run deploy "), expected === "build");
       assert.equal(calls.includes("update-traffic "), expected === "promote");
-      if (expected === "build") assert.match(calls, /--no-traffic --tag candidate/);
+      if (expected === "build") {
+        assert.match(calls, /--no-traffic --tag candidate/);
+        assert.match(calls, /run jobs deploy .+ --image registry.example\/gapline@sha256:/);
+        assert.match(calls, /--command node --args job\/run-job.cjs/);
+        assert.match(calls, /run jobs add-iam-policy-binding .+ --role roles\/run.jobsExecutorWithOverrides/);
+      }
       if (expected === "promote") assert.match(calls, /--to-tags candidate=100/);
       if (allowed) assert.match(calls, /https:\/\/tag\.invalid\/p\/tos-opening/);
     } finally {

@@ -9,7 +9,7 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 ENV NEXT_TELEMETRY_DISABLED=1
-RUN npm run build
+RUN RUN_EXECUTOR=inline npm run build && npm run build:job
 
 FROM node:20-bookworm-slim AS run
 RUN apt-get update \
@@ -25,6 +25,7 @@ ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 PORT=8080 HOSTNAME=0.0.0.0 UV_
 COPY --from=build /app/.next/standalone ./
 COPY --from=build /app/.next/static ./.next/static
 COPY --from=build /app/public ./public
+COPY --from=build /app/job/run-job.cjs ./job/run-job.cjs
 USER node
 EXPOSE 8080
 CMD ["node", "server.js"]

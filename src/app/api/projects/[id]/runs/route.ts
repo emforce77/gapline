@@ -2,7 +2,12 @@ import { z } from "zod";
 import type { ApiErrorBody, RequestErrorCode, RunErrorCode } from "@/lib/api-contract";
 import { BudgetExhaustedError, reserveRun } from "@/lib/runs/budget";
 import { describeFailure } from "@/lib/runs/failure";
-import { executeRun, prepareRun } from "@/lib/runs/start-run";
+import { join } from "node:path";
+import { executorConfig } from "@/lib/runs/executor-config";
+import { beginRun, cancelDispatch, executeAttempt } from "@/lib/runs/attempt";
+import { runEventStream } from "@/lib/runs/event-stream";
+import { launchJob } from "@/lib/runs/job-launch";
+import { prepareRun } from "@/lib/runs/start-run";
 import { listActiveRuns, listRuns, listRunsAndWork } from "@/lib/store/run-index";
 import { accessibleProject, ownerHash, sameOrigin, sessionToken } from "@/lib/store/access";
 
@@ -11,7 +16,6 @@ export const dynamic = "force-dynamic";
 /** Equals RUN_TIME_LIMIT_SECONDS and Cloud Run's timeout; measured runs took 2.3–6.4 min (2026-10-03). */
 export const maxDuration = 900;
 
-const HEARTBEAT_MS = 15_000;
 const StartSchema = z.object({
   language: z.enum(["ko", "en"]),
   density: z.enum(["standard", "brief"]),
@@ -72,6 +76,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       density: running.density,
     });
   }
+  const config = executorConfig();
   let prepared;
   let reservation;
   try {
@@ -90,50 +95,20 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return fail(500, { error: failure.code });
   }
 
-  const encoder = new TextEncoder();
-  let closed = false;
-  const run = prepared;
-  const held = reservation;
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      const send = (chunk: string) => {
-        if (closed) return;
-        try {
-          controller.enqueue(encoder.encode(chunk));
-        } catch {
-          closed = true;
-        }
-      };
-      const heartbeat = setInterval(() => send(": ping\n\n"), HEARTBEAT_MS);
-      // The pipeline reports and logs its own failures; only errors outside it need an event here.
-      // A run that has sent run_done is finished, whatever happens after it: never also failed.
-      let ended: "run_done" | "run_failed" | null = null;
-      executeRun(run, held, (event) => {
-        if (event.type === "run_failed" || event.type === "run_done") ended = event.type;
-        send(`data: ${JSON.stringify(event)}\n\n`);
-      })
-        .catch((error: unknown) => {
-          if (ended === "run_failed") return;
-          if (ended === "run_done") {
-            console.error(`run finished, then failed: project=${id} run=${run.runId}`, error);
-            return;
-          }
-          const failure = describeFailure(error);
-          console.error(`run failed: project=${id} run=${run.runId} code=${failure.code}`, error);
-          send(
-            `data: ${JSON.stringify({ type: "run_failed", t: 0, error: failure.code, ...failure })}\n\n`,
-          );
-        })
-        .finally(() => {
-          clearInterval(heartbeat);
-          if (!closed) controller.close();
-          closed = true;
-        });
-    },
-    cancel() {
-      closed = true;
-    },
-  });
+  const job = await beginRun(prepared, reservation);
+  if (config.mode === "job") {
+    try {
+      await launchJob(config, id, job.runId);
+    } catch (error) {
+      console.error(`Dispatch failed for run=${job.runId}`, error);
+      await cancelDispatch(id, job.runId);
+    }
+  } else {
+    void executeAttempt(id, job.runId).catch((error) =>
+      console.error(`Run failed: ${job.runId}`, error),
+    );
+  }
+  const stream = runEventStream(join(prepared.dir, "events.jsonl"), job.startedAt, request.signal);
   return new Response(stream, {
     headers: {
       "Content-Type": "text/event-stream; charset=utf-8",

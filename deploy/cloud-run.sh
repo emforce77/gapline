@@ -46,6 +46,10 @@ builder="projects/$project/serviceAccounts/scene-ad-build@$project.iam.gservicea
 if [[ "$promote" == 0 ]]; then
   # --set-env-vars replaces all previous values, including the daily allowance.
   budget="${DAILY_BUDGET_USD:?set DAILY_BUDGET_USD to the live daily allowance (docs/DEPLOY.md)}"
+  job="${service}-run-$(git rev-parse --short=12 HEAD)"
+  executor="${RUN_EXECUTOR:?set RUN_EXECUTOR to job or inline}"
+  case "$executor" in job|inline) ;; *) echo "Invalid executor" >&2; exit 1 ;; esac
+  run_env="DATA_DIR=/data,DATA_BUCKET=$bucket,GCP_PROJECT_ID=$project,DAILY_BUDGET_USD=$budget,VISITOR_DAILY_BUDGET_USD=${VISITOR_DAILY_BUDGET_USD:-3},RUN_EXECUTOR=$executor,RUN_JOB_NAME=$job,RUN_JOB_REGION=$region"
   gcloud run deploy "$service" \
     --no-traffic --tag "$tag" \
     --project "$project" --region "$region" --source . \
@@ -54,7 +58,7 @@ if [[ "$promote" == 0 ]]; then
     --execution-environment gen2 \
     --add-volume "name=data,type=cloud-storage,bucket=$bucket,mount-options=metadata-cache-ttl-secs=0" \
     --add-volume-mount "volume=data,mount-path=/data" \
-    --set-env-vars "DATA_DIR=/data,DATA_BUCKET=$bucket,GCP_PROJECT_ID=$project,DAILY_BUDGET_USD=$budget,VISITOR_DAILY_BUDGET_USD=${VISITOR_DAILY_BUDGET_USD:-3}" \
+    --set-env-vars "$run_env" \
     --set-secrets "GOOGLE_API_KEY=scene-ad-gemini-key:latest" \
     --cpu 2 --memory 2Gi --cpu-boost --concurrency 40 --timeout 900 \
     --min-instances "${MIN_INSTANCES:-0}" --max-instances 8 \
@@ -72,6 +76,18 @@ target="$(gcloud run services describe "$service" --project "$project" --region 
     | [.url, .revisionName] | @tsv')"
 IFS=$'\t' read -r url revision <<< "$target"
 echo "Tag $tag on $revision: $url"
+if [[ "$promote" == 0 && "$executor" == job ]]; then
+  image="$(gcloud run revisions describe "$revision" --project "$project" --region "$region" --format='value(status.imageDigest)')"
+  [[ "$image" =~ @sha256:[0-9a-f]{64}$ ]] || { echo "Revision has no immutable image digest" >&2; exit 1; }
+  # Cloud Run Jobs run in the second-generation environment. The jobs deploy CLI has no gen selector.
+  gcloud run jobs deploy "$job" --project "$project" --region "$region" --image "$image" \
+    --service-account "$account" --tasks 1 --max-retries 0 --task-timeout 900s --cpu 2 --memory 2Gi \
+    --add-volume "name=data,type=cloud-storage,bucket=$bucket,mount-options=metadata-cache-ttl-secs=0" \
+    --add-volume-mount "volume=data,mount-path=/data" --set-env-vars "$run_env" \
+    --set-secrets "GOOGLE_API_KEY=scene-ad-gemini-key:latest" --command node --args job/run-job.cjs
+  gcloud run jobs add-iam-policy-binding "$job" --project "$project" --region "$region" \
+    --member "serviceAccount:$account" --role roles/run.jobsExecutorWithOverrides
+fi
 sample="${SAMPLE_ID:-tos-opening}"
 # A hung revision must not stall the script (curl has no time limit of its own); the slowest first
 # request measured was the 12 s index rebuild above.

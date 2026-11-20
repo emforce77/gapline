@@ -50,6 +50,11 @@ function durable(event: RunEvent): boolean {
 export interface RunOptions {
   runId: string;
   runDir: string;
+  /** Set when beginRun already recorded the start before dispatch. */
+  startedAt?: number;
+  /** Persist writing progress for HTTP clients reading the job's event log. */
+  streamFromLog?: boolean;
+  reportFailure?: boolean;
   clipFile: string;
   clipSeconds: number;
   /** Spoken language of the film, for the recognizer (BCP-47, e.g. en-US). */
@@ -75,7 +80,7 @@ function round(value: number): number {
 export async function runDescription(
   options: RunOptions,
 ): Promise<{ summary: RunSummary; cues: Cue[] }> {
-  const started = Date.now();
+  const started = options.startedAt ?? Date.now();
   const ledgerFile = join(options.runDir, "ledger.jsonl");
   const eventsFile = join(options.runDir, "events.jsonl");
   await mkdir(join(options.runDir, "voice"), { recursive: true });
@@ -97,15 +102,16 @@ export async function runDescription(
     return result;
   };
 
-  await emit({
-    type: "run_started",
-    runId: options.runId,
-    language: options.language,
-    density: options.density,
-    writerModel: options.writerModel,
-    reviewerModel: options.reviewerModel,
-    clipSeconds: options.clipSeconds,
-  });
+  if (options.startedAt === undefined)
+    await emit({
+      type: "run_started",
+      runId: options.runId,
+      language: options.language,
+      density: options.density,
+      writerModel: options.writerModel,
+      reviewerModel: options.reviewerModel,
+      clipSeconds: options.clipSeconds,
+    });
 
   try {
     // The small watching copy is needed by watch, write and review: kept beside the clip, encoded
@@ -212,8 +218,15 @@ export async function runDescription(
         context,
         model: options.writerModel,
         ledgerFile,
-        onDelta: (text) =>
-          options.emit?.({ type: "writer_delta", text, t: round((Date.now() - started) / 1000) }),
+        onDelta: (text) => {
+          const delta = {
+            type: "writer_delta" as const,
+            text,
+            t: round((Date.now() - started) / 1000),
+          };
+          if (options.streamFromLog) log.add(JSON.stringify(delta) + "\n");
+          options.emit?.(delta);
+        },
       });
     });
     const { placed, dropped } = placeCues(drafts, gaps);
@@ -439,7 +452,10 @@ export async function runDescription(
     for (const item of finalReview.missing) {
       const free = roomForMoment(item, gaps, taken);
       // One new line per stretch of free room: the first item found there claims it.
-      if (typeof free !== "string" && !addable.some((a) => a.gapId === item.gapId && a.end === free.end))
+      if (
+        typeof free !== "string" &&
+        !addable.some((a) => a.gapId === item.gapId && a.end === free.end)
+      )
         addable.push({ ...item, at: free.start, end: free.end });
     }
     let finalFix: RunSummary["finalFix"];
@@ -595,6 +611,10 @@ export async function runDescription(
     console.error(`run failed: run=${options.runId} code=${failure.code}`, error);
     // Lines a refused write left queued go out with this one, in order. If storage refuses this
     // write too, the run's own error is the one raised (the stream route then sends run_failed).
+    if (options.reportFailure === false) {
+      await log.flush();
+      throw error;
+    }
     await emit({ type: "run_failed", error: failure.code, ...failure }).catch((logError: unknown) =>
       console.error(`run_failed not logged: run=${options.runId}`, logError),
     );

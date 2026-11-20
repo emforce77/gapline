@@ -1,3 +1,4 @@
+import { attemptSignal, withinAttempt } from "../runs/attempt-signal";
 import { z } from "zod";
 import { appendCallRecord, type CallRecord } from "./ledger";
 import { setTimeout as delay } from "node:timers/promises";
@@ -175,7 +176,9 @@ export async function callStructured<T>(
         `LLM provider busy, retrying in ${wait.toFixed(1)} s: label=${call.label} ` +
           `model=${call.model} attempt=${attempt} status=${error.status}`,
       );
-      await delay(wait * 1000, undefined, { signal: call.signal });
+      await delay(wait * 1000, undefined, {
+        signal: call.signal ? withinAttempt(call.signal) : attemptSignal.getStore(),
+      });
     }
   }
 }
@@ -272,7 +275,7 @@ async function callOnce<T>(
       `${GEMINI_URL}/${encodeURIComponent(call.model)}:streamGenerateContent?alt=sse`,
       {
         method: "POST",
-        signal: call.signal ?? AbortSignal.timeout(240_000),
+        signal: withinAttempt(call.signal ?? AbortSignal.timeout(240_000)),
         headers: {
           "x-goog-api-key": apiKey(),
           "Content-Type": "application/json",

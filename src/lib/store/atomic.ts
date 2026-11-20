@@ -98,7 +98,7 @@ export async function updateJson<T, R>(
   change: (state: T) => R,
 ): Promise<R> {
   const bucketName = process.env.DATA_BUCKET;
-  if (process.env.K_SERVICE && !bucketName)
+  if ((process.env.K_SERVICE || process.env.CLOUD_RUN_JOB) && !bucketName)
     throw new Error("DATA_BUCKET is required for atomic Cloud Run writes");
   if (bucketName) return updateObjectJson(new Storage().bucket(bucketName), key, initial, change);
   const file = join(dataDir(), key);

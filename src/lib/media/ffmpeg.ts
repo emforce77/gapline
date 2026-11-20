@@ -1,3 +1,4 @@
+import { withinAttempt } from "../runs/attempt-signal";
 import { spawn } from "node:child_process";
 import { createReadStream, createWriteStream } from "node:fs";
 import { mkdtemp, rm } from "node:fs/promises";
@@ -17,18 +18,26 @@ export interface FfmpegResult {
 
 /** ffmpeg exited non-zero; the message carries the tail of its stderr (for logs, not for viewers). */
 export class FfmpegError extends Error {}
+export class FfmpegTimeoutError extends FfmpegError {}
 
 /** Runs ffmpeg and throws with the tail of stderr when it exits non-zero. */
-export function runFfmpeg(args: string[]): Promise<FfmpegResult> {
+export function runFfmpeg(args: string[], timeoutMs = 300_000): Promise<FfmpegResult> {
   return new Promise((resolve, reject) => {
-    const child = spawn(ffmpegPath(), ["-hide_banner", "-nostdin", ...args]);
+    const timeout = AbortSignal.timeout(timeoutMs);
+    const signal = withinAttempt(timeout);
+    const child = spawn(ffmpegPath(), ["-hide_banner", "-nostdin", ...args], {
+      signal,
+      killSignal: "SIGKILL",
+    });
     const out: Buffer[] = [];
     let stderr = "";
     child.stdout.on("data", (chunk: Buffer) => out.push(chunk));
     child.stderr.on("data", (chunk: Buffer) => {
       stderr += chunk.toString();
     });
-    child.on("error", reject);
+    child.on("error", (error) =>
+      reject(timeout.aborted ? new FfmpegTimeoutError(`ffmpeg exceeded ${timeoutMs} ms`) : error),
+    );
     child.on("close", (code) => {
       if (code === 0) {
         resolve({ stderr, stdout: Buffer.concat(out) });

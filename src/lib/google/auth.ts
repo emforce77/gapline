@@ -1,3 +1,4 @@
+import { withinAttempt } from "../runs/attempt-signal";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -28,8 +29,11 @@ export function gcpProjectId(): string {
  */
 export async function googleAccessToken(): Promise<string> {
   if (cached && cached.expires > Date.now()) return cached.token;
-  if (process.env.K_SERVICE) {
-    const response = await fetch(METADATA_TOKEN_URL, { headers: { "Metadata-Flavor": "Google" } });
+  if (process.env.K_SERVICE || process.env.CLOUD_RUN_JOB) {
+    const response = await fetch(METADATA_TOKEN_URL, {
+      headers: { "Metadata-Flavor": "Google" },
+      signal: withinAttempt(AbortSignal.timeout(10_000)),
+    });
     if (!response.ok) throw new Error(`Metadata token HTTP ${response.status}`);
     const body = (await response.json()) as { access_token: string; expires_in: number };
     // The metadata server hands out its current token with whatever lifetime it has left. A fixed
@@ -77,17 +81,23 @@ export async function googleFetch(
   url: string,
   init: Omit<RequestInit, "headers" | "body"> & { body: string },
   unreachable?: (error: unknown) => Error,
+  { timeoutMs = 120_000, refreshToken = true } = {},
 ): Promise<Response> {
   const send = async () => {
     const headers = await googleHeaders();
     try {
-      return await fetch(url, { ...init, headers });
+      const timeout = withinAttempt(AbortSignal.timeout(timeoutMs));
+      return await fetch(url, {
+        ...init,
+        headers,
+        signal: init.signal ? AbortSignal.any([init.signal, timeout]) : timeout,
+      });
     } catch (error) {
       throw unreachable ? unreachable(error) : error;
     }
   };
   const first = await send();
-  if (first.status !== HTTP_UNAUTHORIZED) return first;
+  if (!refreshToken || first.status !== HTTP_UNAUTHORIZED) return first;
   await first.body?.cancel();
   console.warn(`google: HTTP 401 from ${new URL(url).host}; asking for a new token, sending again`);
   dropGoogleToken();

@@ -21,7 +21,7 @@ export async function extractStill(clipFile: string, at: number): Promise<Buffer
     "-f",
     "image2pipe",
     "pipe:1",
-  ]).catch((error: unknown) => {
+  ], 60_000).catch((error: unknown) => {
     if (error instanceof FfmpegError) throw error;
     throw new FfmpegError("Could not start ffmpeg to extract a source frame", { cause: error });
   });

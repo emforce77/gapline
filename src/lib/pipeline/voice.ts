@@ -35,18 +35,24 @@ export async function synthesizeLine(input: {
   const settleCall = reserveCall([...input.text].length * TTS_USD_PER_CHARACTER);
   let cost: number | null = null;
   try {
-    const response = await googleFetch("https://texttospeech.googleapis.com/v1/text:synthesize", {
-      method: "POST",
-      body: JSON.stringify({
-        input: { text: input.text },
-        voice: { languageCode: voice.languageCode, name: input.voiceName ?? voice.name },
-        audioConfig: {
-          audioEncoding: "LINEAR16",
-          sampleRateHertz: SAMPLE_RATE,
-          speakingRate: input.speakingRate,
-        },
-      }),
-    });
+    const response = await googleFetch(
+      "https://texttospeech.googleapis.com/v1/text:synthesize",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          input: { text: input.text },
+          voice: { languageCode: voice.languageCode, name: input.voiceName ?? voice.name },
+          audioConfig: {
+            audioEncoding: "LINEAR16",
+            sampleRateHertz: SAMPLE_RATE,
+            speakingRate: input.speakingRate,
+          },
+        }),
+      },
+      (error) =>
+        new ServiceError("voice_failed", `Text-to-Speech unreachable: ${String(error)}`, true),
+      { timeoutMs: 60_000 },
+    );
     // An HTTP error is not billed, so the call costs nothing (and frees its bound in the run budget).
     if (!response.ok) cost = 0;
     if (!response.ok)
@@ -93,6 +99,8 @@ export async function synthesizeLine(input: {
       ok: false,
       error: error instanceof Error ? error.message : String(error),
     });
+    if (error instanceof Error && ["AbortError", "TimeoutError"].includes(error.name))
+      throw new ServiceError("voice_failed", error.message, true);
     throw error;
   } finally {
     settleCall(cost);

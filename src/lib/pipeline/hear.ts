@@ -360,24 +360,27 @@ async function recognizeChunk(
   length: number,
   languageCode: string,
 ): Promise<RecognizedChunk> {
-  const { stdout } = await runFfmpeg([
-    "-ss",
-    String(from),
-    "-t",
-    String(length),
-    "-i",
-    clipFile,
-    "-vn",
-    "-ac",
-    "1",
-    "-ar",
-    "16000",
-    "-c:a",
-    "flac",
-    "-f",
-    "flac",
-    "pipe:1",
-  ]);
+  const { stdout } = await runFfmpeg(
+    [
+      "-ss",
+      String(from),
+      "-t",
+      String(length),
+      "-i",
+      clipFile,
+      "-vn",
+      "-ac",
+      "1",
+      "-ar",
+      "16000",
+      "-c:a",
+      "flac",
+      "-f",
+      "flac",
+      "pipe:1",
+    ],
+    60000,
+  );
   const url =
     `https://${STT_LOCATION}-speech.googleapis.com/v2/projects/${gcpProjectId()}` +
     `/locations/${STT_LOCATION}/recognizers/_:recognize`;

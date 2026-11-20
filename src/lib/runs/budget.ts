@@ -1,3 +1,4 @@
+import { attemptSignal } from "./attempt-signal";
 import { AsyncLocalStorage } from "node:async_hooks";
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
@@ -270,6 +271,7 @@ export function runChargeBound(budget: RunBudget): number {
 }
 /** Unknown charges consume the full bound; failed and retried requests count too. */
 export function reserveCall(maxUsd: number): (costUsd: number | null) => void {
+  attemptSignal.getStore()?.throwIfAborted();
   const state = running.getStore();
   if (!state) return () => {};
   maxUsd = Math.min(maxUsd, state.callCapUsd ?? maxUsd);

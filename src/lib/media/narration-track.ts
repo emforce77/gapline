@@ -107,19 +107,22 @@ export async function speedUpLine(line: TrimmedLine, tempo: number): Promise<Tri
   try {
     const input = join(dir, "take.wav");
     await writeFile(input, encodeWav(line.pcm, line.sampleRate));
-    const { stdout } = await runFfmpeg([
-      "-i",
-      input,
-      "-af",
-      `atempo=${tempo}`,
-      "-f",
-      "s16le",
-      "-ac",
-      "1",
-      "-ar",
-      String(line.sampleRate),
-      "pipe:1",
-    ]);
+    const { stdout } = await runFfmpeg(
+      [
+        "-i",
+        input,
+        "-af",
+        `atempo=${tempo}`,
+        "-f",
+        "s16le",
+        "-ac",
+        "1",
+        "-ar",
+        String(line.sampleRate),
+        "pipe:1",
+      ],
+      30000,
+    );
     const bytes = stdout.buffer.slice(stdout.byteOffset, stdout.byteOffset + stdout.byteLength);
     return trimPcm(new Int16Array(bytes), line.sampleRate);
   } finally {
