@@ -12,6 +12,8 @@ export interface CallRecord {
   promptTokensDetails?: { modality: string; tokenCount: number }[];
   completionTokens: number;
   costUsd: number;
+  /** The reservation for this call, if recorded. */
+  boundUsd?: number;
   /** False when usage is incomplete; costUsd contributes only the known subtotal. */
   costKnown?: boolean;
   /**
