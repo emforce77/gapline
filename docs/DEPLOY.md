@@ -283,6 +283,8 @@ reads those separately and deduplicates copied reservations and measurement reco
 budget dates. Add `--local-dir /path/to/data` for another known local generation directory.
 
 Settled amounts can include estimated or conservatively charged usage. Pending reservations appear
-separately. Charges absent from these ledgers require reconciliation with the provider. Check before
+separately. A started picture check or one-prompt baseline without its result also lists an
+outstanding measurement cap. That cap remains visible after an interruption and clears when the
+result is recorded. Charges absent from these ledgers require reconciliation with the provider. Check before
 each paid task, stop non-stage calls at $4 cumulative spend, and keep all calls including the final
 within $5. These are event-wide thresholds separate from Cloud Run's daily allowance.

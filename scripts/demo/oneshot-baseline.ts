@@ -34,6 +34,11 @@ async function main() {
   await mkdir(parent, { recursive: true });
   // Exclusive directory also prevents repeating a paid take after a partial failure.
   await mkdir(output);
+  await writeFile(
+    join(output, "oneshot-baseline.started"),
+    JSON.stringify({ started: new Date().toISOString(), cap: limit }),
+    { flag: "wx" },
+  );
   const ledgerFile = join(output, "ledger.jsonl");
   const reservation: Reservation = {
     id: "oneshot-baseline",
@@ -102,6 +107,7 @@ async function main() {
         narrationWav: join(output, "narration.wav"),
         describedMp4: join(output, "described.mp4"),
       });
+      await readCallRecords(ledgerFile);
       await writeFile(join(output, "timings.json"), JSON.stringify({ sourceRun, spans }, null, 2));
     },
     budget,

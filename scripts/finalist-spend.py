@@ -33,6 +33,7 @@ def summarize(live, roots):
     days = defaultdict(Counter)
     seen = {}
     duplicate_calls = set()
+    measurement_holds = {}
     sources = [("live", live)]
     for root in sorted(set(p.resolve() for p in roots)):
         if not root.is_dir():
@@ -45,15 +46,19 @@ def summarize(live, roots):
         # These two measurement drivers use a call ledger without reserveRun. Local run and edit
         # call ledgers are already covered by the settled reservation in their DATA_DIR.
         for task in ("picture-check", "oneshot-baseline"):
-            ledger = root / "measure" / task / "ledger.jsonl"
-            if not ledger.is_file():
-                continue
+            folder = root / "measure" / task
+            ledger = folder / "ledger.jsonl"
             occurrences = Counter()
-            for line in ledger.read_text().splitlines():
+            task_charges = Decimal(0)
+            for line in (ledger.read_text().splitlines() if ledger.is_file() else []):
                 call = parse(line)
                 day = call["at"][:10]
                 if day < START:
                     continue
+                unknown = call.get("costKnown") is False or call.get("costSource") == "unknown"
+                cost = money(call["costUsd"])
+                bound = money(call.get("boundUsd", "0.29" if task == "picture-check" else "0.20"))
+                task_charges += max(cost, bound) if unknown else cost
                 fingerprint = json.dumps(call, sort_keys=True, default=str)
                 occurrences[fingerprint] += 1
                 key = (fingerprint, occurrences[fingerprint])
@@ -61,12 +66,32 @@ def summarize(live, roots):
                     continue
                 duplicate_calls.add(key)
                 days[day]["calls"] += 1
-                days[day]["local_calls_usd"] += money(call["costUsd"])
-                if call.get("costKnown") is False or call.get("costSource") == "unknown":
+                days[day]["local_calls_usd"] += cost
+                if unknown:
                     days[day]["unknown"] += 1
                     # Include only the amount still at risk above any already recorded subtotal.
-                    ceiling = call.get("boundUsd", "0.29" if task == "picture-check" else "0.20")
-                    days[day]["unknown_bound"] += max(Decimal(0), money(ceiling) - money(call["costUsd"]))
+                    days[day]["unknown_bound"] += max(Decimal(0), bound - cost)
+
+            for marker in folder.glob("*.started"):
+                raw = marker.read_text().strip()
+                # Original picture cases wrote the timestamp only. The follow-up and the baseline
+                # write their actual cap before the first provider call.
+                info = parse(raw) if raw.startswith("{") else {"started": raw, "cap": "0.29"}
+                started = info["started"]
+                if started[:10] < START:
+                    continue
+                result = marker.with_suffix(".json") if task == "picture-check" else folder / "timings.json"
+                key = (task, marker.stem, started)
+                task_limit = money(info.get("limit", "0.60") if task == "picture-check" else info["cap"])
+                remaining = min(money(info["cap"]), max(Decimal(0), task_limit - task_charges))
+                complete, previous = measurement_holds.get(key, (False, remaining))
+                measurement_holds[key] = (complete or result.is_file(), min(previous, remaining))
+
+    for (_, _, started), (complete, remaining) in measurement_holds.items():
+        if not complete:
+            row = days[started[:10]]
+            row["measurement_pending_n"] += 1
+            row["measurement_pending_usd"] += remaining
 
     for source, state in sources:
         if any(day >= START and money(cost) for day, cost in state["legacy"].items()):
@@ -120,9 +145,10 @@ def main():
               f"로컬 정산 {row['local_n']}건 ${row['local_usd']:.9f}  "
               f"독립 측정 {row['calls']}호출 ${row['local_calls_usd']:.9f}  "
               f"미정산 {row['pending_n']}건 ${row['pending_usd']:.9f} 예약  "
+              f"결과 대기 측정 {row['measurement_pending_n']}건 추가 상한 ${row['measurement_pending_usd']:.9f}  "
               f"원장에 명시된 비용 불명 {row['unknown']}건")
     charged = total['live_usd'] + total['local_usd'] + total['local_calls_usd']
-    held = total['pending_usd'] + total['unknown_bound']
+    held = total['pending_usd'] + total['unknown_bound'] + total['measurement_pending_usd']
     print(f"11/20 이후 원장 합계 ${charged:.9f}, 미정산·미확정 예약 상한 ${held:.9f}. "
           f"결선 외 중지선 ${STOP}, 결선 포함 총예산 ${TOTAL}.")
     if charged >= STOP:
