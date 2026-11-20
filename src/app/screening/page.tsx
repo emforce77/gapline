@@ -68,15 +68,17 @@ export default async function Screening() {
         <section className={s.case}>
           <h2>{t.timing}</h2>
           <p>{t.timingBody}</p>
+          <audio
+            controls
+            preload="none"
+            className={s.takes}
+            aria-label={t.originalAudio}
+            src={media + "/english-original.m4a"}
+          />
           <div className={s.frames}>
             {timingCase.frames.map((frame) => (
               <figure key={frame.file}>
-                <img
-                  src={media + "/" + frame.file + ".jpg"}
-                  alt=""
-                  width="640"
-                  height="268"
-                />
+                <img src={media + "/" + frame.file + ".jpg"} alt="" width="640" height="268" />
                 <figcaption>
                   <b>{formatClock(frame.seconds)}</b> {t[frame.caption]}
                 </figcaption>
@@ -88,13 +90,10 @@ export default async function Screening() {
             controls
             preload="none"
             className={s.takes}
-            aria-label={t.takes}
-            src={media + "/english-line.m4a"}
+            aria-label={t.editedAudio}
+            src={media + "/english-edited.m4a"}
           />
-          <Link
-            className="button"
-            href={`/p/${timingCase.project}?run=${timingCase.editedRun}`}
-          >
+          <Link className="button" href={`/p/${timingCase.project}?run=${timingCase.editedRun}`}>
             {t.edit}
           </Link>
           <p>

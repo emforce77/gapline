@@ -74,6 +74,31 @@ async function build() {
   });
   // Both saved mixes start at 56.5 s. Hear the original English line, then the accepted edit.
   const englishMix = (run: string) => join(opening, "runs", run, "described.mp4");
+  for (const [run, name] of [
+    [timingCase.originalRun, "english-original.m4a"],
+    [timingCase.editedRun, "english-edited.m4a"],
+  ]) {
+    await runFfmpeg([
+      "-y",
+      "-ss",
+      "56.5",
+      "-t",
+      "4",
+      "-i",
+      englishMix(run),
+      "-map",
+      "0:a:0",
+      "-c:a",
+      "aac",
+      "-b:a",
+      "160k",
+      "-movflags",
+      "+faststart",
+      "-metadata",
+      "comment=" + movieCredit,
+      join(out, name),
+    ]);
+  }
   await runFfmpeg([
     "-y",
     "-ss",

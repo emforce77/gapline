@@ -88,9 +88,6 @@
   .case {
     padding: 32px 0;
   }
-  .frames {
-    grid-template-columns: 1fr;
-  }
 }
 
 .takes {
