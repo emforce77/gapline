@@ -297,21 +297,38 @@ less than a second after the previous one (median 3). Writing every event on its
 are written before the run goes on; a refused write keeps its lines for the next one. The runs above, the replay and one run stopped by
 the daily allowance cost $4.61 together.
 
-### Finalist picture check preparation (20 November 2026)
+### Finalist picture check (20 November 2026)
 
-For the opening run ending in `221ceb`, the last spoken line introduces the man with the
-mechanical eye. At 57.20 s the brain and electrodes are in focus. At 59.72 s the eyepiece is
-visible. The producer's revised line describes electrodes, visible in both of its pictures
-(57.20 s and 58.41 s). In the team scene (`1c9aa1`, L3), the outstretched arm at 37.30 s and
-39.35 s provides a second timing question. These are observations of the source film.
+**Keep the existing video review.** Attaching two stills to each spoken line caught
+the early eyepiece and also rejected an accepted line about the rocket rising. A separate check
+restricted to timing rejected that line and a second accepted line. Either false positive
+exceeded the adoption threshold. The public English example uses the producer’s edit.
 
-The measurement script extracted 30 JPEGs for the 15 voiced lines across the two original runs
-and the edited opening. A counting-only request for the opening's six lines and twelve JPEGs
-returned 22,152 input tokens (text 2,929, image 12,852, video 4,290, audio 2,081). The request body
-was 9,844,301 bytes. The reviewer has yet to issue a verdict on these pictures. The measurement
-uses a fixed set of reference labels and records the video-only control, false positives, timing
-and costs for each completed comparison. The normal pipeline still uses the existing video review.
+Before calling the model, we extracted 30 JPEGs for 15 spoken lines across two original runs
+and one edit. The opening still is 0.5 s after the start and the second is 0.1 s before the voice
+ends. Three lines failed the reference check. The eyepiece appears late (opening L6),
+the arm goes around the other man late (team L3), and the handheld object cannot be identified as
+a microphone (team L1). The other twelve labels accept the picture timing, including two lines
+that describe an action already in progress. [Frozen labels](../evals/picture-labels-2026-11-20.json)
 
-From the repository root, `node --env-file=.env.local --import tsx scripts/measure-picture-check.ts
---frames-only` prepares the pictures and a label sheet under `runtime/measure/picture-check/`.
-The paid comparison uses `--cap-usd 0.60` after the labels have been confirmed.
+| Input to Gemini | Outcome on the fixed labels | Elapsed | Estimated USD |
+| --- | --- | ---: | ---: |
+| Opening, video and stills | Rejected the early eyepiece. Also rejected the accepted rocket ascent (L2). | 194.8 s | 0.107776 |
+| Same opening, video only | Rejected the early eyepiece. Accepted the rocket ascent. | 215.7 s | 0.105102 |
+| Team, video and stills | Rejected L1 for its pronoun and L3 for its pronoun and the name “Thom”. These reasons missed the object identification and arm timing. | 97.3 s | 0.054809 |
+| Edited opening, video and stills | Accepted the producer’s electrode description. Rejected the unchanged rocket ascent again. | 209.3 s | 0.119222 |
+| Timing only, both videos and stills | Rejected all three reference failures and two of seven accepted lines. | 73.6 s | 0.051426 |
+
+The opening shows the brain and electrodes at 57.20 s. The eyepiece is visible at 59.72 s. The
+producer’s line ends earlier, with the electrodes visible in both stills. The historical run had
+passed the early line. Both repeat reviews flagged it, so this comparison provides no evidence
+that the stills were necessary to catch it.
+
+The final call received ten distinct lines in shuffled order within each film, with anonymous IDs
+and no labels. It caught the late eyepiece and arm. For the third rejection it said the microphone
+was **raised later** and still called the object a microphone. Its two false positives concerned the
+rocket ascending and the sunny town emerging as the grid transformed the street.
+In both cases it required the end state at the opening still. These are results on the two
+selected films. The five calls cost an estimated $0.4383345 against the $0.60 measurement budget.
+The case records include the previous and new line judgments, exact quotes, frame times, usage and
+latency. [Line-by-line results](../evals/picture-check-2026-11-20.json)

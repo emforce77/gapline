@@ -1,0 +1,933 @@
+{
+  "title": "Do line-specific pictures improve visual timing review?",
+  "date": "2026-11-20",
+  "decision": "no-go",
+  "scope": "Two public Tears of Steel excerpts in English. The opening has one original and one edited narration. Fixed annotations cover visual grounding and timing. These are selected examples.",
+  "sources": {
+    "frozenLabels": "evals/picture-labels-2026-11-20.json",
+    "reviewRunner": "scripts/measure-picture-check.ts",
+    "blindRunner": "scripts/measure-picture-timing.ts"
+  },
+  "decisionEvidence": {
+    "reviewCriterion": "Require a spoiler violation on opening L6 with stills and zero spoiler or unseen violations on accepted lines in every still-assisted review.",
+    "reviewFindings": [
+      "Opening L6 was flagged as a spoiler with and without stills.",
+      "The still-assisted check rejected opening L2 as a spoiler in both versions. These two judgments concern identical words and pictures."
+    ],
+    "falsePositiveRunCues": [
+      "20260928t064307205-en-standard-221ceb/L2",
+      "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L2"
+    ],
+    "blindCriterion": "Compare each anonymous judgment to the frozen visual label. Later and not_visible reject a line. An indeterminate judgment remains unresolved.",
+    "blindAcceptedLines": 7,
+    "blindRejectedLines": 3,
+    "blindFalsePositives": [
+      "A1",
+      "B2"
+    ],
+    "blindMissedRejectLabels": [],
+    "blindIndeterminate": [],
+    "reasonAlignmentNotes": {
+      "B3": "The line-level rejection agrees with the frozen label. The label questions whether the object can be identified as a microphone. The model called it a microphone and rejected the timing of the raising action.",
+      "B1": "The frozen label questions when the arm goes around the other man. The blind answer also disputes the timing of pointing. The earlier general review cited the pronoun and the spelling of the name.",
+      "A1": "The blind answer disputes the onset of ascent. It recognizes the exhaust at the opening.",
+      "B2": "The blind answer recognizes the transforming grid at the opening and disputes when the sunny town becomes visible."
+    }
+  },
+  "accounting": {
+    "currency": "USD",
+    "basis": "Gemini usage at the configured list prices. completionTokens includes thinkingTokens. Durations below are summed API-call latency.",
+    "callCount": 5,
+    "generalReviewEstimatedUsd": 0.3869085,
+    "blindTimingEstimatedUsd": 0.051426,
+    "totalEstimatedUsd": 0.4383345,
+    "totalPromptTokens": 95391,
+    "totalCompletionTokens": 97811,
+    "totalThinkingTokens": 95099,
+    "totalLatencyMs": 790661
+  },
+  "lineReference": "Keys combine the source run ID and cue ID. Frame times are sampling times relative to each clip. Each still-assisted verdict used the two frame references listed for that cue.",
+  "linesByRunAndCue": {
+    "20260928t064307205-en-standard-221ceb/L1": {
+      "text": "Rocket thrusters blast plumes of fire.",
+      "startSeconds": 11.2,
+      "endSeconds": 13.558458333333332,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 11.7,
+          "jpegSha256": "204227559279ebeee88de96ec300af6b71049024c8f5db432169d5aa0a9d842a"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 13.458458333333333,
+          "jpegSha256": "17c5fd793a1b56ef6d00f05aa277527a8090aa4f22a52eed37a8167490dbeaaf"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "Lit thrusters and their plumes fill the opening frame.",
+      "evidenceSha256": "3911b64f92d5f646b8a942fcc973986a720e6cde1c461e0d57f572e4ca01a79a",
+      "storedVerdict": {
+        "cueId": "L1",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "20260928t064307205-en-standard-221ceb/L2": {
+      "text": "Exhaust pours from the thrusters as the rocket ascends.",
+      "startSeconds": 15,
+      "endSeconds": 18.645791666666668,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 15.5,
+          "jpegSha256": "45b4a4caa54e1cba5cb0b53aec86832d0264db33d23f436cdbe9288a343bbbfc"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 18.545791666666666,
+          "jpegSha256": "348ab1f3450f3098b8830338b588b4b52b5e7e713ac50c826c68e6ca869ad93f"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "The engines are firing and the wide shot shows the rocket lifting away.",
+      "evidenceSha256": "98f82939402a77161e1578a5017420dfe8c90f92ca9e7bfddcd293cfeecffc38",
+      "storedVerdict": {
+        "cueId": "L2",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "20260928t064307205-en-standard-221ceb/L3": {
+      "text": "This film is supported by the Netherlands Film Fund.",
+      "startSeconds": 19,
+      "endSeconds": 21.16,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 19.5,
+          "jpegSha256": "a1dab87ba4a59456f8d5cf13bea11d0f184b69b7635b688a2c61e2f00572dc56"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 21.06,
+          "jpegSha256": "bee5e7146830f4e2c03119c317f9c704fc24067555899bde02193c74c2da3105"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "The Film Fund credit is already legible.",
+      "evidenceSha256": "250de808c1ed4fa81952e9f1e4a7a3bf6c3b2d07ad23c01b9d2b9984d88059c8",
+      "storedVerdict": {
+        "cueId": "L3",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "20260928t064307205-en-standard-221ceb/L4": {
+      "text": "Forty years later, wireframe holograms replay the conversation.",
+      "startSeconds": 45.6,
+      "endSeconds": 49.25,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 46.1,
+          "jpegSha256": "abe2538efcba68b64c0eab68ffbcad126d4763ca67d9234023724057216a15e4"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 49.15,
+          "jpegSha256": "4a693f3694bc70ba71c27149ece4927ff536a073c2e5d7930355fb1026817943"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "The time jump has occurred and the wireframe figures are visible.",
+      "evidenceSha256": "7381644f903f65bc6810790efa47d7bd9085faf824e24d131168dc429cb299c2",
+      "storedVerdict": {
+        "cueId": "L4",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "20260928t064307205-en-standard-221ceb/L5": {
+      "text": "A display reads: Simulation ready.",
+      "startSeconds": 54.1,
+      "endSeconds": 56.20783333333333,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 54.6,
+          "jpegSha256": "93af4a0bebbb7a2b16fd7de5c2b1ca7ce5cc0cb70b782f0e5876adae185bfcb4"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 56.10783333333333,
+          "jpegSha256": "0efcd64fa3a2ef5f081dac18660380af2f6622f3eabdf1f7cfa0234fb7b2d5e5"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "The simulation-ready message is already on the display.",
+      "evidenceSha256": "1d00161439bf34c4dd85a9b1fbd2fff870c4e9da8cf4dbf79cccb0feccd86afc",
+      "storedVerdict": {
+        "cueId": "L5",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "20260928t064307205-en-standard-221ceb/L6": {
+      "text": "A man with a robotic eyepiece inspects a brain.",
+      "startSeconds": 56.7,
+      "endSeconds": 59.82,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 57.2,
+          "jpegSha256": "f2dcc3a8322685c997ccbba1a2c40471e9117c0b15425eedf1f93deb96444f2d"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 59.72,
+          "jpegSha256": "5a28580a18148adc32654c144d093d5a9a6aa0aa847c02391c5d8569e2851873"
+        }
+      ],
+      "frozenLabel": "reject",
+      "labelReason": "At the opening frame only the brain and electrodes are identifiable; the mechanical eye appears near the end.",
+      "evidenceSha256": "d94337cadedea2931f32f6df17bdaaeb1f0b2f3e16c11ca0b7e3575052dff860",
+      "storedVerdict": {
+        "cueId": "L6",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "20260922t054724430-en-standard-1c9aa1/L1": {
+      "text": "He raises a microphone.",
+      "startSeconds": 5.2,
+      "endSeconds": 6.807291666666667,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 5.7,
+          "jpegSha256": "7d2ab27552db466a780351136f88a8df4681539c7449b74f464f89f6053ebeec"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 6.707291666666667,
+          "jpegSha256": "8103abfd721447a2b1b7d7cbc41fe3261ca2f16a710ef9e090750f1f0593e21b"
+        }
+      ],
+      "frozenLabel": "reject",
+      "labelReason": "He raises a small hand-held device, but the picture does not establish that it is a microphone.",
+      "evidenceSha256": "6117e082175a2db8a675f5bc011a3b57f10767c50e9f9ba594ac438cbe71bc31",
+      "storedVerdict": {
+        "cueId": "L1",
+        "pass": false,
+        "violations": [
+          {
+            "rule": "clarity",
+            "quote": "He",
+            "reason": "The pronoun is ambiguous because multiple men are present and neither has been introduced or described yet."
+          }
+        ],
+        "fix": "The man in the red jacket raises a microphone."
+      }
+    },
+    "20260922t054724430-en-standard-1c9aa1/L2": {
+      "text": "A shimmering grid transforms the ruined street into a sunny canal town.",
+      "startSeconds": 27.2,
+      "endSeconds": 31.621583333333334,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 27.7,
+          "jpegSha256": "a886bb9073d8507f66343ec787deb8aca3f96161fe9aa1816a6d145559366079"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 31.521583333333332,
+          "jpegSha256": "4ecaffe10f83fd16d673c0e2b3ea90cafc33d9d5fa4a62e01a62cf3b7b4bf165"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "The shimmering grid is active and the rebuilding street is visible.",
+      "evidenceSha256": "32dbaa97174b0ebca20a958acbec61a2f5bf4e1d8a5314379bd0627041134d37",
+      "storedVerdict": {
+        "cueId": "L2",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "20260922t054724430-en-standard-1c9aa1/L3": {
+      "text": "He puts an arm around Thom and points ahead.",
+      "startSeconds": 36.8,
+      "endSeconds": 39.45445833333333,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 37.3,
+          "jpegSha256": "13c486f550aa8951528c86dcc096b502f77e9502c9f2e70d15987e219dd7f9a8"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 39.354458333333326,
+          "jpegSha256": "7e7af1a13a9693ffbfd79957b0ae093c003a7b2bc796881dd7c1ec12f3b2ce6a"
+        }
+      ],
+      "frozenLabel": "reject",
+      "labelReason": "His arm is extended to point; he does not yet put it around the other man.",
+      "evidenceSha256": "5e6de463991332ce77cbdd917dec4353fb0db959e08de96817e95e95c4474d1a",
+      "storedVerdict": {
+        "cueId": "L3",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L1": {
+      "text": "Rocket thrusters blast plumes of fire.",
+      "startSeconds": 11.2,
+      "endSeconds": 13.558458333333332,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 11.7,
+          "jpegSha256": "204227559279ebeee88de96ec300af6b71049024c8f5db432169d5aa0a9d842a"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 13.458458333333333,
+          "jpegSha256": "17c5fd793a1b56ef6d00f05aa277527a8090aa4f22a52eed37a8167490dbeaaf"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "Lit thrusters and their plumes fill the opening frame.",
+      "evidenceSha256": "3911b64f92d5f646b8a942fcc973986a720e6cde1c461e0d57f572e4ca01a79a",
+      "storedVerdict": {
+        "cueId": "L1",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L2": {
+      "text": "Exhaust pours from the thrusters as the rocket ascends.",
+      "startSeconds": 15,
+      "endSeconds": 18.645791666666668,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 15.5,
+          "jpegSha256": "45b4a4caa54e1cba5cb0b53aec86832d0264db33d23f436cdbe9288a343bbbfc"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 18.545791666666666,
+          "jpegSha256": "348ab1f3450f3098b8830338b588b4b52b5e7e713ac50c826c68e6ca869ad93f"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "The engines are firing and the wide shot shows the rocket lifting away.",
+      "evidenceSha256": "98f82939402a77161e1578a5017420dfe8c90f92ca9e7bfddcd293cfeecffc38",
+      "storedVerdict": {
+        "cueId": "L2",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L3": {
+      "text": "This film is supported by the Netherlands Film Fund.",
+      "startSeconds": 19,
+      "endSeconds": 21.16,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 19.5,
+          "jpegSha256": "a1dab87ba4a59456f8d5cf13bea11d0f184b69b7635b688a2c61e2f00572dc56"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 21.06,
+          "jpegSha256": "bee5e7146830f4e2c03119c317f9c704fc24067555899bde02193c74c2da3105"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "The Film Fund credit is already legible.",
+      "evidenceSha256": "250de808c1ed4fa81952e9f1e4a7a3bf6c3b2d07ad23c01b9d2b9984d88059c8",
+      "storedVerdict": {
+        "cueId": "L3",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L4": {
+      "text": "Forty years later, wireframe holograms replay the conversation.",
+      "startSeconds": 45.6,
+      "endSeconds": 49.25,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 46.1,
+          "jpegSha256": "abe2538efcba68b64c0eab68ffbcad126d4763ca67d9234023724057216a15e4"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 49.15,
+          "jpegSha256": "4a693f3694bc70ba71c27149ece4927ff536a073c2e5d7930355fb1026817943"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "The time jump has occurred and the wireframe figures are visible.",
+      "evidenceSha256": "7381644f903f65bc6810790efa47d7bd9085faf824e24d131168dc429cb299c2",
+      "storedVerdict": {
+        "cueId": "L4",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L5": {
+      "text": "A display reads: Simulation ready.",
+      "startSeconds": 54.1,
+      "endSeconds": 56.20783333333333,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 54.6,
+          "jpegSha256": "93af4a0bebbb7a2b16fd7de5c2b1ca7ce5cc0cb70b782f0e5876adae185bfcb4"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 56.10783333333333,
+          "jpegSha256": "0efcd64fa3a2ef5f081dac18660380af2f6622f3eabdf1f7cfa0234fb7b2d5e5"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "The simulation-ready message is already on the display.",
+      "evidenceSha256": "1d00161439bf34c4dd85a9b1fbd2fff870c4e9da8cf4dbf79cccb0feccd86afc",
+      "storedVerdict": {
+        "cueId": "L5",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    },
+    "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L6": {
+      "text": "Thin electrodes protrude from a brain.",
+      "startSeconds": 56.7,
+      "endSeconds": 58.510000000000005,
+      "frames": [
+        {
+          "moment": "start",
+          "atSeconds": 57.2,
+          "jpegSha256": "f2dcc3a8322685c997ccbba1a2c40471e9117c0b15425eedf1f93deb96444f2d"
+        },
+        {
+          "moment": "voice_end",
+          "atSeconds": 58.410000000000004,
+          "jpegSha256": "17098216c7cda15ddb1bf7b875d6a270a36b5d7bc782668da7b1dcbbe4d6a78b"
+        }
+      ],
+      "frozenLabel": "accept",
+      "labelReason": "The thin electrodes are already visible on the brain.",
+      "evidenceSha256": "6d2774ac5a3094e32e8ba6487e62d651908ba28c2c0d7445f8d3f31f2c035558",
+      "storedVerdict": {
+        "cueId": "L6",
+        "pass": true,
+        "violations": [],
+        "fix": ""
+      }
+    }
+  },
+  "generalReviewCalls": [
+    {
+      "runId": "20260928t064307205-en-standard-221ceb",
+      "input": "video_with_line_stills",
+      "ledger": {
+        "at": "2026-11-20T05:33:10.098Z",
+        "label": "20260928t064307205-en-standard-221ceb-photos",
+        "model": "gemini-3.8-flash",
+        "provider": "Google Gemini API",
+        "promptTokens": 21306,
+        "promptTokensDetails": [
+          {
+            "modality": "IMAGE",
+            "tokenCount": 12852
+          },
+          {
+            "modality": "TEXT",
+            "tokenCount": 2929
+          },
+          {
+            "modality": "VIDEO",
+            "tokenCount": 5525
+          }
+        ],
+        "completionTokens": 24479,
+        "thinkingTokens": 23966,
+        "cachedTokens": 0,
+        "costUsd": 0.10777575,
+        "costKnown": true,
+        "costSource": "token_estimate",
+        "attempt": 1,
+        "latencyMs": 194843,
+        "firstTokenMs": 191613,
+        "finishReason": "STOP",
+        "ok": true
+      },
+      "verdictsByCue": {
+        "L1": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        },
+        "L2": {
+          "pass": false,
+          "violations": [
+            {
+              "rule": "spoiler",
+              "quote": "as the rocket ascends",
+              "reason": "The rocket is not yet shown ascending when the line begins, as the picture remains a close-up of the thrusters firing on the launchpad."
+            }
+          ],
+          "fix": "Bright exhaust pours from the thrusters."
+        },
+        "L3": {
+          "pass": false,
+          "violations": [
+            {
+              "rule": "redundant",
+              "quote": "This film is supported by the Netherlands Film Fund",
+              "reason": "The line spends the gap reading a funding credit while more important visual information, the rocket ascending above the futuristic cityscape, goes undescribed."
+            }
+          ],
+          "fix": "The rocket ascends into the sky above a futuristic cityscape."
+        },
+        "L4": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        },
+        "L5": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        },
+        "L6": {
+          "pass": false,
+          "violations": [
+            {
+              "rule": "spoiler",
+              "quote": "A man with a robotic eyepiece inspects",
+              "reason": "The man with the robotic eyepiece is not visible when the line starts, as he only leans into view later in the shot."
+            }
+          ],
+          "fix": "A pin-studded brain rests on a dish as a man with a robotic eyepiece leans in to inspect it."
+        }
+      },
+      "missing": [
+        {
+          "gapId": "g2",
+          "at": 17.5,
+          "what": "A rocket ascends into the sky above a futuristic cityscape."
+        }
+      ]
+    },
+    {
+      "runId": "20260928t064307205-en-standard-221ceb",
+      "input": "video_without_line_stills",
+      "ledger": {
+        "at": "2026-11-20T05:36:24.995Z",
+        "label": "20260928t064307205-en-standard-221ceb-video",
+        "model": "gemini-3.8-flash",
+        "provider": "Google Gemini API",
+        "promptTokens": 8216,
+        "promptTokensDetails": [
+          {
+            "modality": "TEXT",
+            "tokenCount": 2691
+          },
+          {
+            "modality": "VIDEO",
+            "tokenCount": 5525
+          }
+        ],
+        "completionTokens": 26384,
+        "thinkingTokens": 25992,
+        "cachedTokens": 0,
+        "costUsd": 0.105102,
+        "costKnown": true,
+        "costSource": "token_estimate",
+        "attempt": 1,
+        "latencyMs": 215674,
+        "firstTokenMs": 213015,
+        "finishReason": "STOP",
+        "ok": true
+      },
+      "verdictsByCue": {
+        "L1": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        },
+        "L2": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        },
+        "L3": {
+          "pass": false,
+          "violations": [
+            {
+              "rule": "redundant",
+              "quote": "This film is supported by the Netherlands Film Fund.",
+              "reason": "It spends the gap reading a funding credit while a more important visual, the new futuristic cityscape setting, goes undescribed."
+            }
+          ],
+          "fix": "The rocket ascends over a futuristic cityscape of towers and industrial cranes."
+        },
+        "L4": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        },
+        "L5": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        },
+        "L6": {
+          "pass": false,
+          "violations": [
+            {
+              "rule": "spoiler",
+              "quote": "A man with a robotic eyepiece",
+              "reason": "The man does not appear until later in the shot, while at the start of the line only a brain on a dish is shown."
+            }
+          ],
+          "fix": "A brain sits on a dish studded with pins before a man with a robotic eyepiece leans in to inspect it."
+        }
+      },
+      "missing": []
+    },
+    {
+      "runId": "20260922t054724430-en-standard-1c9aa1",
+      "input": "video_with_line_stills",
+      "ledger": {
+        "at": "2026-11-20T05:40:00.689Z",
+        "label": "20260922t054724430-en-standard-1c9aa1-photos",
+        "model": "gemini-3.8-flash",
+        "provider": "Google Gemini API",
+        "promptTokens": 12828,
+        "promptTokensDetails": [
+          {
+            "modality": "VIDEO",
+            "tokenCount": 3825
+          },
+          {
+            "modality": "TEXT",
+            "tokenCount": 2577
+          },
+          {
+            "modality": "IMAGE",
+            "tokenCount": 6426
+          }
+        ],
+        "completionTokens": 12050,
+        "thinkingTokens": 11687,
+        "cachedTokens": 0,
+        "costUsd": 0.0548085,
+        "costKnown": true,
+        "costSource": "token_estimate",
+        "attempt": 1,
+        "latencyMs": 97296,
+        "firstTokenMs": 95128,
+        "finishReason": "STOP",
+        "ok": true
+      },
+      "verdictsByCue": {
+        "L1": {
+          "pass": false,
+          "violations": [
+            {
+              "rule": "clarity",
+              "quote": "He",
+              "reason": "The pronoun refers to a person who has not yet been introduced in the narration or named in the dialogue."
+            }
+          ],
+          "fix": "The man with the cybernetic eyepiece raises a microphone."
+        },
+        "L2": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        },
+        "L3": {
+          "pass": false,
+          "violations": [
+            {
+              "rule": "clarity",
+              "quote": "He",
+              "reason": "The pronoun refers to a character who has not been introduced in the narration or named in the dialogue."
+            },
+            {
+              "rule": "unseen",
+              "quote": "Thom",
+              "reason": "The character's name is spelled using outside knowledge of the film rather than the dialogue's spelling, Tom."
+            }
+          ],
+          "fix": "The man with the cybernetic eyepiece puts an arm around Tom and points ahead."
+        }
+      },
+      "missing": [
+        {
+          "gapId": "g1",
+          "at": 0,
+          "what": "In a ruined city, a grey-haired man looks across a bridge at a towering mechanical walker."
+        }
+      ]
+    },
+    {
+      "runId": "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f",
+      "input": "video_with_line_stills",
+      "ledger": {
+        "at": "2026-11-20T05:41:38.003Z",
+        "label": "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f-photos",
+        "model": "gemini-3.8-flash",
+        "provider": "Google Gemini API",
+        "promptTokens": 21303,
+        "promptTokensDetails": [
+          {
+            "modality": "IMAGE",
+            "tokenCount": 12852
+          },
+          {
+            "modality": "TEXT",
+            "tokenCount": 2926
+          },
+          {
+            "modality": "VIDEO",
+            "tokenCount": 5525
+          }
+        ],
+        "completionTokens": 27532,
+        "thinkingTokens": 27028,
+        "cachedTokens": 0,
+        "costUsd": 0.11922225,
+        "costKnown": true,
+        "costSource": "token_estimate",
+        "attempt": 1,
+        "latencyMs": 209263,
+        "firstTokenMs": 206268,
+        "finishReason": "STOP",
+        "ok": true
+      },
+      "verdictsByCue": {
+        "L1": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        },
+        "L2": {
+          "pass": false,
+          "violations": [
+            {
+              "rule": "spoiler",
+              "quote": "as the rocket ascends",
+              "reason": "The rocket's ascent is revealed only after the cut to the wide shot at 17.50 seconds, so describing it at 15.00 seconds against the close-up opening picture is too early."
+            }
+          ],
+          "fix": "Describe only the exhaust pouring from the thrusters without mentioning the rocket's ascent."
+        },
+        "L3": {
+          "pass": false,
+          "violations": [
+            {
+              "rule": "redundant",
+              "quote": "This film is supported by the Netherlands Film Fund.",
+              "reason": "The line spends the gap reading a funding credit while a more important visual, the new futuristic industrial city setting, goes undescribed."
+            }
+          ],
+          "fix": "Describe the rocket ascending over the futuristic industrial city instead of reading the funding credit."
+        },
+        "L4": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        },
+        "L5": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        },
+        "L6": {
+          "pass": true,
+          "violations": [],
+          "fix": ""
+        }
+      },
+      "missing": [
+        {
+          "gapId": "g2",
+          "at": 17.5,
+          "what": "The rocket ascends into the sky over a futuristic industrial cityscape."
+        },
+        {
+          "gapId": "g4",
+          "at": 58.6,
+          "what": "An older man wearing a robotic eyepiece leans down to inspect the brain."
+        }
+      ]
+    }
+  ],
+  "blindTimingCall": {
+    "ledger": {
+      "at": "2026-11-20T05:45:18.422Z",
+      "label": "blind-picture-timing",
+      "model": "gemini-3.8-flash",
+      "provider": "Google Gemini API",
+      "promptTokens": 31738,
+      "promptTokensDetails": [
+        {
+          "modality": "IMAGE",
+          "tokenCount": 21420
+        },
+        {
+          "modality": "TEXT",
+          "tokenCount": 968
+        },
+        {
+          "modality": "VIDEO",
+          "tokenCount": 9350
+        }
+      ],
+      "completionTokens": 7366,
+      "thinkingTokens": 6426,
+      "cachedTokens": 0,
+      "costUsd": 0.051426,
+      "boundUsd": 0.2130915,
+      "costKnown": true,
+      "costSource": "token_estimate",
+      "attempt": 1,
+      "latencyMs": 73585,
+      "firstTokenMs": 67812,
+      "finishReason": "STOP",
+      "ok": true
+    },
+    "anonymousLineCount": 10,
+    "deduplication": "Five unchanged opening lines shared identical wording, start and end times, and frame evidence across the original and edited runs. Each appears once in this call.",
+    "videos": [
+      {
+        "clip": "A",
+        "sha256": "5a1507c31d136e3f68c5ab3d1cb159f54d5ce47bcea8c9f46ec01e311d54f814"
+      },
+      {
+        "clip": "B",
+        "sha256": "ea2932650da980de6745cf0566d2a966cd380df1ced2effdc2026a93faccddf2"
+      }
+    ],
+    "systemInstruction": "For each narration line, identify the visible subject, action or change its wording claims at the stated start. The clip letter on a line identifies its video; each clip has its own clock. Decide each line independently.\nUse the labeled opening and ending pictures and the moving clip. The opening picture was sampled after the line started. If a cut or reveal occurs between the stated start and that picture, consult the moving clip. When the timing cannot be resolved, return indeterminate.\nUse supported when the claim is visually supported by the time narration begins. Use later when a detail is first shown after that time. Use not_visible when the claim lacks visual support throughout the clip. When several details are claimed, quote the specific words that determine your judgment. Note what is actually visible in the opening picture and later in the clip. Do not infer exact onset times from the stills. Ignore style, script coverage and audio quality. Return one judgment for each listed line ID.",
+    "reasoningEffort": "medium",
+    "temperature": 0,
+    "maxOutputTokens": 44823,
+    "observations": "quotedWords, openingObservation, laterObservation, firstSeenIn and status are the returned model fields. Any onset times within observation text are model estimates.",
+    "judgments": [
+      {
+        "source": "20260928t064307205-en-standard-221ceb/L2",
+        "id": "A1",
+        "status": "later",
+        "quotedWords": "the rocket ascends",
+        "openingObservation": "A close-up view shows thrusters pouring exhaust, but the ascending rocket is not visible.",
+        "laterObservation": "A wide view shows the rocket ascending into the sky behind buildings.",
+        "firstSeenIn": "by_end"
+      },
+      {
+        "source": "20260928t064307205-en-standard-221ceb/L6",
+        "id": "A2",
+        "status": "later",
+        "quotedWords": "A man with a robotic eyepiece",
+        "openingObservation": "A brain rests on a dish in close-up with no one clearly visible.",
+        "laterObservation": "A man wearing a robotic eyepiece leans down into frame to inspect the brain.",
+        "firstSeenIn": "by_end"
+      },
+      {
+        "source": "20260928t064307205-en-standard-221ceb/L5",
+        "id": "A3",
+        "status": "supported",
+        "quotedWords": "A display reads: Simulation ready",
+        "openingObservation": "Holographic text reading 'SIMULATION READY...' is displayed across the screen.",
+        "laterObservation": "The 'SIMULATION READY...' display remains visible in front of the technicians.",
+        "firstSeenIn": "opening"
+      },
+      {
+        "source": "20260928t064307205-en-standard-221ceb/L3",
+        "id": "A4",
+        "status": "supported",
+        "quotedWords": "This film is supported by the Netherlands Film Fund",
+        "openingObservation": "Text reading 'This film is supported by the Netherlands Film Fund' appears in the bottom left.",
+        "laterObservation": "The text credit continues to be shown in the lower-left corner.",
+        "firstSeenIn": "opening"
+      },
+      {
+        "source": "20260928t064307205-en-standard-221ceb/L1",
+        "id": "A5",
+        "status": "supported",
+        "quotedWords": "Rocket thrusters blast plumes of fire",
+        "openingObservation": "Bright plumes of fire blast vigorously from multiple rocket thrusters.",
+        "laterObservation": "The rocket thrusters continue firing bright plumes of fire.",
+        "firstSeenIn": "opening"
+      },
+      {
+        "source": "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L6",
+        "id": "A6",
+        "status": "supported",
+        "quotedWords": "Thin electrodes protrude from a brain",
+        "openingObservation": "Thin metal electrodes protrude from the upper surface of a brain on a dish.",
+        "laterObservation": "The thin electrodes remain embedded and sticking out of the brain.",
+        "firstSeenIn": "opening"
+      },
+      {
+        "source": "20260928t064307205-en-standard-221ceb/L4",
+        "id": "A7",
+        "status": "supported",
+        "quotedWords": "wireframe holograms replay the conversation",
+        "openingObservation": "Orange and blue wireframe holograms of two figures are visible replaying their earlier conversation.",
+        "laterObservation": "The wireframe holograms fade as a playback interface overlay appears.",
+        "firstSeenIn": "opening"
+      },
+      {
+        "source": "20260922t054724430-en-standard-1c9aa1/L3",
+        "id": "B1",
+        "status": "later",
+        "quotedWords": "puts an arm around Thom and points ahead",
+        "openingObservation": "The man in red gestures toward Thom without having an arm around him or pointing forward.",
+        "laterObservation": "He places his arm around Thom around 40 seconds and points forward around 41 seconds, after the narration ends.",
+        "firstSeenIn": "after_end"
+      },
+      {
+        "source": "20260922t054724430-en-standard-1c9aa1/L2",
+        "id": "B2",
+        "status": "later",
+        "quotedWords": "into a sunny canal town",
+        "openingObservation": "A shimmering geometric grid dome expands across the dark, ruined street.",
+        "laterObservation": "The scene finishes transforming to reveal sunny brick buildings and green trees.",
+        "firstSeenIn": "by_end"
+      },
+      {
+        "source": "20260922t054724430-en-standard-1c9aa1/L1",
+        "id": "B3",
+        "status": "later",
+        "quotedWords": "raises a microphone",
+        "openingObservation": "The man in red has his hands lowered and has not yet raised a microphone.",
+        "laterObservation": "The man receives the microphone handset and raises it upward toward his face.",
+        "firstSeenIn": "by_end"
+      }
+    ]
+  }
+}

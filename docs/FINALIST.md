@@ -29,7 +29,7 @@
 
 검증 결과가 바뀔 때만 해당 구간의 대사를 바꾼다.
 
-- 사진 포함 검수가 기계 눈을 실제로 지적하고 정상 줄을 오판하지 않았으면, 그 판정과 원본 프레임을 화면에 같이 띄운다. 사진 없는 검수도 잡았으면 “The final check flagged the reveal. Here are the frames the producer can inspect.”라고 한다. 사진을 넣은 경우에만 잡았으면 “Adding these frames made the check catch this early reveal in this run.”이라고 한다. 새 자동 실행에서 고친 음성까지 확인할 때만 그 전후를 들려준다.
+- 11월 20일 재검수에서 영상만 본 검수와 사진을 함께 본 검수 모두 기계 눈의 이른 등장을 지적했다. 사진을 넣은 검수는 정상으로 정해 둔 로켓 상승 줄도 반려했다. 무대에서는 제작자가 기계 눈 줄을 고친 전후 음성을 사용한다. 자동 검수 실험을 묻는다면 “Both checks caught the eyepiece. Adding stills also flagged a rocket line we had accepted. The producer listened against the original and changed the wording.”이라고 답한다.
 - 같은 모델·같은 대사표로 한 번 생성한 대조군에서 실제로 들리는 문제가 있으면, 인터뷰 대신 같은 구간의 두 음성을 재생하고 “Same scene, model and transcript. Listen for where the narrator starts speaking.”이라고 소개한다. 문제가 들리지 않으면 기존 인터뷰를 쓴다.
 - 태그 리비전에서 중단 후 같은 실행이 끝난 기록이 있으면 “We interrupted this run after review. It resumed from its saved work and finished the track.”이라는 말과 녹화를 함께 쓴다. 삭제 경로가 배포되고 공개 주소에서 확인되면 준비해 둔 발표자 소유 업로드에서 삭제 결과를 보여준다.
 - 라이브 생성이 거절되거나 네트워크가 끊기면 “This is a recording of an earlier run. You’ll hear the original soundtrack and its saved narration.”이라고 알리고 로컬 녹음·보고서를 연다. 현장에서 원래 무전과 대사, 해설이 객석에서 구별되는지 리허설한다.
