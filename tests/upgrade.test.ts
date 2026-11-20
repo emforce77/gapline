@@ -73,6 +73,10 @@ it("sends native Gemini media/schema options and streams only answer parts throu
   const deltas: string[] = [];
   const usage = {
     promptTokenCount: 100,
+    promptTokensDetails: [
+      { modality: "TEXT", tokenCount: 10 },
+      { modality: "IMAGE", tokenCount: 90 },
+    ],
     candidatesTokenCount: 25,
     thoughtsTokenCount: 75,
     totalTokenCount: 200,
@@ -97,6 +101,7 @@ it("sends native Gemini media/schema options and streams only answer parts throu
             { text: "Describe these." },
             { inlineData: { mimeType: "video/mp4", data: "dmlkZW8=" } },
             { inlineData: { mimeType: "audio/wav", data: "YXVkaW8=" } },
+            { inlineData: { mimeType: "image/jpeg", data: "aW1hZ2U=" } },
           ],
         },
       ]);
@@ -142,6 +147,7 @@ it("sends native Gemini media/schema options and streams only answer parts throu
           { type: "text", text: "Describe these." },
           { type: "video_url", video_url: { url: "data:video/mp4;base64,dmlkZW8=" } },
           { type: "input_audio", input_audio: { format: "wav", data: "YXVkaW8=" } },
+          { type: "image", jpegBase64: "aW1hZ2U=" },
         ],
         schemaName: "fixture",
         schema,
@@ -153,6 +159,7 @@ it("sends native Gemini media/schema options and streams only answer parts throu
       assert.deepEqual(result.data, { ok: true });
       assert.deepEqual(deltas, ['{"ok":', "true}"]);
       assert.equal(result.record.promptTokens, 100);
+      assert.deepEqual(result.record.promptTokensDetails, usage.promptTokensDetails);
       assert.equal(result.record.completionTokens, 100);
       assert.equal(result.record.costKnown, true);
       assert.equal(result.record.costSource, "token_estimate");
@@ -508,4 +515,61 @@ it("restricts uploads to their owning session and edits to actual neighboring au
     { id: "L3", start: 7, seconds: 2 },
   ].map((c) => ({ ...c, gapId: "g1", status: "fits" })) as Cue[];
   assert.deepEqual(editBounds(cues, [{ id: "g1", start: 0, end: 10 }], "L2"), { min: 3, max: 7 });
+});
+
+it("checks a measured prompt before paying and before retrying an oversized answer", async () => {
+  const dir = await mkdtemp(join(tmpdir(), "picture-cap-"));
+  const reservation = {
+    id: "picture",
+    scope: "experiment" as const,
+    date: "2026-11-20",
+    amount: 0.6,
+  };
+  const call = {
+    model: "gemini-3.8-flash",
+    schemaName: "check",
+    schema: z.object({ ok: z.boolean() }),
+    label: "cap",
+    ledgerFile: join(dir, "ledger.jsonl"),
+    system: "Check the picture.",
+    user: [{ type: "text" as const, text: "Test" }],
+  };
+  for (const before of [60_001, 100]) {
+    let paid = 0;
+    await withFetch(
+      async (url, init) => {
+        if (url.endsWith(":countTokens")) {
+          const req = JSON.parse(String(init?.body)).generateContentRequest;
+          assert.equal(req.contents[0].parts[0].text, "Test");
+          assert.equal(req.systemInstruction.parts[0].text, call.system);
+          return Response.json({ totalTokens: before });
+        }
+        paid++;
+        return new Response(
+          "data: " +
+            JSON.stringify({
+              candidates: [{ content: { parts: [{ text: '{"ok":true}' }] }, finishReason: "STOP" }],
+              usageMetadata: {
+                promptTokenCount: 60_001,
+                candidatesTokenCount: 1,
+                totalTokenCount: 60_002,
+              },
+            }) +
+            "\n\n",
+        );
+      },
+      () =>
+        withRunBudget(
+          reservation,
+          async () => {
+            await assert.rejects(callStructured(call), /allowance|60,000/);
+          },
+          { limit: 0.6, spent: 0, pending: 0, callCapUsd: 0.29 },
+        ),
+    );
+    assert.equal(paid, before > 60_000 ? 0 : 1);
+  }
+  const [entry] = await readCallRecords(call.ledgerFile);
+  assert.equal(entry.promptTokens, 60_001);
+  assert.equal(entry.costKnown, true);
 });

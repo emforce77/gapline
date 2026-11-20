@@ -211,3 +211,33 @@ describe("what a refused speech request is charged", () => {
     assert.equal(runChargeBound(budget), 0);
   });
 });
+
+it("uses the requested script cap for admission and holds each verified request before starting it", async () => {
+  const previous = process.env.DATA_DIR;
+  process.env.DATA_DIR = await mkdtemp(join(tmpdir(), "scene-measure-budget-"));
+  try {
+    const reservation = await reserveRun("demo", undefined, 0.6);
+    assert.equal(reservation.amount, 0.6);
+    const ledger = JSON.parse(
+      await readFile(join(process.env.DATA_DIR, "budget/demo-v2.json"), "utf8"),
+    );
+    assert.equal(ledger.entries[0].amount, 0.6);
+    const budget = newRunBudget(reservation, 0.29);
+    await withRunBudget(
+      reservation,
+      async () => {
+        reserveCall(1.1)(null);
+        const settle = reserveCall(1.1);
+        assert.throws(() => reserveCall(1.1), /allowance/);
+        settle(0.03);
+        assert.throws(() => reserveCall(1.1), /allowance/);
+        assert.equal(budget.pending, 0);
+        assert.equal(budget.spent.toFixed(2), "0.32");
+      },
+      budget,
+    );
+  } finally {
+    if (previous === undefined) delete process.env.DATA_DIR;
+    else process.env.DATA_DIR = previous;
+  }
+});

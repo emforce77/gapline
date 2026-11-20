@@ -72,9 +72,10 @@ export async function executeRun(
   run: PreparedRun,
   reservation: Reservation,
   emit?: (event: TimedRunEvent) => void,
+  callCapUsd?: number,
 ): Promise<{ runId: string }> {
   const { project, runId, dir, key } = run;
-  const budget = newRunBudget(reservation);
+  const budget = newRunBudget(reservation, callCapUsd);
   let summary: Awaited<ReturnType<typeof runDescription>>["summary"];
   try {
     if (run.owner) {
@@ -152,9 +153,10 @@ export async function startRun(input: {
   language: Language;
   density: Density;
   budgetScope?: BudgetScope;
+  scriptBudget?: { limit: number; callCapUsd: number };
   emit?: (event: TimedRunEvent) => void;
 }): Promise<{ runId: string }> {
   const prepared = await prepareRun(input);
-  const reservation = await reserveRun(input.budgetScope);
-  return executeRun(prepared, reservation, input.emit);
+  const reservation = await reserveRun(input.budgetScope, undefined, input.scriptBudget?.limit);
+  return executeRun(prepared, reservation, input.emit, input.scriptBudget?.callCapUsd);
 }

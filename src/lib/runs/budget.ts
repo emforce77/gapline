@@ -150,7 +150,10 @@ const REFUSALS: Record<BudgetErrorCode | VisitorBudgetErrorCode, string> = {
 export async function reserveRun(
   scope: BudgetScope = "demo",
   owner?: string,
+  amount = RUN_RESERVE_USD,
 ): Promise<Reservation> {
+  if (!Number.isFinite(amount) || amount <= 0 || amount > RUN_RESERVE_USD)
+    throw new Error("Invalid reservation amount");
   const now = new Date();
   const { date, resetAt } = budgetDay(now);
   const legacy = await legacySpend(scope, date);
@@ -158,7 +161,7 @@ export async function reserveRun(
     id: randomUUID(),
     date,
     scope,
-    amount: RUN_RESERVE_USD,
+    amount,
     ...(owner ? { owner } : {}),
   };
   const visitor = owner && scope === "demo" ? { owner, cap: visitorDailyCap() } : undefined;
@@ -235,13 +238,20 @@ export async function settleRun(reservation: Reservation, costUsd: number | null
 /** What one run's paid calls have used: settled calls at their cost, unknown ones at their bound. */
 export interface RunBudget {
   limit: number;
+  /** For measured scripts with a verified, smaller per-call upper bound. */
+  callCapUsd?: number;
   spent: number;
   /** Bounds of calls still in flight. */
   pending: number;
 }
 const running = new AsyncLocalStorage<RunBudget>();
-export function newRunBudget(reservation: Reservation): RunBudget {
-  return { limit: reservation.amount, spent: 0, pending: 0 };
+export function currentCallCapUsd(): number | undefined {
+  return running.getStore()?.callCapUsd;
+}
+export function newRunBudget(reservation: Reservation, callCapUsd?: number): RunBudget {
+  if (callCapUsd !== undefined && (!Number.isFinite(callCapUsd) || callCapUsd <= 0))
+    throw new Error("Invalid call cap");
+  return { limit: reservation.amount, spent: 0, pending: 0, callCapUsd };
 }
 export function withRunBudget<T>(
   reservation: Reservation,
@@ -262,6 +272,7 @@ export function runChargeBound(budget: RunBudget): number {
 export function reserveCall(maxUsd: number): (costUsd: number | null) => void {
   const state = running.getStore();
   if (!state) return () => {};
+  maxUsd = Math.min(maxUsd, state.callCapUsd ?? maxUsd);
   if (state.spent + state.pending + maxUsd > state.limit + CAP_EPSILON)
     throw new BudgetExhaustedError(
       "run_allowance",

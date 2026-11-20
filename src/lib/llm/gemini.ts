@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { appendCallRecord, type CallRecord } from "./ledger";
 import { setTimeout as delay } from "node:timers/promises";
-import { reserveCall } from "../runs/budget";
+import { currentCallCapUsd, reserveCall } from "../runs/budget";
 import { MODELS } from "../models";
 
 const GEMINI_URL = "https://generativelanguage.googleapis.com/v1beta/models";
@@ -11,6 +11,7 @@ export const MAX_OUTPUT_TOKENS = 65536;
 export type ContentPart =
   | { type: "text"; text: string }
   | { type: "video_url"; video_url: { url: string } }
+  | { type: "image"; jpegBase64: string }
   | { type: "input_audio"; input_audio: { data: string; format: "wav" | "mp3" | "m4a" } };
 
 export interface StructuredCall<T> {
@@ -39,6 +40,7 @@ function apiKey(): string {
 
 export interface GeminiUsage {
   promptTokenCount?: number;
+  promptTokensDetails?: CallRecord["promptTokensDetails"];
   candidatesTokenCount?: number;
   thoughtsTokenCount?: number;
   cachedContentTokenCount?: number;
@@ -87,6 +89,8 @@ export function estimateGeminiCost(
 
 function nativePart(part: ContentPart) {
   if (part.type === "text") return { text: part.text };
+  if (part.type === "image")
+    return { inlineData: { mimeType: "image/jpeg", data: part.jpegBase64 } };
   if (part.type === "input_audio") {
     const mime = { wav: "audio/wav", mp3: "audio/mp3", m4a: "audio/mp4" } as const;
     return { inlineData: { mimeType: mime[part.input_audio.format], data: part.input_audio.data } };
@@ -185,6 +189,47 @@ async function callOnce<T>(
   attempt: number,
 ): Promise<{ data: T; record: CallRecord }> {
   const started = Date.now();
+  const schema = z.toJSONSchema(call.schema);
+  delete schema.$schema;
+  const request = {
+    systemInstruction: { parts: [{ text: call.system }] },
+    contents: [{ role: "user", parts: call.user.map(nativePart) }],
+    generationConfig: {
+      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      temperature: call.temperature ?? 0.4,
+      responseFormat: { text: { mimeType: "APPLICATION_JSON", schema } },
+      ...(call.reasoningEffort ? { thinkingConfig: { thinkingLevel: call.reasoningEffort } } : {}),
+    },
+  };
+  const model = encodeURIComponent(call.model);
+  const callCap = currentCallCapUsd();
+  if (callCap !== undefined) {
+    // A reduced reservation is safe only if this specific request fits it, including thinking.
+    const counted = await fetch(`${GEMINI_URL}/${model}:countTokens`, {
+      method: "POST",
+      signal: call.signal ?? AbortSignal.timeout(60_000),
+      headers: { "x-goog-api-key": apiKey(), "Content-Type": "application/json" },
+      body: JSON.stringify({
+        generateContentRequest: { ...request, model: `models/${call.model}` },
+      }),
+    });
+    if (!counted.ok)
+      throw new Error(`Gemini countTokens HTTP ${counted.status}; generation stopped`);
+    const { totalTokens } = z
+      .object({ totalTokens: z.number().int().nonnegative() })
+      .parse(await counted.json());
+    const estimate = estimateGeminiCost(
+      {
+        promptTokenCount: totalTokens,
+        candidatesTokenCount: MAX_OUTPUT_TOKENS,
+        totalTokenCount: totalTokens + MAX_OUTPUT_TOKENS,
+      },
+      call.model,
+      started,
+    );
+    if (totalTokens > 60_000 || estimate === null || estimate > callCap)
+      throw new Error(`Prompt of ${totalTokens} tokens exceeds the measured request allowance`);
+  }
   const settleCall = reserveCall(1.1 * priceMultiplier(started));
   let firstTokenAt: number | null = null;
   let text = "";
@@ -206,6 +251,7 @@ async function callOnce<T>(
       model: call.model,
       provider: "Google Gemini API",
       promptTokens: usage?.promptTokenCount ?? 0,
+      promptTokensDetails: usage?.promptTokensDetails,
       completionTokens: (usage?.candidatesTokenCount ?? 0) + (usage?.thoughtsTokenCount ?? 0),
       thinkingTokens: usage?.thoughtsTokenCount ?? 0,
       cachedTokens: usage?.cachedContentTokenCount ?? 0,
@@ -222,8 +268,6 @@ async function callOnce<T>(
   };
 
   try {
-    const schema = z.toJSONSchema(call.schema);
-    delete schema.$schema;
     const response = await fetch(
       `${GEMINI_URL}/${encodeURIComponent(call.model)}:streamGenerateContent?alt=sse`,
       {
@@ -233,18 +277,7 @@ async function callOnce<T>(
           "x-goog-api-key": apiKey(),
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: call.system }] },
-          contents: [{ role: "user", parts: call.user.map(nativePart) }],
-          generationConfig: {
-            maxOutputTokens: MAX_OUTPUT_TOKENS,
-            temperature: call.temperature ?? 0.4,
-            responseFormat: { text: { mimeType: "APPLICATION_JSON", schema } },
-            ...(call.reasoningEffort
-              ? { thinkingConfig: { thinkingLevel: call.reasoningEffort } }
-              : {}),
-          },
-        }),
+        body: JSON.stringify(request),
       },
     );
     if (!response.ok || !response.body) {
@@ -311,6 +344,8 @@ async function callOnce<T>(
       if (done) break;
     }
     streamComplete = true;
+    if (callCap !== undefined && (usage?.promptTokenCount ?? 0) > 60_000)
+      throw new Error("Gemini reported more than 60,000 prompt tokens; measurement stopped");
     if (!finishReason)
       throw new ProviderError(
         "Gemini API stream ended without a finish reason",

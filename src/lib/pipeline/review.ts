@@ -1,5 +1,5 @@
 import { ModelOutputError } from "../errors";
-import { callStructured } from "../llm/gemini";
+import { callStructured, type ContentPart } from "../llm/gemini";
 import { reasoningEffort } from "../models";
 import {
   DENSITY_STYLE,
@@ -11,6 +11,7 @@ import {
   type ClipContext,
 } from "./context";
 import { ruleSummaryForPrompt } from "./guidelines";
+import type { LineStills } from "./line-stills";
 import { UNIT_NAME } from "./length";
 import { ReviewSchema, type MissingItem, type Verdict } from "./schemas";
 
@@ -25,13 +26,22 @@ export function reviewerSystem(
   context: ClipContext,
   finalOutput = false,
   lengthLimits = false,
+  frames = false,
 ): string {
   return `You review ${languageName(context.language)} audio description lines for blind and low-vision viewers
 against published guidelines. You did not write them. You see the clip itself; judge every line against
 the picture and the soundtrack at that moment.
 
 Rules (a line fails if it breaks any of them):
-${ruleSummaryForPrompt()}
+${ruleSummaryForPrompt()}${
+    frames
+      ? `
+
+Frames: each line has two labeled pictures from the original clip. Check what the line says
+against its opening picture. An object or action first revealed later in the video or in its end
+picture cannot be described early. Use the moving clip to judge motion and cuts between pictures.`
+      : ""
+  }
 
 For each line return pass=true with no violations, or pass=false with every violation: the rule id, the
 exact words that break it, and a one-sentence reason. "fix" says how to repair the line in one sentence.
@@ -64,6 +74,8 @@ export async function reviewLines(input: {
    * the reviewer's thinking from 28–33k to 35–36k tokens (about 15 s; docs/EVALUATION.md, 2026-10-03).
    */
   lines: { id: string; start: number; end: number; text: string; maxUnits?: number }[];
+  /** Original-clip pictures, present for every line when doing a frame-assisted review. */
+  frames?: LineStills;
   /** Already approved lines, for naming consistency. */
   approved: { id: string; start: number; text: string }[];
   /** True when the lines are the whole script, so coverage can be judged. */
@@ -89,6 +101,24 @@ export async function reviewLines(input: {
   const approved = input.approved
     .map((l) => `- ${l.id} at ${l.start.toFixed(3)} s: ${l.text}`)
     .join("\n");
+  const pictureParts: ContentPart[] = [];
+  if (input.frames) {
+    const labels = {
+      start: "just after it starts",
+      voice_end: "as the voice ends",
+      room_end: "end of its room",
+    };
+    for (const { id } of input.lines) {
+      const pair = input.frames.get(id);
+      if (!pair || pair.length !== 2) throw new Error(`Missing review frames for ${id}`);
+      for (const frame of pair) {
+        pictureParts.push(
+          { type: "text", text: `${id} · ${labels[frame.moment]} · ${frame.at.toFixed(2)} s` },
+          { type: "image", jpegBase64: frame.jpeg.toString("base64") },
+        );
+      }
+    }
+  }
   let retry = "";
   for (let attempt = 1; ; attempt++) {
     const { data } = await callStructured({
@@ -98,9 +128,11 @@ export async function reviewLines(input: {
         input.context,
         input.finalOutput,
         input.lines.some((l) => l.maxUnits),
+        input.frames !== undefined,
       ),
       user: [
         { type: "video_url", video_url: { url: input.context.videoDataUrl } },
+        ...pictureParts,
         {
           type: "text",
           text:
@@ -131,7 +163,13 @@ export async function reviewLines(input: {
     if (problem) throw new ModelOutputError(problem);
     const byId = new Map(data.verdicts.map((v) => [v.cueId, v]));
     return {
-      verdicts: input.lines.map((l) => byId.get(l.id)!),
+      verdicts: input.lines.map(({ id }) => {
+        const verdict = byId.get(id)!;
+        const frames = input.frames?.get(id);
+        return frames
+          ? { ...verdict, frames: frames.map(({ moment, at }) => ({ moment, at })) }
+          : verdict;
+      }),
       missing: input.wholeScript ? data.missing : [],
     };
   }

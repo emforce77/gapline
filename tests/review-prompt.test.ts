@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { describe, it } from "node:test";
 import { z } from "zod";
 import type { ClipContext } from "../src/lib/pipeline/context";
@@ -30,6 +31,20 @@ describe("reviewer instructions", () => {
       assert.match(prompt, new RegExp(`Write reason and fix in ${name}`));
     });
   }
+
+  it("keeps the video-only final check byte-identical to the saved baseline", () => {
+    const expected = {
+      en: "2a8658c07d1b513b52883c221a2d1a74e70eccf9c9859549e1ff1666f74b6417",
+      ko: "82215114ff8a8f9501d1e6fac1964439467f64615651041ef806e45871946d72",
+    };
+    for (const language of ["en", "ko"] as const) {
+      const baseline = reviewerSystem(context(language), true);
+      assert.equal(createHash("sha256").update(baseline).digest("hex"), expected[language]);
+      const withFrames = reviewerSystem(context(language), true, false, true);
+      assert.match(withFrames, /Frames: each line has two labeled pictures/);
+      assert.equal(withFrames.replace(/\n\nFrames:[\s\S]*?between pictures\./, ""), baseline);
+    }
+  });
 
   it("keep the requirement in the final-output audit too", () => {
     const prompt = reviewerSystem(context("ko"), true).replace(/\s+/g, " ");

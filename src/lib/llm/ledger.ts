@@ -8,6 +8,8 @@ export interface CallRecord {
   model: string;
   provider: string;
   promptTokens: number;
+  /** Per-modality counts when supplied by Gemini. Older records have only a total. */
+  promptTokensDetails?: { modality: string; tokenCount: number }[];
   completionTokens: number;
   costUsd: number;
   /** False when usage is incomplete; costUsd contributes only the known subtotal. */

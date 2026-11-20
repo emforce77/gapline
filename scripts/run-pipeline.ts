@@ -1,15 +1,30 @@
 /**
  * Runs one description for an existing project from the command line (same path as the web app).
- * Usage: npm run pipeline -- <projectId> <ko|en> [standard|brief]
+ * Usage: npm run pipeline -- <projectId> <ko|en> [standard|brief] [--cap-usd 0.80]
  * Out:   <DATA_DIR>/projects/<projectId>/runs/<runId>/ and a printed summary.
  */
+import { parseArgs } from "node:util";
 import { startRun } from "../src/lib/runs/start-run";
 import type { Density, Language } from "../src/lib/pipeline/schemas";
 
 async function main(): Promise<void> {
-  const [projectId = "tos-opening", language = "ko", density = "standard"] = process.argv.slice(2);
+  const { values, positionals } = parseArgs({
+    options: { "cap-usd": { type: "string" } },
+    allowPositionals: true,
+  });
+  const [projectId = "tos-opening", language = "ko", density = "standard"] = positionals;
+  if (
+    positionals.length > 3 ||
+    !["ko", "en"].includes(language) ||
+    !["standard", "brief"].includes(density)
+  )
+    throw new Error("Expected <projectId> <ko|en> [standard|brief]");
+  const limit = values["cap-usd"] === undefined ? undefined : Number(values["cap-usd"]);
+  if (limit !== undefined && (!(limit > 0) || limit > 0.8))
+    throw new Error("Finalist sample rerun requires --cap-usd in (0, 0.80]");
   const { runId } = await startRun({
     projectId,
+    scriptBudget: limit === undefined ? undefined : { limit, callCapUsd: 0.29 },
     language: language as Language,
     density: density as Density,
     emit: (event) => {

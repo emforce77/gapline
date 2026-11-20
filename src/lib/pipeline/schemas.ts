@@ -162,7 +162,12 @@ export const ReviewSchema = z
   );
 export type MissingItem = z.infer<typeof MissingItemSchema>;
 export type Violation = z.infer<typeof ViolationSchema>;
-export type Verdict = z.infer<typeof VerdictSchema>;
+/** Original-clip evidence supplied by the reviewer caller and retained with its verdict. */
+export interface ReviewFrame {
+  moment: "start" | "voice_end" | "room_end";
+  at: number;
+}
+export type Verdict = z.infer<typeof VerdictSchema> & { frames?: ReviewFrame[] };
 
 export const RevisionSchema = z
   .object({
