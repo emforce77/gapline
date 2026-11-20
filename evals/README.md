@@ -54,3 +54,12 @@ the candidate runs. The opening clip reuses its earlier subtitle reference and i
 
 This sample is too small to support claims about comprehension or satisfaction for blind or low-vision
 viewers, or about quality across films.
+
+The 20 November picture check uses the 15 voiced lines in two English sample runs and the
+producer's edited opening. The [frozen labels](picture-labels-2026-11-20.json) identify each
+run and cue, the expected picture judgment, the reason, and a hash of the wording and its two
+timed JPEGs. Three lines are marked reject. The labels were fixed before inference. To repeat
+the comparison on the original media, prepare the pictures with `--frames-only` as described
+in [Evaluation](../docs/EVALUATION.md#finalist-picture-check-preparation-20-november-2026).
+The archived labels can then be used as `runtime/measure/picture-check/labels.json`;
+the measurement checks their evidence hashes against freshly extracted frames.

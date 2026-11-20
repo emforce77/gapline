@@ -1,0 +1,92 @@
+[
+  {
+    "key": "20260928t064307205-en-standard-221ceb/L1",
+    "evidence": "3911b64f92d5f646b8a942fcc973986a720e6cde1c461e0d57f572e4ca01a79a",
+    "label": "accept",
+    "reason": "Lit thrusters and their plumes fill the opening frame."
+  },
+  {
+    "key": "20260928t064307205-en-standard-221ceb/L2",
+    "evidence": "98f82939402a77161e1578a5017420dfe8c90f92ca9e7bfddcd293cfeecffc38",
+    "label": "accept",
+    "reason": "The engines are firing and the wide shot shows the rocket lifting away."
+  },
+  {
+    "key": "20260928t064307205-en-standard-221ceb/L3",
+    "evidence": "250de808c1ed4fa81952e9f1e4a7a3bf6c3b2d07ad23c01b9d2b9984d88059c8",
+    "label": "accept",
+    "reason": "The Film Fund credit is already legible."
+  },
+  {
+    "key": "20260928t064307205-en-standard-221ceb/L4",
+    "evidence": "7381644f903f65bc6810790efa47d7bd9085faf824e24d131168dc429cb299c2",
+    "label": "accept",
+    "reason": "The time jump has occurred and the wireframe figures are visible."
+  },
+  {
+    "key": "20260928t064307205-en-standard-221ceb/L5",
+    "evidence": "1d00161439bf34c4dd85a9b1fbd2fff870c4e9da8cf4dbf79cccb0feccd86afc",
+    "label": "accept",
+    "reason": "The simulation-ready message is already on the display."
+  },
+  {
+    "key": "20260928t064307205-en-standard-221ceb/L6",
+    "evidence": "d94337cadedea2931f32f6df17bdaaeb1f0b2f3e16c11ca0b7e3575052dff860",
+    "label": "reject",
+    "reason": "At the opening frame only the brain and electrodes are identifiable; the mechanical eye appears near the end."
+  },
+  {
+    "key": "20260922t054724430-en-standard-1c9aa1/L1",
+    "evidence": "6117e082175a2db8a675f5bc011a3b57f10767c50e9f9ba594ac438cbe71bc31",
+    "label": "reject",
+    "reason": "He raises a small hand-held device, but the picture does not establish that it is a microphone."
+  },
+  {
+    "key": "20260922t054724430-en-standard-1c9aa1/L2",
+    "evidence": "32dbaa97174b0ebca20a958acbec61a2f5bf4e1d8a5314379bd0627041134d37",
+    "label": "accept",
+    "reason": "The shimmering grid is active and the rebuilding street is visible."
+  },
+  {
+    "key": "20260922t054724430-en-standard-1c9aa1/L3",
+    "evidence": "5e6de463991332ce77cbdd917dec4353fb0db959e08de96817e95e95c4474d1a",
+    "label": "reject",
+    "reason": "His arm is extended to point; he does not yet put it around the other man."
+  },
+  {
+    "key": "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L1",
+    "evidence": "3911b64f92d5f646b8a942fcc973986a720e6cde1c461e0d57f572e4ca01a79a",
+    "label": "accept",
+    "reason": "Lit thrusters and their plumes fill the opening frame."
+  },
+  {
+    "key": "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L2",
+    "evidence": "98f82939402a77161e1578a5017420dfe8c90f92ca9e7bfddcd293cfeecffc38",
+    "label": "accept",
+    "reason": "The engines are firing and the wide shot shows the rocket lifting away."
+  },
+  {
+    "key": "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L3",
+    "evidence": "250de808c1ed4fa81952e9f1e4a7a3bf6c3b2d07ad23c01b9d2b9984d88059c8",
+    "label": "accept",
+    "reason": "The Film Fund credit is already legible."
+  },
+  {
+    "key": "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L4",
+    "evidence": "7381644f903f65bc6810790efa47d7bd9085faf824e24d131168dc429cb299c2",
+    "label": "accept",
+    "reason": "The time jump has occurred and the wireframe figures are visible."
+  },
+  {
+    "key": "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L5",
+    "evidence": "1d00161439bf34c4dd85a9b1fbd2fff870c4e9da8cf4dbf79cccb0feccd86afc",
+    "label": "accept",
+    "reason": "The simulation-ready message is already on the display."
+  },
+  {
+    "key": "edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f/L6",
+    "evidence": "6d2774ac5a3094e32e8ba6487e62d651908ba28c2c0d7445f8d3f31f2c035558",
+    "label": "accept",
+    "reason": "The thin electrodes are already visible on the brain."
+  }
+]
