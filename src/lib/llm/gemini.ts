@@ -23,6 +23,8 @@ export interface StructuredCall<T> {
   schemaName: string;
   schema: z.ZodType<T>;
   temperature?: number;
+  /** Set only for a script whose explicit budget is below a full-length answer. */
+  maxOutputTokens?: number;
   /** Gemini thinking level. Unset = the model default. */
   reasoningEffort?: "low" | "medium" | "high";
   /** Where the call is recorded; one JSONL line per call. */
@@ -161,7 +163,7 @@ export async function callStructured<T>(
 ): Promise<{ data: T; record: CallRecord }> {
   for (let attempt = 1; ; attempt++) {
     try {
-      return await callOnce(call, attempt);
+      return await callStructuredOnce(call, attempt);
     } catch (error) {
       if ((error instanceof SyntaxError || error instanceof z.ZodError) && attempt === 1) {
         console.warn(`LLM output invalid, retrying once: label=${call.label} model=${call.model}`);
@@ -184,18 +186,21 @@ export async function callStructured<T>(
  * One direct Gemini API call with a JSON-schema response. Streamed text reaches the UI, final
  * usage yields a list-price estimate, and zod validates the JSON. Failed calls are recorded too.
  */
-async function callOnce<T>(
+export async function callStructuredOnce<T>(
   call: StructuredCall<T>,
-  attempt: number,
+  attempt = 1,
 ): Promise<{ data: T; record: CallRecord }> {
   const started = Date.now();
   const schema = z.toJSONSchema(call.schema);
   delete schema.$schema;
+  const outputTokens = call.maxOutputTokens ?? MAX_OUTPUT_TOKENS;
+  if (!Number.isInteger(outputTokens) || outputTokens <= 0 || outputTokens > MAX_OUTPUT_TOKENS)
+    throw new Error("Invalid maximum output tokens");
   const request = {
     systemInstruction: { parts: [{ text: call.system }] },
     contents: [{ role: "user", parts: call.user.map(nativePart) }],
     generationConfig: {
-      maxOutputTokens: MAX_OUTPUT_TOKENS,
+      maxOutputTokens: outputTokens,
       temperature: call.temperature ?? 0.4,
       responseFormat: { text: { mimeType: "APPLICATION_JSON", schema } },
       ...(call.reasoningEffort ? { thinkingConfig: { thinkingLevel: call.reasoningEffort } } : {}),
@@ -221,8 +226,8 @@ async function callOnce<T>(
     const estimate = estimateGeminiCost(
       {
         promptTokenCount: totalTokens,
-        candidatesTokenCount: MAX_OUTPUT_TOKENS,
-        totalTokenCount: totalTokens + MAX_OUTPUT_TOKENS,
+        candidatesTokenCount: outputTokens,
+        totalTokenCount: totalTokens + outputTokens,
       },
       call.model,
       started,
