@@ -50,6 +50,13 @@
   overflow: hidden;
 }
 
+.upload-management {
+  flex-basis: 100%;
+}
+.upload-management .label {
+  margin: 4px 0;
+}
+
 .ws-main {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 380px;

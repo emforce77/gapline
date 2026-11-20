@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { DeleteUpload } from "./DeleteUpload";
 import { LanguageToggle } from "@/components/LanguageToggle";
 import { useI18n } from "@/i18n/client";
 import type { Project } from "@/lib/store/projects";
@@ -20,6 +21,9 @@ export function WorkspaceHeader({ project }: { project: Project }) {
             {project.attribution} · {project.license}
           </span>
         ) : null}
+        {project.kind === "upload" && project.id.startsWith("u-") && (
+          <DeleteUpload projectId={project.id} />
+        )}
       </div>
       <LanguageToggle lang={lang} label={t.nav.language} />
     </header>

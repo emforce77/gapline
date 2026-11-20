@@ -1,3 +1,4 @@
+import { releaseUploadWork } from "../store/upload-work";
 import { appendFile, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { RUN_TIME_LIMIT_SECONDS } from "../api-contract";
@@ -20,6 +21,7 @@ interface RunJob {
   language: PreparedRun["language"];
   density: PreparedRun["density"];
   analysisKey: string;
+  uploadToken?: string;
   analysisReused: boolean;
   startedAt: number;
   reservation: Reservation;
@@ -50,6 +52,7 @@ export async function beginRun(
   run: PreparedRun,
   reservation: Reservation,
   emit?: Emit,
+  uploadToken?: string,
 ): Promise<RunJob> {
   const { projectId, runId, language, density } = run;
   const job: RunJob = {
@@ -58,6 +61,7 @@ export async function beginRun(
     language,
     density,
     analysisKey: run.key,
+    uploadToken,
     analysisReused: !!(run.cached.speech && run.cached.scene),
     startedAt: Date.now(),
     reservation,
@@ -98,6 +102,7 @@ export async function beginRun(
     );
     return job;
   } catch (error) {
+    await releaseUploadWork(projectId, uploadToken);
     await settleRun(reservation, 0);
     await indexRunEnded(projectId, runId, true).catch(logIndexFailure(projectId, runId));
     throw error;
@@ -126,6 +131,7 @@ export async function cancelDispatch(projectId: string, runId: string): Promise<
   try {
     await event(job, failureEvent(job, new Error("Cloud Run Job dispatch failed")));
   } finally {
+    await releaseUploadWork(projectId, job.uploadToken);
     await settleRun(job.reservation, 0);
     await indexRunEnded(projectId, runId, true).catch(logIndexFailure(projectId, runId));
   }
@@ -196,11 +202,13 @@ export async function executeAttempt(
         },
         () => runChargeBound(budget),
       );
+      await releaseUploadWork(projectId, job.uploadToken);
       await settleRun(job.reservation, charge);
       await indexRunEnded(projectId, runId, true).catch(logIndexFailure(projectId, runId));
     }
     throw error;
   }
+  await releaseUploadWork(projectId, job.uploadToken);
   await indexRunEnded(projectId, runId, false).catch(logIndexFailure(projectId, runId));
   await settleRun(
     job.reservation,

@@ -170,7 +170,7 @@ export const en = {
     ],
     whyClose:
       "Gapline is built for that gap: one press of Generate writes, checks, voices and mixes a description track that fits the film's own silences.",
-    uploadIntro: `Clips up to 90\u00a0seconds and 30\u00a0MB. Preparing a clip takes under a minute. Generating its description takes ${RUN_WAIT.detail}. It calls paid Google Cloud and Gemini APIs within a daily allowance shared by every visitor. Only the browser that uploaded a clip can open it.`,
+    uploadIntro: `Clips up to 90\u00a0seconds and 30\u00a0MB. Preparing a clip takes under a minute. Generating its description takes ${RUN_WAIT.detail}. It calls paid Google Cloud and Gemini APIs within a daily allowance shared by every visitor.`,
     uploadTitle: "Your clip",
     uploadHint:
       "MP4, MOV or WebM, 3\u00a0to\u00a090\u00a0seconds and up to 30\u00a0MB. Generating {language} narration for all 65\u00a0seconds of the sample took {time} and cost {cost}.",
@@ -192,6 +192,14 @@ export const en = {
     },
   },
   upload: {
+    private: "Only this browser can open what you upload.",
+    deleteOpen: "Delete upload",
+    deleteQuestion: "Delete this upload, its results and its files? This can't be undone.",
+    deleteYes: "Delete for good",
+    deleting: "Deleting…",
+    deleteBusy: "A run or an edit is still going. Delete after it ends.",
+    deleteFailed: "Couldn't delete. Try again.",
+    deleted: "Deleted: the upload and its results are gone.",
     drop: "Drop the video to upload it.",
     /** Before the upload hint, for a mouse only: a touch screen hides it (.pointer-hint, tokens.css). */
     dropHint: "Drop a video here or choose one.",
@@ -347,8 +355,8 @@ export const en = {
       "Finished, but no line fit this clip's silences, so the film has no description.",
     replayFinished: "Replay finished.",
     samplePrivate: "Versions you make on this sample are visible only to you, in this browser.",
-    replay: "Replay the run",
-    replaying: "Replaying at {speed}× speed",
+    replay: "Replay the recorded run",
+    replaying: "Recorded run · {speed}× speed",
     stopReplay: "Stop replay",
     noRun: "Press Generate to make a track in {language}.",
     noRunHint:

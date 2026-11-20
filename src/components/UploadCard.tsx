@@ -66,7 +66,21 @@ export function UploadCard({
   const [phase, setPhase] = useState<Phase>({ name: "idle" });
   const [dragging, setDragging] = useState(false);
   const [status, setStatus] = useState<LiveStatus | null>(null);
+  const statusLine = useRef<HTMLParagraphElement>(null);
+  const [deleted, setDeleted] = useState(false);
   const t = dictionary(lang);
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    if (url.searchParams.get("deleted") === "1") {
+      setDeleted(true);
+      url.searchParams.delete("deleted");
+      window.history.replaceState(window.history.state, "", url);
+    }
+  }, []);
+  useEffect(() => {
+    if (deleted) statusLine.current?.focus();
+  }, [deleted]);
+
   const working =
     phase.name === "checking" || phase.name === "sending" || phase.name === "preparing";
 
@@ -97,6 +111,7 @@ export function UploadCard({
 
   async function upload(file: File) {
     if (working) return;
+    setDeleted(false);
     setPhase({ name: "checking" });
     const early = checkClipFile(file, null);
     const refusal = early ?? checkClipFile(file, await readVideoSeconds(file));
@@ -262,13 +277,16 @@ export function UploadCard({
       <p className="sr-only" aria-live="polite">
         {progressSpoken}
       </p>
-      <p className={styles.status} id={STATUS_ID} aria-live="polite">
+      <p ref={statusLine} tabIndex={-1} className={styles.status} id={STATUS_ID} aria-live="polite">
         {phase.name === "preparing"
           ? t.upload.preparing
           : phase.name === "cancelled"
             ? t.upload.cancelled
-            : ""}
+            : deleted
+              ? t.upload.deleted
+              : ""}
       </p>
+      <p className="label">{t.upload.private}</p>
       {refused ? <p className={styles.note}>{refused}</p> : null}
       {phase.name === "failed" ? (
         <p className="upload-error" role="alert">

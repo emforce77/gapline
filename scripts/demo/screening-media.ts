@@ -4,8 +4,10 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { runFfmpeg, withScratchDir } from "../../src/lib/media/ffmpeg";
 
+import { timingCase } from "../../src/app/screening/evidence";
+
 const out = "public/screening-media";
-const opening = "runtime/projects/tos-opening";
+const opening = join("runtime/projects", timingCase.project);
 const before = "20260922t051536291-ko-standard-d88b71";
 const after = "20260923t064439178-ko-standard-837b9f";
 const interview = "runtime/projects/eval-ko-intro/runs/20260922t052555638-ko-standard-cb49f5";
@@ -79,13 +81,13 @@ async function build() {
     "-t",
     "4",
     "-i",
-    englishMix("20260928t064307205-en-standard-221ceb"),
+    englishMix(timingCase.originalRun),
     "-ss",
     "56.5",
     "-t",
     "4",
     "-i",
-    englishMix("edit-4dc2dfa9d338d9ffd6bafe0d2a8b445e4879b96f"),
+    englishMix(timingCase.editedRun),
     "-filter_complex",
     "[0:a][1:a]concat=n=2:v=0:a=1[audio]",
     "-map",
@@ -100,14 +102,11 @@ async function build() {
     "comment=" + movieCredit,
     join(out, "english-line.m4a"),
   ]);
-  for (const [seconds, name] of [
-    ["56.7", "brain"],
-    ["59.3", "eyepiece"],
-  ]) {
+  for (const frame of timingCase.frames) {
     await runFfmpeg([
       "-y",
       "-ss",
-      seconds,
+      String(frame.seconds),
       "-i",
       join(opening, "clip.mp4"),
       "-frames:v",
@@ -116,7 +115,7 @@ async function build() {
       "scale=640:-2",
       "-q:v",
       "2",
-      join(out, name + ".jpg"),
+      join(out, frame.file + ".jpg"),
     ]);
   }
   await runFfmpeg([

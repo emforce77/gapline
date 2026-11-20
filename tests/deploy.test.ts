@@ -83,6 +83,8 @@ for (const [name, mode, budget, account, expected] of [
       assert.equal(calls.includes("update-traffic "), expected === "promote");
       if (expected === "build") {
         assert.match(calls, /--no-traffic --tag candidate/);
+        const worker = calls.match(/RUN_JOB_NAME=(scene-ad-run-[0-9a-f]{12}-[0-9a-f]{16})/)?.[1];
+        assert.ok(worker && calls.includes("run jobs deploy " + worker));
         assert.match(calls, /run jobs deploy .+ --image registry.example\/gapline@sha256:/);
         assert.match(calls, /--command node --args job\/run-job.cjs/);
         assert.match(calls, /run jobs add-iam-policy-binding .+ --role roles\/run.jobsExecutorWithOverrides/);

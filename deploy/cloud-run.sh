@@ -46,7 +46,9 @@ builder="projects/$project/serviceAccounts/scene-ad-build@$project.iam.gservicea
 if [[ "$promote" == 0 ]]; then
   # --set-env-vars replaces all previous values, including the daily allowance.
   budget="${DAILY_BUDGET_USD:?set DAILY_BUDGET_USD to the live daily allowance (docs/DEPLOY.md)}"
-  job="${service}-run-$(git rev-parse --short=12 HEAD)"
+  # Rebuilding the same commit may select a different base image or configuration.
+  build_id="$(node -e 'process.stdout.write(require("node:crypto").randomBytes(8).toString("hex"))')"
+  job="${service}-run-$(git rev-parse --short=12 HEAD)-$build_id"
   executor="${RUN_EXECUTOR:?set RUN_EXECUTOR to job or inline}"
   case "$executor" in job|inline) ;; *) echo "Invalid executor" >&2; exit 1 ;; esac
   run_env="DATA_DIR=/data,DATA_BUCKET=$bucket,GCP_PROJECT_ID=$project,DAILY_BUDGET_USD=$budget,VISITOR_DAILY_BUDGET_USD=${VISITOR_DAILY_BUDGET_USD:-3},RUN_EXECUTOR=$executor,RUN_JOB_NAME=$job,RUN_JOB_REGION=$region"

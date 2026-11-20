@@ -225,6 +225,10 @@ button {
 
 /* A finger needs about 44 px; a mouse keeps the compact toggles. */
 @media (pointer: coarse) {
+  .upload-management .button,
+  .frame-comparison summary {
+    min-height: 44px;
+  }
   .segmented button {
     height: 44px;
   }
